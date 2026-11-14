@@ -107,14 +107,13 @@ From `results/replay_check_*.json` (`scripts/check_replay.py`, run against a liv
 
 | Script | Mode | Rig | Wall time | Agent turns: replay / live / fallback | Turns that fell back |
 |---|---|---|---|---|---|
-| mayday | guided | 4A1T | 68.6 s | 5 / 0 / 0 | none |
-| mayday | hands-free | 3A2T | 64.5 s | 7 / 0 / 6 | aar, phone#1, phone#2, phone#4, phone_reached#3, phone_reached#5 |
-| mayday | hands-free | 4A1T | 75.9 s | 5 / 0 / 0 | none |
-| beacon | hands-free | 3A2T | 86.9 s | 7 / 0 / 0 | none |
-| mayday | hands-free | 3A2T | 82.1 s | 5 / 0 / 0 | none |
-| scout | hands-free | 3A2T | 72.8 s | 4 / 0 / 0 | none |
+| beacon | hands-free | 3A2T | 86.4 s | 7 / 0 / 0 | none |
+| mayday | guided | 4A1T | 74.9 s | 5 / 0 / 0 | none |
+| mayday | hands-free | 3A2T | 81.4 s | 5 / 0 / 0 | none |
+| mayday | hands-free | 4A1T | 82.4 s | 5 / 0 / 0 | none |
+| scout | hands-free | 3A2T | 72.3 s | 4 / 0 / 0 | none |
 
 Recorded agent responses: 50 files in `fixtures/llm_cache/`, model claude-sonnet-5-5, recorded through the Claude CLI between 2026-11-14T10:44 and 2026-11-14T14:19 (local time). The demo replays them; nothing in that folder is hand-written.
-Headless-browser walk of the board (`results/ui_walk.json`, `scripts/shots.cjs`): beacon 65.7 s, 16 screenshots, 0 console messages; mayday 80 s, 14 screenshots, 0 console messages; scout 64.6 s, 13 screenshots, 0 console messages.
-Tests (`bash run_tests.sh`, offline, replay-mode model): 182 passed, 0 failed in 125 s, last run 2026-11-14T14:22.
+Headless-browser walk of the board (`results/ui_walk.json`, `scripts/shots.cjs`): beacon 88.6 s, 15 screenshots, 0 console messages; mayday 81.7 s, 14 screenshots, 0 console messages; scout 73.4 s, 13 screenshots, 0 console messages.
+Tests (`bash run_tests.sh`, offline, replay-mode model): 183 passed, 0 failed in 124 s, last run 2026-11-14T15:25.
 

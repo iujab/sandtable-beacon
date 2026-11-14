@@ -1,11 +1,12 @@
 {
- "mode": "auto",
+ "script": "mayday",
+ "mode": "assist",
  "profile": "4A1T",
  "simulated": true,
  "llm_backend": "replay",
  "final_step": "done",
  "phase": "terminated",
- "wall_s": 75.9,
+ "wall_s": 74.9,
  "runs": {
   "preplan": [
    "replay"
@@ -31,8 +32,8 @@
   "replans": 1,
   "hazards": 1,
   "mayday_to_assign_s": 2.8,
-  "mayday_to_contact_s": 34.2,
-  "mayday_to_all_out_s": 40.4
+  "mayday_to_contact_s": 39.2,
+  "mayday_to_all_out_s": 47.0
  },
- "at": "2026-11-14T11:38:52-0600"
+ "at": "2026-11-14T15:34:25-0600"
 }

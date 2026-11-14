@@ -48,25 +48,23 @@
     "role": "Pucks (Qorvo DWM3001CDK: Bluetooth + UWB) locate occupants phones; this board consumes that feed. Radar and tagged-crew modes are simulated.",
     "mode_now": "simulated"
   },
-  "status": "building",
+  "status": "partial",
   "progress": {
-    "percent": 85,
-    "phase": "Fixture demo: agent turns re-recorded on corrected, deterministic prompts; all three scripts replay hands-free with no fallback; independent judge review done and its findings fixed (true closing line instead of 'accountability complete', accountability never behind the phones, write-ups consistent on what ran live). Live (private): accountability reads the real record against the phones; the hands-free live replay run is being recorded and proven on lane L16's final Beacon module; then the owner's private instance, new figures, final write-up pass.",
+    "percent": 92,
+    "phase": "Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones.",
     "done": [
-      "Crew tracking product with pre-plan agent, mayday exercise, replayed real-model runs (morning)",
-      "Real open-data fixture for 7325 Medical Center Dr, footprint-fitted synthetic twin, spatial engine",
-      "Scout radar engine in simulation (multistatic UWB: self-location, registration into the twin, breathing-person detection, twin-mismatch flags)",
-      "GeoJSON and Cursor-on-Target feeds",
-      "Beacon link: consumes lane L16 feed, phones as rescue targets, accountability against the building record, report",
-      "Phones layer on the board (ring, candidates, fix, zone, device counts), mode switch Beacon | Scout | Crews",
-      "Radar feasibility write-up with sources; puck enclosure (DWM3001CDK + cell, UNO Q host brick)"
+      "Board, reflex layer, agent with tools, report page, GeoJSON and Cursor-on-Target feeds; three modes (Beacon phones, Scout radar, Crews tags) on one board",
+      "Stand-in data for the public repository: real open data for a Los Angeles medical office building, footprint-fitted synthetic twin, NAIP imagery",
+      "Beacon link to lane L16's module (vendored at its final commit): phones as rescue targets, two-puck story (the twin rules out a mirror place; a crew's search rules out the other), accountability against the record, true closing line",
+      "Recorded real model turns for the beacon, scout and mayday scripts; all replay hands-free with zero fallbacks on a real-time server (results/replay_check_*_auto_3A2T.json)",
+      "Live adapters for CoStar (data kit), Matterport (Model API, Showcase SDK view) and Vexcel (API v2), run privately on one real building; privacy guard and publish check keep every sponsor-derived byte out of the tree",
+      "Live accountability: the record against the phones, the storey's other tenancies as not covered; private recorded hands-free live run, replayed four times with zero fallbacks; private laptop bundle and laptop steps (docs/TOOLKIT_SWAP.md)",
+      "Scout radar engine in simulation with ablation; radar feasibility write-up with sources; puck enclosure design",
+      "Independent judge review and fixes; README, PITCH, DEVPOST truth pass (what ran live, what is stand-in, what the hardware does and does not do)"
     ],
     "left_software": [
-      "Record a complete hands-free run on the live data and prove twice that live mode with LLM_BACKEND=replay reaches the report with zero fallback lines (server builder, in progress); then re-pack the private bundle: .venv/bin/python scripts/pack_live_bundle.py pack",
-      "Private live instance for the owner on the tailnet, port 1820 (never used for repository figures)",
-      "Report page fixes from the judge review (report builder, in progress): the pruned phone drawn on the report plan, labels, provenance wording",
-      "Re-take the tracked board and report figures from the hands-free replayed run, fixture mode (board builder, in progress); update figure references in README, PITCH, DEVPOST",
-      "Final pass: bash run_tests.sh, python scripts/check_replay.py for all three scripts, bash scripts/check_publishable.sh, commit, restart the standing demo on the final code"
+      "Optional, with an Anthropic key on the laptop: run the live exercise with LLM_BACKEND=anthropic (written, never exercised: no key on the build machine)",
+      "Optional: re-run python scripts/vendor_beacon.py if lane L16 changes its module again, then bash run_tests.sh"
     ],
     "left_hardware": [
       "1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow vendor/beacon/hardware/BRINGUP.md (lane L16's guide, vendored; flashing in vendor/beacon/hardware/FLASH.md, the iOS app in vendor/beacon/docs/IOS_BUILD.md). Works when http://localhost:1885/healthz answers with source 'pucks'.",
@@ -78,30 +76,31 @@
       "7. No hardware for Scout (radar) or Crews (tags): both run simulated only on these boards."
     ],
     "needs_from_owner": [
-      "On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, then python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, and start with SANDTABLE_DATA_MODE=live on the command line. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository",
-      "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
+      "On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, then SANDTABLE_DATA_MODE=live LLM_BACKEND=replay python -m sandtable.demo and press Exercise. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository",
+      "The hardware run (left_hardware steps): two pucks, two iPhones, lane L16's module; until then say 'not run on hardware'",
+      "ANTHROPIC_API_KEY for live agent decisions with real phones (recorded turns cover only the recorded exercises)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T15:25:27-06:00"
+    "updated": "2026-11-14T15:30:57-06:00"
   },
   "rubric": {
-    "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",
-    "Agentic depth (30%)": "Situations as goals with a reply budget; the agent chooses tools (record, aerial vision, twin, phones, accountability) and ends in actions (assign with route, radio, EMS request, observations, record corrections); must search a ring or two candidates, never 'go to the phone'; re-called when geometry improves. Beacon turns use the labelled fallback policy until recorded.",
+    "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'. On a live record (private run) the accountability reads the record against the phones: \"The record does not say who is in this suite; the phones reported 3 people in it\", and the storey's five other tenancies, with no puck, are listed as not covered with the 25 to 62 people the record's employee counts imply.",
+    "Agentic depth (30%)": "Situations as goals with a reply budget; the agent chooses tools (record, aerial vision, twin, phones, accountability) and ends in actions (assign with route, radio, EMS request, observations, record corrections); must search a ring or two candidates, never 'go to the phone'; re-called when geometry improves. The hands-free runs replay recorded real model turns (fixture: beacon, scout and mayday scripts, zero fallbacks; live building: a private recorded run, replayed four times with zero fallbacks).",
     "Usefulness (25%)": "Incident commander and command post: who is inside, where, who is unaccounted for as an honest range, and a report at the end; prevention bureaus get a pre-plan draft for any commercial address.",
     "Demo and polish (15%)": "One screen, two physical pucks and two iPhones, a printable report, a phone page for the rescue team that reads the feed; every uncertain thing drawn as uncertain."
   },
   "self_score": {
     "creativity": 4,
-    "utility": 3,
-    "charity": 5,
-    "avidity": 4,
+    "utility": 4,
+    "charity": 4,
+    "avidity": 5,
     "track_fit": 4,
     "demo_risk": 3
   },
   "demo": {
     "port": 1810,
     "url_path": "/",
-    "command": "bash run_demo.sh --tailnet",
+    "command": "bash run_demo.sh --tailnet --beacon-port 1918",
     "running": true
   },
   "images": [
@@ -132,9 +131,9 @@
   ],
   "tests": {
     "command": "bash run_tests.sh",
-    "passed": 174,
+    "passed": 183,
     "failed": 0,
-    "last_run": "2026-11-14T13:27:18-0600"
+    "last_run": "2026-11-14T15:25:01-0600"
   },
   "limitations": [
     "No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured",

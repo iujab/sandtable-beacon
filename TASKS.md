@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 3:30 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 3:38 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,7 +8,7 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 85% | Fixture demo: agent turns re-recorded on corrected, deterministic prompts; all three scripts replay hands-free with no fallback; independent judge review done and its findings fixed (true closing line instead of 'accountability complete', accountability never behind the phones, write-ups consistent on what ran live). Live (private): accountability reads the real record against the phones; the hands-free live replay run is being recorded and proven on lane L16's final Beacon module; then the owner's private instance, new figures, final write-up pass. |
+| Command board | `sandtable-live-fireground-twin/` | partial | 92% | Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones. |
 | Phones and pucks | `sandtable-beacon-victim-phones/` | partial | 92% | complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
@@ -68,15 +68,12 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Fixture demo: agent turns re-recorded on corrected, deterministic prompts; all three scripts replay hands-free with no fallback; independent judge review done and its findings fixed (true closing line instead of 'accountability complete', accountability never behind the phones, write-ups consistent on what ran live). Live (private): accountability reads the real record against the phones; the hands-free live replay run is being recorded and proven on lane L16's final Beacon module; then the owner's private instance, new figures, final write-up pass.
+**Being worked on now:** Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones.
 
 **Left to build (agents):**
 
-- Record a complete hands-free run on the live data and prove twice that live mode with LLM_BACKEND=replay reaches the report with zero fallback lines (server builder, in progress); then re-pack the private bundle: .venv/bin/python scripts/pack_live_bundle.py pack
-- Private live instance for the owner on the tailnet, port 1820 (never used for repository figures)
-- Report page fixes from the judge review (report builder, in progress): the pruned phone drawn on the report plan, labels, provenance wording
-- Re-take the tracked board and report figures from the hands-free replayed run, fixture mode (board builder, in progress); update figure references in README, PITCH, DEVPOST
-- Final pass: bash run_tests.sh, python scripts/check_replay.py for all three scripts, bash scripts/check_publishable.sh, commit, restart the standing demo on the final code
+- Optional, with an Anthropic key on the laptop: run the live exercise with LLM_BACKEND=anthropic (written, never exercised: no key on the build machine)
+- Optional: re-run python scripts/vendor_beacon.py if lane L16 changes its module again, then bash run_tests.sh
 
 **Left to do with real hardware (you):**
 
@@ -90,19 +87,21 @@ Taken from each part's `project.json` at sync time.
 
 **Needed from you:**
 
-- On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, then python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, and start with SANDTABLE_DATA_MODE=live on the command line. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository
-- ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)
+- On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, then SANDTABLE_DATA_MODE=live LLM_BACKEND=replay python -m sandtable.demo and press Exercise. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository
+- The hardware run (left_hardware steps): two pucks, two iPhones, lane L16's module; until then say 'not run on hardware'
+- ANTHROPIC_API_KEY for live agent decisions with real phones (recorded turns cover only the recorded exercises)
 - Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for
 
 **Finished:**
 
-- Crew tracking product with pre-plan agent, mayday exercise, replayed real-model runs (morning)
-- Real open-data fixture for 7325 Medical Center Dr, footprint-fitted synthetic twin, spatial engine
-- Scout radar engine in simulation (multistatic UWB: self-location, registration into the twin, breathing-person detection, twin-mismatch flags)
-- GeoJSON and Cursor-on-Target feeds
-- Beacon link: consumes lane L16 feed, phones as rescue targets, accountability against the building record, report
-- Phones layer on the board (ring, candidates, fix, zone, device counts), mode switch Beacon | Scout | Crews
-- Radar feasibility write-up with sources; puck enclosure (DWM3001CDK + cell, UNO Q host brick)
+- Board, reflex layer, agent with tools, report page, GeoJSON and Cursor-on-Target feeds; three modes (Beacon phones, Scout radar, Crews tags) on one board
+- Stand-in data for the public repository: real open data for a Los Angeles medical office building, footprint-fitted synthetic twin, NAIP imagery
+- Beacon link to lane L16's module (vendored at its final commit): phones as rescue targets, two-puck story (the twin rules out a mirror place; a crew's search rules out the other), accountability against the record, true closing line
+- Recorded real model turns for the beacon, scout and mayday scripts; all replay hands-free with zero fallbacks on a real-time server (results/replay_check_*_auto_3A2T.json)
+- Live adapters for CoStar (data kit), Matterport (Model API, Showcase SDK view) and Vexcel (API v2), run privately on one real building; privacy guard and publish check keep every sponsor-derived byte out of the tree
+- Live accountability: the record against the phones, the storey's other tenancies as not covered; private recorded hands-free live run, replayed four times with zero fallbacks; private laptop bundle and laptop steps (docs/TOOLKIT_SWAP.md)
+- Scout radar engine in simulation with ablation; radar feasibility write-up with sources; puck enclosure design
+- Independent judge review and fixes; README, PITCH, DEVPOST truth pass (what ran live, what is stand-in, what the hardware does and does not do)
 
 **Known limitations:**
 

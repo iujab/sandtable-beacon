@@ -213,6 +213,11 @@ class CommandAgent:
         scan = self.tools.scan_view()                 # both None in the mayday exercise: then the prompt is exactly the recorded one
         phones = self.tools.phones_view()
         accountability = self.tools.accountability_view() if phones is not None else None
+        if phones is not None or scan is not None:
+            # Field runs: an order's route length and way depend on where the crew stood at that instant, so on timing. The
+            # after-action input must be the same for the same incident at any speed, so those two details are left out here
+            # (the order itself stays). The mayday input is exactly as recorded.
+            log_lines = [re.sub(r", \d+ m via .*$", "", line) if line.startswith("assign: ") else line for line in log_lines]
         if phones is not None:
             template = prompts.AAR_BEACON.replace("{phones}", json.dumps(phones, sort_keys=True)).replace(
                 "{accountability}", json.dumps(accountability, sort_keys=True)).replace(

@@ -41,6 +41,8 @@ Built for HackPrinceton Fall 2026. Main track: **Education** (as Sandtable). Spe
 | Both pucks mid-room (careless) | 4% | 4% | 0% | 86% | 10% | 3.0% (0.1%) | 0.30 m / 0.73 m |
 | Three pucks: the door-wall pair plus one in the far corner | 84% | 78% | 6% | 8% | 8% | 1.2% (1.0%) | 0.20 m / 0.59 m |
 
+Two phones taking turns on two boards (simulated, 100 phone scenes): the wait for a position is 3.5 s in the median and 9 s at the 90th percentile; 23% get none within the scene; 2.7% of the positions shown are wrong.
+
 "Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
 
 When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 6.3% of trials and 100% of those positions are wrong (6.0% of trials are wrong positions produced by the statement; 22.5% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
@@ -55,13 +57,13 @@ The owner asked whether both boards could ride on one thrown device instead:
 
 | Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
 |---|---|---|---|---|---|---|
-| Two boards on one device, 0.1 m apart | 33 degrees | 2.34 m | 100% | 0% | n/a | 16.1 m2 |
-| Two boards on one device, 0.3 m apart | 17 degrees | 1.51 m | 100% | 0% | n/a | 15.5 m2 |
-| Two boards on one device, 0.5 m apart | 22 degrees | 1.51 m | 98% | 0% | n/a | 12.5 m2 |
-| Two separate pucks 2 m apart | 7 degrees | 0.71 m | 100% | 0% | n/a | 5.3 m2 |
-| Two separate pucks 3 m apart | 6 degrees | 0.42 m | 98% | 2% | 0.34 m | 3.6 m2 |
-| Two separate pucks 4 m apart | 4 degrees | 0.33 m | 96% | 4% | 0.33 m | 2.8 m2 |
-| Three separate pucks (thrown) | n/a | n/a | n/a | 58% | 0.23 m | 1.2 m2 |
+| Two boards on one device, 0.1 m apart | 37 degrees | 2.19 m | 100% | 0% | n/a | 16.0 m2 |
+| Two boards on one device, 0.3 m apart | 19 degrees | 1.55 m | 100% | 0% | n/a | 15.4 m2 |
+| Two boards on one device, 0.5 m apart | 22 degrees | 1.38 m | 98% | 0% | n/a | 12.8 m2 |
+| Two separate pucks 2 m apart | 8 degrees | 0.60 m | 100% | 0% | n/a | 5.5 m2 |
+| Two separate pucks 3 m apart | 7 degrees | 0.47 m | 98% | 2% | 0.44 m | 3.5 m2 |
+| Two separate pucks 4 m apart | 4 degrees | 0.30 m | 96% | 4% | 0.34 m | 3.0 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 56% | 0.21 m | 1.2 m2 |
 
 Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
 <!-- LAYOUT_NUMBERS:END -->
@@ -79,15 +81,23 @@ And by number of pucks and by radio:
 | Bluetooth signal strength | 4 | 16% | 1.15 m | 142.8 m2 | 0.0% (0.0%) |
 | Bluetooth signal strength | 5 | 19% | 1.27 m | 154.5 m2 | 0.0% (0.0%) |
 | UWB ranging | 1 | 0% | n/a | 25.6 m2 | n/a (0.0%) |
-| UWB ranging | 2 | 3% | 0.34 m | 5.5 m2 | 0.0% (0.0%) |
-| UWB ranging | 3 | 47% | 0.30 m | 2.1 m2 | 2.4% (1.1%) |
-| UWB ranging | 4 | 60% | 0.23 m | 1.2 m2 | 0.0% (0.0%) |
-| UWB ranging | 5 | 60% | 0.22 m | 1.0 m2 | 0.0% (0.0%) |
+| UWB ranging | 2 | 3% | 0.38 m | 5.4 m2 | 0.0% (0.0%) |
+| UWB ranging | 3 | 46% | 0.28 m | 2.2 m2 | 2.4% (1.1%) |
+| UWB ranging | 4 | 60% | 0.23 m | 1.4 m2 | 0.0% (0.0%) |
+| UWB ranging | 5 | 60% | 0.21 m | 1.0 m2 | 0.0% (0.0%) |
 
 When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most 14.3% of the positions shown (4.0% of trials; UWB, any puck count).
 
 Cold Bluetooth count (no app): over 600 windows the count runs 2.1 devices low on average, the published band contains the true number of advertising devices in 60% of windows, and 37% of windows read zero while devices are in the room. It is a weak signal and the board treats it as one.
 <!-- MAIN_NUMBERS:END -->
+
+## Does it ever draw a wrong dot?
+
+An independent reviewer broke an earlier version of this demo: after a puck was moved, the board showed a position metres from the truth with a confident error bar, and with both pucks mid-room it flipped between "cannot choose" and a wrong position. Both were real faults (ranges kept from before the puck moved; a position published without accounting for its mirror image). They are fixed, and the check that found the last one is now part of the repository:
+
+<!-- HONESTY_NUMBERS:BEGIN -->
+**Simulated self-check** (`scripts/honesty_check.py`, results in `results/honesty_check.json`): 9 adversarial scenes on the simulator (the walk-through, the mid-room layout held for two minutes, a puck moved while ranging, the phone dragged into the next room, the exercise scale changed, a phone going quiet, stop sharing, two phones on shared boards), 6,830 steps. In every scene: no coordinates without a position, no dot for a stale phone, nothing republished after stop sharing. A position is counted wrong when it is more than three sigma and more than a metre from the truth: the worst scene (phone-dragged-into-next-room) shows 1.3% of its position steps wrong, and the others none. The check fails above 3%; it currently passes.
+<!-- HONESTY_NUMBERS:END -->
 
 ## How it works
 

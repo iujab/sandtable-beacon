@@ -400,6 +400,9 @@ class Director:
         await self._reach(first, scene, slow, human)
         await self._exit_with(first, inc.phones[first]["rescuer"] or r1, slow)
         await self._wait(lambda: st(first) == "out", 120 * human, f"{first} out")
+        # "out" is decided on entering the stair; let the crew finish its walk to the stair's node before anything else happens, so
+        # no crew is caught mid-step at an instant that depends on the clock rate (a determinism leak for recorded agent turns)
+        await self._wait(lambda: inc.units[inc.phones[first]["rescuer"] or r1]["_follow"] is None, 60 * human, "the first crew at the stair")
         if s.beacon.story is not None and "after_rescue" in s.beacon.story["frames"]:
             await s.beacon.story_step("after_rescue")
             await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turn after the rescue")

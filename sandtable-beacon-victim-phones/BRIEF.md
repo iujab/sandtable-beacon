@@ -36,3 +36,17 @@ The product was given, not ideated: Sandtable's third sensing mode, in the owner
 ## 5. Work packages (all Opus 5.5 builders; the lead wrote roster, prune, layout, the feed and the documents)
 
 R1 iOS and Qorvo research · R2 Android, Bluetooth and noise-model research · R3 board, host and geometry research · W1 models, locator, tracker · W2 simulator, scenarios, evaluation · W3 session, feeds, server, walk-through, launcher · W4 command agent, tools, report · W5 board and simulated phone · W7 iOS app · W8 puck host and hardware guides · an independent iOS reviewer · an independent skeptical judge.
+
+## 6. The independent review, and what it changed
+
+A fresh Opus builder judged the README and the running demo with no knowledge of the build (about 13:10 to 13:25 CST). Scores it gave: CoStar use of the data 3/10, agentic depth 3, usefulness 5, demo and polish 6; creativity 7, utility 4, charity 8, avidity 8; hardware fit 2; CoStar shortlist: no. Its five most damaging findings and what was done:
+
+| Finding | What was done |
+|---|---|
+| No sponsor data: the record is open data, the twin synthetic | The module now runs unchanged on the command board's private live bundle (CoStar record and Matterport scan of a real suite) through `BEACON_BUNDLE_DIR`; verified structurally, no data copied. The fixture stays the public default and is labelled |
+| Confident wrong positions: 3.6 m off after a puck moved; flips in the mid-room layout; a stale phone drawn as a fix with a 45 m error bar | Ranges are forgotten when a puck moves; a two-puck position is published only when its mirror spot is explained; ranges used together must describe the same moment; a stale phone has no geometry. An adversarial self-check (`scripts/honesty_check.py`) now hunts for such cases: 9 scenes, pass |
+| The twin's rule-out is partly circular (a one-wall assumption shared by simulator and locator; a line-of-sight value an iPhone never gives) | The simulator no longer gives a line-of-sight value; the assumption is named in the README, the pitch and the limitations; the door-wall result is now reported as twin alone versus occupant's statement |
+| The agent in the demo was a deterministic fallback | The walk-through's agent turn is a recorded real model run again after the scene settled; the fallback is labelled; the README says exactly when each applies |
+| Nothing physical; the simulator ignored one phone per board | Turn-taking is modelled and evaluated; the walk-through says it assumes one board per phone at each puck position. Hardware: still nothing run |
+
+Also fixed from its list: wrong-position rates are given as a share of the positions shown; the Cursor-on-Target feed says RANGE ONLY for a ring; the simulated phone page no longer leaves ghost phones; "stop sharing" removes the phone at once; the phone page no longer tells an iPhone 14 or 15 user to point the phone.

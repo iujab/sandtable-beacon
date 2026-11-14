@@ -786,13 +786,13 @@
    },
    "outcome_share_at_end": {
     "twin_fix": 0.34,
-    "statement_fix": 0.41,
+    "statement_fix": 0.39,
     "cannot_choose": 0.04,
-    "ring_or_other": 0.21
+    "ring_or_other": 0.23
    },
    "wrong_fix_rate_of_fixes": 0.027,
    "wrong_fix_rate_of_trials": 0.02,
-   "fix_err_median_m": 0.284
+   "fix_err_median_m": 0.258
   },
   "pairs": {
    "phone_scenes": 50,
@@ -802,8 +802,8 @@
     "never_within_scene": 0.18
    },
    "wait_first_fix": {
-    "median_s": 1.5,
-    "p90_s": 1.5,
+    "median_s": 0.5,
+    "p90_s": 0.5,
     "never_within_scene": 0.22
    },
    "outcome_share_at_end": {
@@ -820,16 +820,16 @@
  "cadence_check": {
   "text": "estimates every 0.25 s over 3 s vs only in the last second (this run)",
   "records": 40,
-  "identical_outcome_and_fix": 39
+  "identical_outcome_and_fix": 40
  },
  "timings_s": {
-  "main_s": 21.4,
-  "cadence_check_s": 1.8,
+  "main_s": 21.0,
+  "cadence_check_s": 1.6,
   "cold_s": 0.2,
-  "layouts_s": 17.5,
-  "two_puck_s": 7.1,
+  "layouts_s": 17.7,
+  "two_puck_s": 7.9,
   "two_phone_s": 4.1,
-  "two_puck_cadence_check_s": 0.2,
+  "two_puck_cadence_check_s": 0.1,
   "layout_figures_s": 0.9,
   "two_puck_figures_s": 0.6
  }

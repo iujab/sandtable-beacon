@@ -66,9 +66,18 @@ class AppState:
         self._last_hello: str | None = None
 
     def _clear_local_writes(self) -> None:
-        """Fixture mode only: tags and corrections are written to local files, and each incident starts clean."""
-        if hasattr(self.provider.matterport, "clear_overlay"):
-            self.provider.matterport.clear_overlay()
+        """Each incident starts clean: tags and corrections written by the previous one are cleared. Fixture mode: local files.
+        Live Matterport in dry run: the private log of pins the agent would have written (otherwise every run's twin, and so every
+        prompt, would carry the pins of the runs before it and recorded turns could never replay)."""
+        mp = self.provider.matterport
+        if hasattr(mp, "clear_overlay"):
+            mp.clear_overlay()
+        elif getattr(mp, "dry_run", False) and hasattr(mp, "_dryrun_log"):
+            log_path = mp._dryrun_log()
+            if log_path is not None and log_path.exists():
+                log_path.unlink()
+            if isinstance(getattr(mp, "_twin", None), dict):
+                mp._twin["tags"] = [t for t in mp._twin.get("tags", []) if not str(t.get("id", "")).startswith("dryrun-")]
         if hasattr(self.provider.costar, "clear_corrections"):
             self.provider.costar.clear_corrections()
 
@@ -396,7 +405,7 @@ class AppState:
             self.situations.get_nowait()
         self.preplan, self.aar = None, None
         self._clear_local_writes()
-        self.twin.data["tags"] = [t for t in self.twin.data.get("tags", []) if not str(t.get("id", "")).startswith("obs-")]
+        self.twin.data["tags"] = [t for t in self.twin.data.get("tags", []) if not str(t.get("id", "")).startswith(("obs-", "dryrun-"))]
         self.agent.reset()
         self.scout.reset()
         await self.beacon.reset()

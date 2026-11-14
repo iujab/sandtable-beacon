@@ -28,7 +28,7 @@ See `TASKS.md` for Windows, for running the phones part alone, and for the real-
 ## What is real and what is not, today
 
 - The phone ranging, the locator and the command board run end to end on a **simulator**. Every screen that shows simulated data says so.
-- The building record, the twin and the aerial view are **labelled stand-ins** built from open data until the sponsor toolkit is plugged in.
+- The building record, the twin and the aerial view in this repository are **labelled stand-ins** built from open data. With the sponsor keys and the CoStar data kit, the same code has run privately on live CoStar, Matterport and Vexcel data for one real building. None of that data is in this repository; `sandtable-live-fireground-twin/docs/TOOLKIT_SWAP.md` says how to switch.
 - The iPhone app is **source code that has not been compiled yet**. The UWB boards run Qorvo's stock firmware, which this project does not modify.
 - Nothing here is a certified life-safety system.
 

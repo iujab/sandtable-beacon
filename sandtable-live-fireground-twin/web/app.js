@@ -570,7 +570,7 @@ function renderBeaconHead() {
     (lim.length ? `<div class="st2" title="${esc(lim.join("; "))}"><b>Cannot tell:</b> ${lim.map(esc).join("; ")}</div>` : "");
 }
 function renderAcc() {
-  const el = $("tab-acc"), rows = beacon.rows(), tot = beacon.foreign || (beacon.acc?.rows && rows.length !== beacon.acc.rows.length) ? null : beacon.totals();
+  const el = $("tab-acc"), rows = mergeSuites(beacon.rows()), tot = beacon.foreign || (beacon.acc?.rows && rows.length !== beacon.acc.rows.length) ? null : beacon.totals();
   if (!rows.length) {
     el.innerHTML = `<div class="sc-empty"><p>The building record's suites against the phones heard: who the record expects, who reported in, who is still unaccounted for.</p><p>${beacon.foreign ? "<b>The Beacon module is set up for another building</b>: its suites are not in this twin." : beacon.connected ? "No pucks in a room yet." : "<b>Beacon module not connected.</b> No phone data; the record is in the Record tab."}</p></div>`;
     return;
@@ -640,6 +640,24 @@ function renderPlace() {
     if (beacon.dev) { toast("DEV SAMPLE: pucks kept on the board, not sent"); stopPlacing(); return; }
     try { await api("/api/beacon/pucks", { pucks, room: P.room?.id, floor: S.bundle.twin.exercise_floor }); toast(`Sent ${pucks.map((q) => q.id).join(", ")} to the Beacon module (placed by hand)`); stopPlacing(); onBeaconChange(); } catch { /* the toast says why */ }
   };
+}
+// one row per suite: a scanned suite has several rooms that all carry the same suite number
+function mergeSuites(rows) {
+  const by = new Map();
+  for (const r of rows) {
+    const k = r.suite || r.room;
+    const m = by.get(k);
+    if (!m) { by.set(k, { ...r, crews: [...(r.crews || [])] }); continue; }
+    for (const f of ["phones_opt_in", "people_reported", "located", "cold_devices"]) m[f] = (m[f] || 0) + (r[f] || 0);
+    if (r.expected && m.expected && r.room !== m.room) m.expected = { ...m.expected, people: (m.expected.people || 0) + (r.expected.people || 0), low: (m.expected.low || 0) + (r.expected.low || 0), high: (m.expected.high || 0) + (r.expected.high || 0), basis: "sum of the rooms' estimates" };
+    if (r.unaccounted && m.unaccounted) m.unaccounted = { low: (m.unaccounted.low || 0) + (r.unaccounted.low || 0), high: (m.unaccounted.high || 0) + (r.unaccounted.high || 0) };
+    m.priority = Math.min(m.priority ?? 9, r.priority ?? 9);
+    m.crews = [...new Set([...m.crews, ...(r.crews || [])])];
+    m.assigned = m.assigned || r.assigned; m.reached = m.reached || r.reached; m.out = m.out || r.out;
+    const rank = { "people-reported": 0, "devices-heard": 1, silent: 2, unscanned: 3, "vacant-on-record": 4 };
+    if ((rank[r.state] ?? 5) < (rank[m.state] ?? 5)) m.state = r.state;
+  }
+  return [...by.values()];
 }
 function beaconBox() {
   const b = beacon.b; if (!b || !b.room || !(b.pucks || []).length) return null;

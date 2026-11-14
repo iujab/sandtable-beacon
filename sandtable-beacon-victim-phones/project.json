@@ -47,9 +47,11 @@
  },
  "status": "building",
  "progress": {
-  "percent": 78,
-  "phase": "simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet",
+  "percent": 82,
+  "phase": "fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet",
   "done": [
+   "Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle",
+   "Command agent: the walk-through shows a recorded real model run (replay); other situations get a labelled deterministic fallback",
    "Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885",
    "Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)",
    "Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md",
@@ -61,9 +63,9 @@
    "Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md"
   ],
   "left_software": [
-   "Fix what the independent iOS review finds; then your first Xcode build will tell us the rest (paste the errors back)",
-   "Recorded command-agent runs for the walk-through (so the board shows a real model's plan, not the labelled fallback)",
-   "Fix what the skeptical-judge review finds",
+   "Fix round in progress (independent judge's findings): a two-puck position only when the mirror spot is explained; stale phones never drawn as dots; an adversarial self-check (scripts/honesty_check.py) that hunts for confident wrong positions; simulated ranges without the line-of-sight score a real iPhone does not give; board fixes (phantom phone from the phone page, label collisions, stale agent orders)",
+   "Re-run the evaluation after the fixes and refresh every number in the documents",
+   "Your first Xcode build of apps/ios will tell us what the syntax check could not (paste the errors back); the independent review fixed 10 defects, none a certain compile error",
    "After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do"
   ],
   "left_hardware": [
@@ -86,7 +88,7 @@
    "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
    "CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then"
   ],
-  "updated": "2026-11-14T13:06:31-06:00"
+  "updated": "2026-11-14T13:30:54-06:00"
  },
  "owner_questions": [
   {
@@ -187,7 +189,10 @@
   "An iPhone 14 or 15 reports distance but no direction to an accessory.",
   "A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.",
   "The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.",
-  "Not a life-safety product."
+  "Not a life-safety product.",
+  "An independent review found the demo could show a confident wrong position after a puck was moved and when both pucks sat mid-room; the first is fixed, the second is being fixed, and a self-check now hunts for such cases. Treat every simulated accuracy number as provisional until the re-run.",
+  "The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.",
+  "The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such."
  ],
  "team": {
   "lead_model": "claude-fable-5-2",

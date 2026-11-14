@@ -40,13 +40,13 @@ def two_puck_block() -> str:
     lines = [f"**Simulated** (`results/eval_two_puck.json`; {d['layouts']['door-wall']['n']} phone positions per layout over the fire room; "
              "what a real iPhone would deliver: UWB distances only, no line-of-sight flag; noise model with sources in `beacon/models.py`):",
              "",
-             "| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position, share of all trials | Position error, median / 90th percentile |",
+             "| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position: share of the positions shown (share of all trials) | Position error, median / 90th percentile |",
              "|---|---|---|---|---|---|---|---|"]
     for key, label in names:
         L = d["layouts"][key]
         o, a = L["outcome_share"], L["all_fixes"]
         lines.append(f"| {label} | {pct(a['share_of_trials'])} | {pct(o['twin_fix'])} | {pct(o['statement_fix'])} | {pct(o['cannot_choose'])} | "
-                     f"{pct(o['ring_or_other'])} | {pct1(a['wrong_fix_rate_of_trials'])} | {m(a['fix_err_median_m'])} / {m(a['fix_err_p90_m'])} |")
+                     f"{pct(o['ring_or_other'])} | {pct1(a.get('wrong_fix_rate_of_fixes'))} ({pct1(a['wrong_fix_rate_of_trials'])}) | {m(a['fix_err_median_m'])} / {m(a['fix_err_p90_m'])} |")
     fs = d.get("false_statement", {}).get("door-wall")
     if fs:
         worst = max((v.get("statement_fix", 0.0) for v in (fs.get("by_true_room") or {}).values()), default=None)
@@ -54,10 +54,11 @@ def two_puck_block() -> str:
                   f"\"Ring or less\" is mostly a phone that only one puck reached (a blocked link in the simulation). "
                   f"A wrong position is one more than three sigma or 1.5 m from the truth.",
                   "",
-                  f"When the occupant's stated suite is false (the phone is really in a neighbouring room, {fs['n']} trials): the statement produces a wrong position in "
-                  f"{pct1(fs.get('statement_produced_wrong_fix_rate_of_trials'))} of trials with the door-wall layout"
-                  + (f", and in {pct1(worst)} for the suite that shares that wall" if worst is not None else "")
-                  + ". That is the price of dismissing a spot on a statement, and why the board shows the dismissal."]
+                  f"When the occupant's stated suite is false (the phone is really in a neighbouring room, {fs['n']} trials): with the door-wall layout the board mostly shows a ring, "
+                  f"but it shows a position in {pct1(fs['all_fixes']['share_of_trials'])} of trials and {pct(fs['all_fixes'].get('wrong_fix_rate_of_fixes'))} of those positions are wrong "
+                  f"({pct1(fs.get('statement_produced_wrong_fix_rate_of_trials'))} of trials are wrong positions produced by the statement"
+                  + (f"; {pct1(worst)} for the suite that shares that wall" if worst is not None else "")
+                  + "). That is the price of dismissing a spot on a statement, and why the board shows the dismissal."]
     return "\n".join(lines)
 
 
@@ -90,7 +91,7 @@ def main_block() -> str:
              f"noise model: UWB {nz['uwb']['sigma_los_m']:.2f} m white noise plus a static {nz['uwb']['link_bias_sigma_m']:.2f} m bias per link, +{nz['uwb']['wall_bias_m']:.2f} m per wall, "
              f"a body in the way on {100 * nz['uwb']['body_block_prob']:.0f}% of links; Bluetooth {nz['ble']['shadow_sigma_db']:.0f} dB shadowing; sources in `beacon/models.py`):",
              "",
-             "| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position, share of trials |",
+             "| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position: share of the positions shown (share of all trials) |",
              "|---|---|---|---|---|---|"]
     names = {"ble-rssi": "Bluetooth signal strength", "uwb-twr": "UWB ranging"}
     for method in ("ble-rssi", "uwb-twr"):
@@ -98,11 +99,12 @@ def main_block() -> str:
             a = arms.get(("main", method, k, True))
             if not a:
                 continue
-            lines.append(f"| {names[method]} | {k} | {pct(a['geometry_share']['fix'])} | {m(a.get('fix_err_median_m'))} | {a['hpd_area_median_m2']:.1f} m2 | {pct1(a['wrong_fix_rate_of_trials'])} |")
+            lines.append(f"| {names[method]} | {k} | {pct(a['geometry_share']['fix'])} | {m(a.get('fix_err_median_m'))} | {a['hpd_area_median_m2']:.1f} m2 | {pct1(a.get('wrong_fix_rate_of_fixes'))} ({pct1(a['wrong_fix_rate_of_trials'])}) |")
     mm = [arms[k] for k in arms if k[0] == "mismatch" and k[1] == "uwb-twr"]
     if mm:
         worst = max(a["wrong_fix_rate_of_trials"] for a in mm)
-        lines += ["", f"When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most {pct1(worst)} of trials (UWB, any puck count)."]
+        worst_f = max((a.get("wrong_fix_rate_of_fixes") or 0.0) for a in mm)
+        lines += ["", f"When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most {pct1(worst_f)} of the positions shown ({pct1(worst)} of trials; UWB, any puck count)."]
     c = d.get("cold")
     if c:
         lines += ["", f"Cold Bluetooth count (no app): over {c['n_windows']} windows the count runs {abs(c['count_minus_true_advertising_mean']):.1f} devices low on average, the published band contains the true number of advertising devices "

@@ -51,7 +51,7 @@
   "status": "building",
   "progress": {
     "percent": 80,
-    "phase": "All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published): CoStar record from the kit (construction, sprinklers, 72 current tenants), Matterport twin of a scanned suite (real walls, doorways, sweep graph, Showcase SDK view on localhost), Vexcel imagery (3-6 cm ortho, four obliques, roof attributes; the agent vision tool counts parking stalls on it). The beacon flow ran end to end on the live twin. Now: all-three-live board run and verification, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, docs, judge.",
+    "phase": "All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass.",
     "done": [
       "Crew tracking product with pre-plan agent, mayday exercise, replayed real-model runs (morning)",
       "Real open-data fixture for 7325 Medical Center Dr, footprint-fitted synthetic twin, spatial engine",
@@ -62,12 +62,12 @@
       "Radar feasibility write-up with sources; puck enclosure (DWM3001CDK + cell, UNO Q host brick)"
     ],
     "left_software": [
-      "Two-puck scene on the board: click-to-place pucks, two rings per phone, pruned mirror candidate, 'cannot choose' state (board builder, in progress)",
-      "Hands-free beacon script on a frozen two-puck Beacon run so recorded agent turns replay exactly (server builder, in progress)",
-      "Record the agent's turns for the beacon, scout and mayday scripts with a real model: bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py",
-      "README, DEVPOST, PITCH re-cut around Beacon (write-ups builder, in progress)",
-      "Independent skeptical-judge review and fixes",
-      "Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py"
+      "Verify the all-three-live board run end to end (server builder, in progress): pre-plan from the real record, the scanned suite as the map, phones, accountability against the real tenant roster, report",
+      "Live board UI (board builder, in progress): record card, tenants by storey, the four oblique views, the Matterport scan view; live screenshots stay private",
+      "Fix the replay misses on a real-time server, then re-record the beacon and scout scripts: PORT=1930 HUB_PORT=1931 DEMO_ARGS=--no-beacon SCRIPTS=\"beacon scout\" bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py",
+      "Independent skeptical-judge review (running) and fixes",
+      "Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py",
+      "Final write-up pass: what ran live on Nov 14, what is stand-in data in the public repository, what did not run on hardware"
     ],
     "left_hardware": [
       "1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow sandtable-beacon-victim-phones/hardware (vendored here under vendor/beacon/hardware). Works when http://localhost:1885/healthz answers with source 'pucks'.",
@@ -79,11 +79,11 @@
       "7. No hardware for Scout (radar) or Crews (tags): both run simulated only on these boards."
     ],
     "needs_from_owner": [
-      "On the laptop: unzip the CoStar kit OUTSIDE the repository and set COSTAR_KIT_DIR; copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). Details: docs/TOOLKIT_SWAP.md (being rewritten)",
+      "On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, then python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, and start with SANDTABLE_DATA_MODE=live on the command line. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository",
       "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T13:13:36-06:00"
+    "updated": "2026-11-14T13:25:19-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",

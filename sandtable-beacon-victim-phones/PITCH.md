@@ -18,14 +18,14 @@ Two versions of the same script: **live** (two DWM3001CDK pucks, the iPhone 14 a
 | 0:12 | "This is the occupant's side. No account, no name. One button." | Press **Trapped**, set 2 people, cannot move | A phone card appears: trapped, 2 people |
 | 0:22 | "The crew's first puck hears it over ultra-wideband. One puck gives a distance, so the honest answer is a ring, and the building's twin cuts away the parts that are outside the wall." | Point at the ring | A ring around puck A, clipped by the twin |
 | 0:35 | "Second puck. Dropped anywhere, two rings cross in two places, and our board will not pick one for you." | Set puck B down mid-room, click it onto the plan | Two "?" spots: **cannot choose** |
-| 0:50 | **Ah-ha.** "Slide it to the wall the door is in. Now the mirror spot is on the other side of that wall, where nobody in this room can be. Two pucks, one position." | Slide puck B along the door wall, drag it on the plan | The second spot is crossed out with its reason; one position, to about half a metre |
-| 1:05 | "Walk it." | A teammate carries the iPhone across the rectangle | The dot follows |
+| 0:50 | **Ah-ha.** "Slide it to the wall the door is in. Now the mirror spot is on the far side of that wall, outside this room: too far through walls for this radio, or simply not where the occupant says they are. The board crosses it out and tells you why. Two pucks, one position." | Slide puck B along the door wall, drag it on the plan | The second spot is crossed out with its reason; one position, to about half a metre |
+| 1:05 | "Walk it." (live only; the simulated walk-through does not have this step: drag the phone on the simulated phone page instead) | A teammate carries the iPhone across the rectangle | The dot follows |
 | 1:15 | "Now the part only the building record can do. The record says a dentist leases this suite: sedated patients, about four people at this hour, at most nine. Two phones account for three people. One person pressed I am out. The rest are unaccounted for." | Second victim presses **Injured** on the iPhone 15; a third presses **I am out** (simulated phone tab) | Accountability row for 310: expected, inside, safe outside, unaccounted band |
 | 1:35 | "The command agent turns that into orders: rescue team to this spot by this stair, and the next puck goes to Suite 301, the outpatient department nobody has scanned yet." | Press **Ask the command agent** | Agent steps, radio orders, the next-puck marker at Suite 301's door |
 | 1:50 | "Everything here that is simulated says so. With no app we show at most a count of Bluetooth devices, never a dot. And the same feed drives the Sandtable command board." | Point at the SIM or LIVE badge and the feeds panel | |
 | 2:00 | Stop. | | |
 
-If the live path fails at any step, say "this part is simulated" and switch to the walk-through tab: it plays the same sequence (ring, cannot choose, slide to the wall, one position, second phone, accountability, agent) in about 40 seconds.
+If the live path fails at any step, say "this part is simulated" and switch to the walk-through tab: it plays the same sequence (ring, cannot choose, slide to the wall, one position, second phone, accountability, agent) in about 35 seconds. In the walk-through the agent's plan is a recorded real model run; if you press "Ask the command agent" in any other situation without a live model, the board shows a deterministic fallback and says so.
 
 ## The 20-second version inside Sandtable's own demo
 

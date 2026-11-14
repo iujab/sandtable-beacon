@@ -215,7 +215,8 @@ def test_beacon_script_replays_the_recorded_two_puck_run_identically(monkeypatch
             assert "outside the building" in how["B1"] and "searched by Engine 1" in how["B2"] and all(p["out_t_rel"] for p in rep["people"])
             relayed = [e for e in events if e.get("type") == "beacons" and e.get("phones")]
             assert relayed and all(e["link"]["source"] == "replay" and e["replay"] is True and e["sample"] is False for e in relayed)
-            assert all(p.get("placed") == "by hand" for p in relayed[-1]["pucks"]) and len(relayed[-1]["pucks"]) == 2
+            assert all(p.get("placed") == "by hand" and p.get("source") == "hand" for p in relayed[-1]["pucks"]) and len(relayed[-1]["pucks"]) == 2
+            assert s.beacon.state_info()["connected"] is False and s.beacon.state_info()["source"] == "replay"
             b1 = next(p for p in relayed[0]["phones"] if p["id"] == "B1")
             assert b1["pruned"] and "outside the building" in b1["pruned"][0]["reason"]
             par = next(e["text"] for e in inc.timeline if e["kind"] == "par")

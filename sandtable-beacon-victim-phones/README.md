@@ -24,7 +24,7 @@ Built for HackPrinceton Fall 2026. Main track: **Education** (as Sandtable). Spe
 |---|---|
 | The app | An occupant opens Beacon and presses Trapped, Injured, Sheltering or I am out. No account, no name: a random id that rotates. The screen shows exactly what is sent |
 | The pucks | Each puck ranges every phone that opted in. One iPhone ranges both pucks at once; one board serves one phone at a time, so two phones take turns or each puck position carries two boards |
-| The locator | One puck: a ring, clipped where the twin says nobody can be. Two pucks: two mirror spots. With both pucks just inside the wall the door is in, the mirror spot falls outside the room: the twin rules it out, or it is dismissed on the occupant's stated suite and shown as dismissed. With pucks mid-room, the board says "cannot choose" |
+| The locator | One puck: a ring, clipped where the twin says nobody can be. Two pucks: two mirror spots. With both pucks just inside the wall the door is in, the mirror spot falls outside the room. The twin rules it out when it lies outside the building, inside a wall, or two walls away from a puck (the range model assumes ranging through one wall at most: an assumption, not a measurement); otherwise it is dismissed on the occupant's stated suite and shown as dismissed. With pucks mid-room, the board says "cannot choose" |
 | The record | Tenants by suite from the building record, expected head counts with their basis, phones inside, people reported, people who pressed "I am out": an accountability table, search priorities, where to throw the next puck |
 | The agent | A tool-using command agent reads the phones and the record and issues radio orders, the next-puck plan and record checks; a printable incident report closes the loop |
 | The feed | Everything is published for the Sandtable command board: JSON, WebSocket, GeoJSON and Cursor-on-Target (`docs/BEACON_FEED.md`) |
@@ -34,16 +34,16 @@ Built for HackPrinceton Fall 2026. Main track: **Education** (as Sandtable). Spe
 <!-- TWO_PUCK_NUMBERS:BEGIN -->
 **Simulated** (`results/eval_two_puck.json`; 800 phone positions per layout over the fire room; what a real iPhone would deliver: UWB distances only, no line-of-sight flag; noise model with sources in `beacon/models.py`):
 
-| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position, share of all trials | Position error, median / 90th percentile |
+| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position: share of the positions shown (share of all trials) | Position error, median / 90th percentile |
 |---|---|---|---|---|---|---|---|
-| Both pucks just inside the wall the door is in (recommended) | 77% | 48% | 29% | 0% | 23% | 1.1% | 0.26 m / 0.76 m |
-| Both pucks along the outside wall | 83% | 78% | 5% | 0% | 17% | 1.8% | 0.26 m / 0.76 m |
-| Both pucks mid-room (careless) | 18% | 17% | 0% | 57% | 25% | 0.0% | 0.50 m / 0.96 m |
-| Three pucks: the door-wall pair plus one in the far corner | 88% | 84% | 5% | 3% | 9% | 1.0% | 0.20 m / 0.61 m |
+| Both pucks just inside the wall the door is in (recommended) | 77% | 48% | 29% | 0% | 23% | 1.5% (1.1%) | 0.26 m / 0.76 m |
+| Both pucks along the outside wall | 83% | 78% | 5% | 0% | 17% | 2.1% (1.8%) | 0.26 m / 0.76 m |
+| Both pucks mid-room (careless) | 18% | 17% | 0% | 57% | 25% | 0.0% (0.0%) | 0.50 m / 0.96 m |
+| Three pucks: the door-wall pair plus one in the far corner | 88% | 84% | 5% | 3% | 9% | 1.1% (1.0%) | 0.20 m / 0.61 m |
 
 "Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
 
-When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): the statement produces a wrong position in 4.3% of trials with the door-wall layout, and in 13.8% for the suite that shares that wall. That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 5.7% of trials and 82% of those positions are wrong (4.3% of trials are wrong positions produced by the statement; 13.8% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
 <!-- TWO_PUCK_NUMBERS:END -->
 
 ![Where in the room two pucks give one answer, per layout](figures/eval_two_puck_map.png)
@@ -71,20 +71,20 @@ And by number of pucks and by radio:
 <!-- MAIN_NUMBERS:BEGIN -->
 **Simulated** (`results/eval_beacon.json`; 90 trials per cell; pucks thrown from the door, not placed; the phone is in the fire room in 60% of trials and in a neighbouring suite in 40%; noise model: UWB 0.10 m white noise plus a static 0.10 m bias per link, +0.30 m per wall, a body in the way on 25% of links; Bluetooth 6 dB shadowing; sources in `beacon/models.py`):
 
-| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position, share of trials |
+| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position: share of the positions shown (share of all trials) |
 |---|---|---|---|---|---|
-| Bluetooth signal strength | 1 | 0% | n/a | 277.6 m2 | 0.0% |
-| Bluetooth signal strength | 2 | 0% | n/a | 164.2 m2 | 0.0% |
-| Bluetooth signal strength | 3 | 13% | 1.45 m | 176.8 m2 | 0.0% |
-| Bluetooth signal strength | 4 | 16% | 1.15 m | 142.8 m2 | 0.0% |
-| Bluetooth signal strength | 5 | 19% | 1.27 m | 154.5 m2 | 0.0% |
-| UWB ranging | 1 | 0% | n/a | 15.9 m2 | 0.0% |
-| UWB ranging | 2 | 28% | 0.49 m | 2.4 m2 | 0.0% |
-| UWB ranging | 3 | 53% | 0.28 m | 1.4 m2 | 2.2% |
-| UWB ranging | 4 | 69% | 0.25 m | 0.7 m2 | 0.0% |
-| UWB ranging | 5 | 61% | 0.19 m | 0.7 m2 | 0.0% |
+| Bluetooth signal strength | 1 | 0% | n/a | 277.6 m2 | n/a (0.0%) |
+| Bluetooth signal strength | 2 | 0% | n/a | 164.2 m2 | n/a (0.0%) |
+| Bluetooth signal strength | 3 | 13% | 1.45 m | 176.8 m2 | 0.0% (0.0%) |
+| Bluetooth signal strength | 4 | 16% | 1.15 m | 142.8 m2 | 0.0% (0.0%) |
+| Bluetooth signal strength | 5 | 19% | 1.27 m | 154.5 m2 | 0.0% (0.0%) |
+| UWB ranging | 1 | 0% | n/a | 15.9 m2 | n/a (0.0%) |
+| UWB ranging | 2 | 28% | 0.49 m | 2.4 m2 | 0.0% (0.0%) |
+| UWB ranging | 3 | 53% | 0.28 m | 1.4 m2 | 4.2% (2.2%) |
+| UWB ranging | 4 | 69% | 0.25 m | 0.7 m2 | 0.0% (0.0%) |
+| UWB ranging | 5 | 61% | 0.19 m | 0.7 m2 | 0.0% (0.0%) |
 
-When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most 6.0% of trials (UWB, any puck count).
+When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most 13.6% of the positions shown (6.0% of trials; UWB, any puck count).
 
 Cold Bluetooth count (no app): over 600 windows the count runs 2.1 devices low on average, the published band contains the true number of advertising devices in 60% of windows, and 37% of windows read zero while devices are in the room. It is a weak signal and the board treats it as one.
 <!-- MAIN_NUMBERS:END -->
@@ -124,8 +124,8 @@ flowchart LR
 
 | Criterion | Where to look |
 |---|---|
-| Use of the data (30%) | The record and the twin each do a job the other cannot, and the join is by suite and by geometry. Record: tenants by suite, kind of business, leased area, vacancy, life hazards. Twin: which room is which suite, walls that turn two rings into one position, the door to throw the next puck through, the route for the rescue order. Together: expected people per suite against phones inside it; a suite that is vacant on record but has phones in it becomes a record check. Details: `docs/COSTAR_TIE_IN.md` |
-| Agentic depth (30%) | The command agent plans and acts with tools (phones, accountability, next-puck plan, routes, radio, assignments, record checks) and its orders change when a phone resolves or a suite is still unscanned. Every step is on the board |
+| Use of the data (30%) | The record and the twin each do a job the other cannot, and the join is by suite and by geometry. Record: tenants by suite, kind of business, and leased area, head count and listed vacancy when the record has them (the public fixture has none of the three: area then comes from the twin, and "vacant on record" only means no business registration). Twin: which rooms are which suite, walls that turn two rings into one position, the door to throw the next puck through, the route for the rescue order. Together: expected people per suite against phones inside it; a suite with no tenant on record but phones in it becomes a record check. The same module also runs, unchanged, on the command board's private live bundle (a scanned suite's Matterport twin and the CoStar record of its building; not in this repository): there the walk-through's simulated phones stand in a real room and the suite joins to its real tenant record. Details: `docs/COSTAR_TIE_IN.md` |
+| Agentic depth (30%) | The command agent plans and acts with tools (phones, accountability, next-puck plan, routes, radio, assignments, record checks); every step is on the board. In the walk-through the board shows a real model run (Claude Sonnet 5.5), recorded once and replayed; any situation without a recording gets a deterministic policy that is labelled as not a model, unless a live model is configured (`LLM_BACKEND`) |
 | Usefulness (25%) | Monday users: a training officer running an evacuation or search drill on a real building with two pucks and the occupants' own phones; a building manager who wants a roll call that does not depend on a clipboard; and the record's owner, who gets disagreements between record and reality as evidence |
 | Demo and polish (15%) | One screen, two pucks a judge can move, a phone a judge can hold. `PITCH.md` is the script |
 
@@ -193,7 +193,9 @@ bash run_demo.sh --source live --lan     # then scan the board's QR code with ea
 - With the stock firmware the phone app is the reporter: the phone needs a network path to the server, and the app must stay open with the screen on.
 - An iPhone 14 or 15 reports distance but no direction to an accessory, so position needs two well-placed pucks or three.
 - One board serves one phone at a time.
-- Dismissing a mirror spot on the occupant's stated suite can be wrong when the statement is wrong (rate in the table above); the board shows the dismissal for that reason.
+- Dismissing a mirror spot on the occupant's stated suite is wrong when the statement is wrong: most positions produced that way are then wrong (numbers above), which is why the board shows the dismissal.
+- The twin's "two walls away" rule-out rests on an assumption of the range model (one wall at most) that the simulator shares; it has not been tested against real walls.
+- The simulation gives each puck position one board per phone; with two boards and two phones the phones must take turns, which slows every update.
 - A phone whose owner installed nothing cannot be ranged or identified. The cold Bluetooth count is weak (numbers above) and off by default on real hardware.
 - The pucks cannot find their own positions tonight (the stock firmware does not range board to board): they are placed and clicked onto the plan.
 - One floor; no smoke or heat model; the twin and the record are fixtures.

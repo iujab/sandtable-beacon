@@ -43,7 +43,7 @@ export class Plan {
     const xs = this.floor.outline.map((p) => p[0]), ys = this.floor.outline.map((p) => p[1]);
     this.fx = Math.max(...xs); this.fy = Math.max(...ys);
     // text and markers are sized in building metres: scale them down on a small floor (the fixture floor is k = 1)
-    this.k = Math.max(0.35, Math.min(1, Math.max(this.fx, this.fy) / 40));
+    this.k = Math.max(0.35, Math.min(1, Math.max(this.fx, this.fy) / 28));
     svg.style.setProperty("--k", this.k);
     const pad = 4.2 * this.k;
     this.homeBox = [-pad, -pad, this.fx + 2 * pad, this.fy + 2 * pad]; this.box = [...this.homeBox];
@@ -177,10 +177,12 @@ export class Plan {
         const c = this.centre(r.polygon);
         this.g.preplan.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 1.7, class: "rl hz", style: `fill:${color}` }, word));
       } else {
-        // the scan has no stair: the way in and out is the suite entrance, marked at its door
-        const p = this.P(door.at), n = seen[st.id] = (seen[st.id] || 0) + 1, k = this.k;
+        // the scan has no stair: the way in and out is the suite entrance, marked once at its door
+        if (seen[st.id]) { seen[st.id].textContent = `ATTACK + EVAC: ${st.label}`; continue; }
+        const p = this.P(door.at), k = this.k;
         this.g.preplan.appendChild(el("circle", { cx: p[0], cy: p[1], r: 0.9 * k, class: "pp-door", stroke: color }));
-        this.g.preplan.appendChild(el("text", { x: p[0], y: p[1] - (0.9 + 0.9 * n) * k, class: "rl hz", style: `fill:${color}` }, `${word}: ${st.label}`));
+        seen[st.id] = el("text", { x: p[0], y: p[1] + 1.9 * k, class: "rl hz", style: `fill:${color}` }, `${word}: ${st.label}`);
+        this.g.preplan.appendChild(seen[st.id]);
       }
     }
     for (const a of t.anchor_drops || []) {
@@ -246,7 +248,9 @@ export class Plan {
     const k = to.map((v) => v.toFixed(2)).join(" ");
     if (k === this._focusKey) return;
     this._focusKey = k;
-    this.svg.classList.toggle("zoomed", !!bbox); this.zoomed = !!bbox;
+    // "zoomed" (smaller text and markers) only when the box is a real close-up of a big floor
+    this.zoomed = !!bbox && (bbox[2] - bbox[0]) < 0.6 * this.fx && (bbox[3] - bbox[1]) < 0.6 * this.fy;
+    this.svg.classList.toggle("zoomed", this.zoomed);
     if (this._lastSt) this.update(this._lastSt, this._lastSel);
     const from = [...this.box], t0 = performance.now();
     cancelAnimationFrame(this._fr);
@@ -531,7 +535,11 @@ export class Plan {
     for (const [k, sd] of Object.entries(site.sides || {})) if (sd.street) {
       const t = this.g.orient.querySelector(`.side title`); // side letters are drawn by _orientation; the street name sits beside its letter
       const letter = [...this.g.orient.querySelectorAll(".side")].find((q) => q.querySelector("text")?.textContent === k);
-      if (letter) { const c = letter.querySelector("circle"); this.g.orient.appendChild(el("text", { x: Number(c.getAttribute("cx")) + 1.4 * this.k, y: Number(c.getAttribute("cy")) + 0.05, class: "street" }, sd.street)); }
+      if (letter) {
+        // the street name sits beside its letter, on the side away from the view's edge
+        const c = letter.querySelector("circle"), cx = Number(c.getAttribute("cx")), right = cx > this.fx * 0.8;
+        this.g.orient.appendChild(el("text", { x: cx + (right ? -1.4 : 1.4) * this.k, y: Number(c.getAttribute("cy")) + (right ? 1.6 * this.k : 0.05), class: "street", "text-anchor": right ? "end" : "start" }, sd.street));
+      }
     }
   }
   update(st, selected) {

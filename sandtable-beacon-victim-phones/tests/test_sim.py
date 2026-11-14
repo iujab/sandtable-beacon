@@ -195,8 +195,8 @@ def test_walls_have_the_right_sign(twin):
     assert np.mean(err["wall"]) > np.mean(err["los"]) + 0.03          # positive bias through the wall
     assert abs(np.mean(err["los"])) < 0.08                             # unbiased in line of sight
     assert np.mean(rssi["wall"]) < np.mean(rssi["los"]) - 2.0          # per-wall loss, distance removed
-    # los hint: high on a clear link, low through a wall
-    w = World(twin, seed=1, noise=noise)
+    # los hint (studies only, reports_los=True): high on a clear link, low through a wall
+    w = World(twin, seed=1, noise=noise, reports_los=True)
     w.set_pucks([{"id": "P1", "x": p[0], "y": p[1]}], exact=True)
     w.upsert_phone("los", *los_pt)
     w.upsert_phone("wall", *wall_pt)
@@ -415,3 +415,61 @@ def test_noise_defaults_and_mismatch_scaling(twin):
     assert s["uwb"]["sigma_los_m"] == pytest.approx(1.5 * models.DEFAULT_NOISE["uwb"]["sigma_los_m"])
     assert s["uwb"]["max_range_m"] == models.DEFAULT_NOISE["uwb"]["max_range_m"]
     assert w.stated_model()["simulated"] is True
+
+
+# ---- live-like observations and board sharing ------------------------------------------------------------------------
+
+def test_uwb_is_live_like_by_default_and_los_is_an_opt_in(twin):
+    """An iPhone's Nearby Interaction session gives a distance only: no los, rssi or fp unless a study asks for them."""
+    obs = {}
+    for flag in (None, True):
+        w = World(twin, seed=17, reports_los=flag)
+        w.set_pucks([{"id": "P1", "x": 7.0, "y": 6.0}, {"id": "P2", "x": 7.0, "y": 2.0}], exact=True)
+        w.upsert_phone("ph", 3.0, 3.0)
+        obs[flag] = [o for o in run(w, 4.0) if o["kind"] == "uwb"]
+    assert obs[None] and all(set(o) == {"kind", "t", "puck", "eid", "d_m"} for o in obs[None])
+    assert all({"los", "rssi", "fp"} <= set(o) for o in obs[True])
+    assert [o["d_m"] for o in obs[None]] == [o["d_m"] for o in obs[True]]          # paired: same draws either way
+    assert World(twin).sim_model["uwb_link"]["reports_los"] is False
+
+
+def test_board_sharing_turns_serves_one_phone_at_a_time(twin):
+    w = World(twin, seed=23, board_sharing="turns")
+    assert w.sim_model["board_sharing"] == "turns" and "one phone at a time" in w.sim_model["board_sharing_modes"]["turns"]
+    w.set_pucks([{"id": "P1", "x": 9.15, "y": 6.7}, {"id": "P2", "x": 9.15, "y": 2.7}], exact=True)
+    w.upsert_phone("a", 2.1, 1.8)
+    w.upsert_phone("b", 3.4, 6.4)
+    eids = {q["key"]: q["eid"] for q in w.truth()["phones"]}
+    obs = [o for o in run(w, 30.0) if o["kind"] == "uwb"]
+    for pid in ("P1", "P2"):
+        seq = [(o["t"], o["eid"]) for o in obs if o["puck"] == pid]
+        assert {e for _, e in seq} == set(eids.values())                         # both phones get turns
+        bursts = []
+        for t, e in seq:
+            if bursts and bursts[-1][0] == e and t - bursts[-1][2] < 0.6:
+                bursts[-1][2] = t
+            else:
+                bursts.append([e, t, t])
+        for (e1, a1, b1), (e2, a2, b2) in zip(bursts, bursts[1:]):
+            assert e1 != e2                                                       # alternates between the phones
+            assert a2 - b1 >= 0.9                                                 # connection set-up gap
+        assert all(b - a <= 4.0 for _, a, b in bursts)                           # 4 s turns
+    # one phone in range: served continuously (no gaps beyond the 5 Hz cadence and dropouts)
+    w1 = World(twin, seed=23, board_sharing="turns")
+    w1.set_pucks([{"id": "P1", "x": 9.15, "y": 6.7}], exact=True)
+    w1.upsert_phone("a", 2.1, 1.8)
+    ts = [o["t"] for o in run(w1, 20.0) if o["kind"] == "uwb"]
+    assert len(ts) > 0.8 * 5 * 18 and max(b - a for a, b in zip(ts, ts[1:])) < 1.2
+    with pytest.raises(ValueError):
+        World(twin, board_sharing="sometimes")
+
+
+def test_pairs_is_the_default_and_ranges_every_phone_continuously(twin):
+    w = World(twin, seed=23)
+    assert w.sim_model["board_sharing"] == "pairs"
+    w.set_pucks([{"id": "P1", "x": 9.15, "y": 6.7}], exact=True)
+    w.upsert_phone("a", 2.1, 1.8)
+    w.upsert_phone("b", 3.4, 6.4)
+    obs = [o for o in run(w, 10.0) if o["kind"] == "uwb"]
+    per = Counter(o["eid"] for o in obs)
+    assert len(per) == 2 and min(per.values()) > 0.8 * 5 * 10

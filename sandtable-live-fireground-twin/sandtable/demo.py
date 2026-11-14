@@ -152,7 +152,7 @@ def main(argv=None) -> int:
 
     import signal
     import uvicorn
-    print(f"[demo] Sandtable board: http://{host}:{args.port}/   (LLM backend: {os.environ.get('LLM_BACKEND', 'replay')}, data: {', '.join(f"{k.split('_')[0].lower()} {os.environ.get(k) or os.environ.get('SANDTABLE_DATA_MODE', 'fixture')}" for k in ('COSTAR_MODE', 'MATTERPORT_MODE', 'VEXCEL_MODE'))})", flush=True)
+    print(f"[demo] Sandtable board: http://{host}:{args.port}/   (LLM backend: {os.environ.get('LLM_BACKEND', 'replay')}, data: {', '.join(f"{k} {v}" for k, v in _modes().items())})", flush=True)
     # The server runs in a thread so that this main thread owns the signals and always gets to stop the hub it started.
     server = uvicorn.Server(uvicorn.Config("sandtable.server:app", host=host, port=args.port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
@@ -182,8 +182,16 @@ def main(argv=None) -> int:
 _live_room: str | None = None
 
 
+def _modes() -> dict:
+    """Per-layer data modes as the server will see them: the command line, then .env and the bench drop zone (sandtable.config
+    loads those without overriding what is set). Imported only after UWBKIT_URL is known, since config reads it at import."""
+    sys.path.insert(0, str(ROOT))
+    from sandtable import config
+    return {"costar": config.COSTAR_MODE, "matterport": config.MATTERPORT_MODE, "vexcel": config.VEXCEL_MODE}
+
+
 def _live_mode() -> bool:
-    return os.environ.get("SANDTABLE_DATA_MODE") == "live" or any(os.environ.get(k) == "live" for k in ("COSTAR_MODE", "MATTERPORT_MODE", "VEXCEL_MODE"))
+    return any(m == "live" for m in _modes().values())
 
 
 def _live_beacon_bundle(vendored: Path):

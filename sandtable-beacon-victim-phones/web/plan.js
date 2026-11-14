@@ -162,6 +162,7 @@ export class Plan {
     for (const p of d.pucks || []) if (isNum(p.x) && (!p.floor || p.floor === this.floor.id)) pts.push([p.x, p.y]);
     for (const ph of d.phones || []) {
       if (ph.floor && ph.floor !== this.floor.id) continue;
+      if (ph.stale || ph.geometry === "none" || (ph.report && ph.report.safe_outside)) continue;   // a stale phone must not zoom the plan out
       if (ph.geometry === "fix" && isNum(ph.x)) pts.push([ph.x - (ph.sigma_m || 0), ph.y - (ph.sigma_m || 0)], [ph.x + (ph.sigma_m || 0), ph.y + (ph.sigma_m || 0)]);
       for (const c of (ph.geometry === "candidates" ? ph.candidates : []) || []) pts.push([c.x, c.y]);
       if (ph.geometry === "ring" && ph.ring) {
@@ -333,8 +334,23 @@ export class Plan {
   }
   setPlacing(on) { this.placing = !!on; this.svg.classList.toggle("placing", this.placing); }
 
+  // rooms where an opt-in phone is heard now: the presence entry says so (opt_in_phones), or a live phone is ranged
+  // by a puck in that room, or its published geometry sits in that room
+  _optInRooms() {
+    const d = this.data || {}, out = new Set();
+    for (const q of d.presence || []) if (q.room && (q.opt_in_phones || 0) > 0) out.add(q.room);
+    const puckRoom = Object.fromEntries((d.pucks || []).map((p) => [p.id, p.room]));
+    for (const ph of d.phones || []) {
+      if (ph.stale || (ph.report && ph.report.safe_outside)) continue;
+      for (const r of ph.ranges || []) if (puckRoom[r.puck]) out.add(puckRoom[r.puck]);
+      if (ph.ring && puckRoom[ph.ring.puck]) out.add(puckRoom[ph.ring.puck]);
+      for (const r of [ph.room, ph.zone && ph.zone.room, ...(ph.candidates || []).map((c) => c.room)]) if (r) out.add(r);
+    }
+    return out;
+  }
   _updatePresence(list) {
     // one badge per room: several pucks may hear the same devices, so counts are not summed; show the largest band
+    const optIn = this._optInRooms();
     const byRoom = new Map();
     for (const p of list) {
       if (!p.room || !this.rooms[p.room] || (p.floor && p.floor !== this.floor.id)) continue;
@@ -342,17 +358,19 @@ export class Plan {
       if (!cur || (p.count ?? 0) > (cur.best.count ?? 0)) byRoom.set(p.room, { best: p, all: [...(cur?.all || []), p] });
       else cur.all.push(p);
     }
-    const key = JSON.stringify([...byRoom].map(([r, v]) => [r, v.best.count, v.best.count_range, v.all.map((q) => q.puck)]));
+    const key = JSON.stringify([...byRoom].map(([r, v]) => [r, v.best.count, v.best.count_range, v.all.map((q) => q.puck), optIn.has(r)]));
     if (key === this._presKey) return;
     this._presKey = key;
     this.g.presence.replaceChildren();
     this.presEls = [];
     for (const [roomId, v] of byRoom) {
-      const p = v.best, n = p.count ?? 0, rg = p.count_range || [n, n];
+      const p = v.best, n = p.count ?? 0, rg = p.count_range || [n, n], phoneHere = optIn.has(roomId);
       const g = el("g", { class: "pres" });
-      const long = n === 0 ? "no devices heard" : `about ${n} device${n === 1 ? "" : "s"}`, short = n === 0 ? "0 devices" : `~${n} device${n === 1 ? "" : "s"}`;
+      // "no devices heard" would be false where an opt-in phone is being ranged: say "no other devices" there
+      const long = n === 0 ? (phoneHere ? "no other devices heard" : "no devices heard") : `about ${n} device${n === 1 ? "" : "s"}`;
+      const short = n === 0 ? (phoneHere ? "no other devices" : "0 devices") : `~${n} device${n === 1 ? "" : "s"}`;
       const rect = el("rect", { rx: 0 }), t1 = el("text", { class: "n" }, long);
-      const t2 = el("text", { class: "s" }, n === 0 ? "weak evidence of empty, never proof" : `${rg[0]} to ${rg[1]} · devices, not people`);
+      const t2 = el("text", { class: "s" }, n === 0 ? (phoneHere ? "besides the opt-in phone · devices, not people" : "weak evidence of empty, never proof") : `${rg[0]} to ${rg[1]} · devices, not people`);
       g.append(rect, t1, t2, el("title", {}, v.all.map((q) => q.text || "").filter(Boolean).join("\n") || "Cold Bluetooth count: devices, not people; no identities kept"));
       this.g.presence.appendChild(g);
       this.presEls.push({ g, rect, t1, t2, long, short, room: this.rooms[roomId] });
@@ -410,12 +428,12 @@ export class Plan {
       ph.data = p;
       if (p.ring) ph.lastRing = p.ring;
       ph.g.classList.toggle("stale", !!p.stale);
-      const tgt = this._target(p);
+      const tgt = p.stale ? {} : this._target(p);     // stale: the card says where it was last; the plan draws nothing
       const key = JSON.stringify(tgt, (k, v) => (typeof v === "number" ? Math.round(v * 20) / 20 : v));
       // structure = what kind of shape it is; a change of structure plays the collapse, a change of numbers only glides
       const sig = `${p.geometry}|${p.ring ? p.ring.puck + p.ring.kind : ""}|${(p.candidates || []).length}`;
       if (key !== ph.key) { ph.key = key; this._transition(ph, tgt, sig === ph.sig); ph.sig = sig; }
-      this._drawPruned(ph, p);
+      this._drawPruned(ph, p.stale ? { ...p, pruned: [] } : p);
     }
     for (const [id, ph] of this.phones) if (!seen.has(id) && !ph.leaving) {
       ph.leaving = true; ph.key = null;
@@ -429,10 +447,10 @@ export class Plan {
       pruned: el("g"), ghost: el("circle", { class: "ph-ghostring" }), band: el("path", { class: "ph-band" }), bandLine: el("path", { class: "ph-bandline" }),
       arc: el("path", { class: "ph-arc" }), links: el("g"), cands: el("g"), candEls: {},
       fixG: el("g", { class: "ph-fix" }), s1: el("ellipse", { class: "s1" }), s2: el("ellipse", { class: "s2" }), core: el("circle", { class: "core" }), pulse: el("circle", { class: "pulse" }),
-      lab: el("text", { class: "ph-lab" }), sub: el("text", { class: "ph-sub" }), assume: el("text", { class: "ph-assume" }), title: el("title"),
+      lab: el("text", { class: "ph-lab" }), sub: el("text", { class: "ph-sub" }), assume: el("text", { class: "ph-assume" }), title: el("title"), leader: el("line", { class: "ph-leader" }),
     };
     ph.fixG.append(ph.s2, ph.s1, ph.pulse, ph.core);
-    g.append(ph.title, ph.pruned, ph.ghost, ph.band, ph.bandLine, ph.arc, ph.links, ph.cands, ph.fixG, ph.lab, ph.sub, ph.assume);
+    g.append(ph.title, ph.pruned, ph.ghost, ph.band, ph.bandLine, ph.arc, ph.links, ph.cands, ph.fixG, ph.leader, ph.lab, ph.sub, ph.assume);
     g.addEventListener("click", () => this.opts.onPick?.(id));
     g.style.cursor = "pointer";
     this.g.phones.appendChild(g);
@@ -530,21 +548,26 @@ export class Plan {
     return k < 1;
   }
   _drawPruned(ph, p) {
-    const key = JSON.stringify(p.pruned || []);
-    if (key === ph.prunedKey) return;
+    const list = (p.pruned || []).filter((q) => isNum(q.x) && isNum(q.y));
+    const key = JSON.stringify(list.map((q) => [Math.round(q.x * 2) / 2, Math.round(q.y * 2) / 2, q.by || ""]));
+    if (key === ph.prunedKey) {
+      // same ghosts: only refresh their hover text
+      (ph.prunedEls || []).forEach((e, i) => { if (list[i] && e.title) e.title.textContent = `${p.id}: ${e.stated ? "dismissed on a statement" : "ruled out by the twin"}: ${list[i].reason || ""}`; });
+      return;
+    }
     ph.prunedKey = key;
     ph.pruned.replaceChildren();
     ph.prunedEls = [];
-    for (const q of p.pruned || []) {
-      if (!isNum(q.x) || !isNum(q.y)) continue;
+    for (const q of list) {
       const stated = q.by === "occupant-statement" || q.by === "search-room";
       const g = el("g", { class: `ph-ghost${stated ? " stated" : ""}` });
       const c = el("circle"), l1 = el("line"), l2 = el("line");
       if (stated) l2.style.display = "none";
-      g.append(c, l1, l2, el("title", {}, `${p.id}: ${stated ? "dismissed on a statement" : "impossible"}: ${q.reason || "removed by the twin"}`));
+      const title = el("title", {}, `${p.id}: ${stated ? "dismissed on a statement" : "ruled out by the twin"}: ${q.reason || "removed by the twin"}`);
+      g.append(c, l1, l2, title);
       g.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 500, fill: "backwards" });
       ph.pruned.appendChild(g);
-      ph.prunedEls.push({ c, l1, l2, x: q.x, y: q.y });
+      ph.prunedEls.push({ c, l1, l2, x: q.x, y: q.y, title, stated });
     }
   }
   _arcPath(cx, cy, r, arcs) {
@@ -648,8 +671,12 @@ export class Plan {
 
   _placeLabels() {
     const u = this.u, placed = [];
-    // fixed things labels must not cover: pucks and presence badges
-    for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 12 * u, P[1] - 24 * u, P[0] + 12 * u, P[1] + 8 * u]); }
+    const bbox = (e) => { try { const b = e.getBBox(); return b.width ? [b.x, b.y, b.x + b.width, b.y + b.height] : null; } catch { return null; } };
+    // fixed things a label must not cover: pucks with their ids, the device-count badges, the room title, the next-puck marker
+    for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 14 * u, P[1] - 26 * u, P[0] + 14 * u, P[1] + 10 * u]); }
+    for (const b of this.presEls || []) { const q = bbox(b.rect); if (q) placed.push(q); }
+    if (this._focusTag) { const q = bbox(this._focusTag); if (q) placed.push(q); }
+    if (this.nextEl) { const q = bbox(this.nextEl.t); if (q) placed.push(q); }
     // and the phones' own markers (fix cores, candidate markers with their weights)
     for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) {
       if (!(q.op > 0.3) || !isNum(q.x) || k === "ring") continue;
@@ -657,21 +684,37 @@ export class Plan {
       placed.push([P[0] - r, P[1] - r, P[0] + r, P[1] + r + (k === "fix" ? 0 : 14 * u)]);
     }
     const list = [...this.phones.values()].filter((ph) => ph.labAt && ph.labOp > 0.05).sort((a, b) => a.labRank - b.labRank || String(a.id).localeCompare(String(b.id)));
-    const hit = (b) => placed.some((q) => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1]);
+    const over = (b) => placed.reduce((s, q) => s + Math.max(0, Math.min(b[2], q[2]) - Math.max(b[0], q[0])) * Math.max(0, Math.min(b[3], q[3]) - Math.max(b[1], q[1])), 0);
+    const bx = this.box || [0, 0, 1e9, 1e9];
     for (const ph of list) {
       const w = Math.max(ph.lab.getComputedTextLength(), ph.sub.getComputedTextLength(), ph.assume.textContent ? ph.assume.getComputedTextLength() : 0) / 2 + 4 * u;
-      const bx = this.box || [0, 0, 1e9, 1e9];
-      const x = Math.max(bx[0] + w + 4 * u, Math.min(bx[0] + bx[2] - w - 4 * u, ph.labAt[0]));
-      const y = Math.max(bx[1] + 20 * u, Math.min(bx[1] + bx[3] - 34 * u, ph.labAt[1]));
-      let dy = 0;
-      for (const step of [0, -1, 1, -2, 2, -3, 3]) {
-        const yy = y + step * 30 * u, box = [x - w, yy - 15 * u, x + w, yy + (ph.assume.textContent ? 30 : 17) * u];
-        if (!hit(box) || step === 3) { dy = step * 30 * u; placed.push(box); break; }
+      const h1 = 15 * u, h2 = (ph.assume.textContent ? 30 : 17) * u;
+      const clampX = (x) => Math.max(bx[0] + w + 4 * u, Math.min(bx[0] + bx[2] - w - 4 * u, x));
+      const clampY = (y) => Math.max(bx[1] + 20 * u, Math.min(bx[1] + bx[3] - 34 * u, y));
+      const ax = ph.labAt[0], ay = ph.labAt[1];
+      // candidate spots around the anchor: as placed, above, below, right, left, then farther out
+      const steps = [[0, 0], [0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1], [0, -2], [0, 2], [2, 0], [-2, 0]];
+      let best = null;
+      for (const [sx, sy] of steps) {
+        const x = clampX(ax + sx * (w + 12 * u)), y = clampY(ay + sy * 34 * u);
+        const box = [x - w, y - h1, x + w, y + h2], o = over(box);
+        if (!best || o < best[0] - 1e-9) best = [o, x, y, box];
+        if (o === 0) break;
       }
-      ph.lab.setAttribute("x", x); ph.lab.setAttribute("y", y + dy);
-      ph.sub.setAttribute("x", x); ph.sub.setAttribute("y", y + dy + 13 * u);
-      ph.assume.setAttribute("x", x); ph.assume.setAttribute("y", y + dy + 26 * u);
+      const [, x, y, box] = best;
+      placed.push(box);
+      ph.lab.setAttribute("x", x); ph.lab.setAttribute("y", y);
+      ph.sub.setAttribute("x", x); ph.sub.setAttribute("y", y + 13 * u);
+      ph.assume.setAttribute("x", x); ph.assume.setAttribute("y", y + 26 * u);
+      // a label moved away from its marker keeps a thin leader line to it
+      const m = ph.labMark, moved = m && Math.hypot(x - ax, y - ay) > 20 * u;
+      if (moved) {
+        const ly = m[1] < y - h1 ? y - h1 : m[1] > y + h2 ? y + h2 : m[1], lx = Math.max(x - w, Math.min(x + w, m[0]));
+        ph.leader.setAttribute("x1", m[0]); ph.leader.setAttribute("y1", m[1]); ph.leader.setAttribute("x2", lx); ph.leader.setAttribute("y2", ly);
+        ph.leader.style.opacity = ph.labOp * 0.8;
+      } else ph.leader.style.opacity = 0;
     }
+    for (const ph of this.phones.values()) if (!(ph.labAt && ph.labOp > 0.05)) ph.leader.style.opacity = 0;
   }
 
   // ------------------------------------------------------------------ frame loop

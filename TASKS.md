@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 1:24 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 1:32 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,8 +8,8 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 80% | All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published): CoStar record from the kit (construction, sprinklers, 72 current tenants), Matterport twin of a scanned suite (real walls, doorways, sweep graph, Showcase SDK view on localhost), Vexcel imagery (3-6 cm ortho, four obliques, roof attributes; the agent vision tool counts parking stalls on it). The beacon flow ran end to end on the live twin. Now: all-three-live board run and verification, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, docs, judge. |
-| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 78% | simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet |
+| Command board | `sandtable-live-fireground-twin/` | building | 80% | All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass. |
+| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 82% | fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
 
@@ -68,16 +68,16 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published): CoStar record from the kit (construction, sprinklers, 72 current tenants), Matterport twin of a scanned suite (real walls, doorways, sweep graph, Showcase SDK view on localhost), Vexcel imagery (3-6 cm ortho, four obliques, roof attributes; the agent vision tool counts parking stalls on it). The beacon flow ran end to end on the live twin. Now: all-three-live board run and verification, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, docs, judge.
+**Being worked on now:** All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass.
 
 **Left to build (agents):**
 
-- Two-puck scene on the board: click-to-place pucks, two rings per phone, pruned mirror candidate, 'cannot choose' state (board builder, in progress)
-- Hands-free beacon script on a frozen two-puck Beacon run so recorded agent turns replay exactly (server builder, in progress)
-- Record the agent's turns for the beacon, scout and mayday scripts with a real model: bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py
-- README, DEVPOST, PITCH re-cut around Beacon (write-ups builder, in progress)
-- Independent skeptical-judge review and fixes
+- Verify the all-three-live board run end to end (server builder, in progress): pre-plan from the real record, the scanned suite as the map, phones, accountability against the real tenant roster, report
+- Live board UI (board builder, in progress): record card, tenants by storey, the four oblique views, the Matterport scan view; live screenshots stay private
+- Fix the replay misses on a real-time server, then re-record the beacon and scout scripts: PORT=1930 HUB_PORT=1931 DEMO_ARGS=--no-beacon SCRIPTS="beacon scout" bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py
+- Independent skeptical-judge review (running) and fixes
 - Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py
+- Final write-up pass: what ran live on Nov 14, what is stand-in data in the public repository, what did not run on hardware
 
 **Left to do with real hardware (you):**
 
@@ -91,7 +91,7 @@ Taken from each part's `project.json` at sync time.
 
 **Needed from you:**
 
-- On the laptop: unzip the CoStar kit OUTSIDE the repository and set COSTAR_KIT_DIR; copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). Details: docs/TOOLKIT_SWAP.md (being rewritten)
+- On the laptop (about 15 min, docs/TOOLKIT_SWAP.md 'Laptop setup'): clone, venv, pip install -r requirements.txt, copy the private .env, then python scripts/pack_live_bundle.py unpack <the private bundle zip>, python -m sandtable.adapters.check --live, and start with SANDTABLE_DATA_MODE=live on the command line. Open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). The bundle and the .env travel by hand, never through the repository
 - ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)
 - Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for
 
@@ -119,13 +119,13 @@ Taken from each part's `project.json` at sync time.
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)
 
-**Being worked on now:** simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet
+**Being worked on now:** fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet
 
 **Left to build (agents):**
 
-- Fix what the independent iOS review finds; then your first Xcode build will tell us the rest (paste the errors back)
-- Recorded command-agent runs for the walk-through (so the board shows a real model's plan, not the labelled fallback)
-- Fix what the skeptical-judge review finds
+- Fix round in progress (independent judge's findings): a two-puck position only when the mirror spot is explained; stale phones never drawn as dots; an adversarial self-check (scripts/honesty_check.py) that hunts for confident wrong positions; simulated ranges without the line-of-sight score a real iPhone does not give; board fixes (phantom phone from the phone page, label collisions, stale agent orders)
+- Re-run the evaluation after the fixes and refresh every number in the documents
+- Your first Xcode build of apps/ios will tell us what the syntax check could not (paste the errors back); the independent review fixed 10 defects, none a certain compile error
 - After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do
 
 **Left to do with real hardware (you):**
@@ -152,6 +152,8 @@ Taken from each part's `project.json` at sync time.
 
 **Finished:**
 
+- Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle
+- Command agent: the walk-through shows a recorded real model run (replay); other situations get a labelled deterministic fallback
 - Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885
 - Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)
 - Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md
@@ -173,6 +175,9 @@ Taken from each part's `project.json` at sync time.
 - A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.
 - The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.
 - Not a life-safety product.
+- An independent review found the demo could show a confident wrong position after a puck was moved and when both pucks sat mid-room; the first is fixed, the second is being fixed, and a self-check now hunts for such cases. Treat every simulated accuracy number as provisional until the re-run.
+- The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.
+- The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.
 
 
 ## Your questions, answered by the teams

@@ -23,6 +23,7 @@ BEARING_FRESH_S = 3.0
 UWB_WINDOW = 7
 BLE_WINDOW = 10
 HOLD_N = 2
+MIN_LINK_SAMPLES = 3     # a UWB link joins a multi-puck solution once it has this many fresh readings
 # Demotion is slower than promotion: with an unchanged set of pucks and links, a published geometry is replaced by a
 # weaker one (fix -> candidates -> ring -> zone) only after HOLD_DOWN_N consecutive estimates, so that a borderline
 # posterior does not flicker on the board. When the pucks or the links change, HOLD_N applies (the evidence changed).
@@ -48,6 +49,7 @@ class PhoneTrack:
         # Seconds a link's samples stay usable. The session raises it (to 25 s) for live phones that take turns on a
         # board, because the stock puck firmware serves one phone at a time and a still phone's range does not age fast.
         self.link_stale_s = LINK_STALE_S
+        self._ignore_before: dict[str, float] = {}      # per puck: samples timestamped up to this are from before the puck moved
         self.georef_bearing_deg = georef_bearing_deg
         self._uwb: dict[str, deque] = {}
         self._ble: dict[str, deque] = {}
@@ -79,6 +81,10 @@ class PhoneTrack:
         self.first_seen = t if self.first_seen is None else min(self.first_seen, t)
         self.last_seen = t if self.last_seen is None else max(self.last_seen, t)
         self.updates += 1
+        if kind in ("uwb", "sos", "bearing") and t <= self._ignore_before.get(obs.get("puck"), float("-inf")):
+            if kind == "sos" and obs.get("report"):
+                self._merge_report(obs["report"], t)     # the status is still good; the range is not
+            return                                       # measured before that puck moved: it no longer fits the map
         if kind == "uwb":
             d = obs.get("d_m")
             if d is None or not math.isfinite(float(d)):
@@ -95,6 +101,21 @@ class PhoneTrack:
         elif kind == "report":
             if obs.get("report"):
                 self._merge_report(obs["report"], t)
+
+    def forget_puck(self, puck_id: str, now: float, guard_s: float = 0.3) -> None:
+        """The puck moved, was removed, or its ranges changed meaning (exercise scale): what is buffered for it no longer
+        describes the geometry. Drop it, ignore anything timestamped up to `now + guard_s` for that puck, and publish
+        afresh: a geometry computed with the old position is never held over (no dot from stale ranges)."""
+        self._uwb.pop(puck_id, None)
+        self._ble.pop(puck_id, None)
+        self._hist.pop(puck_id, None)
+        if self._bearing is not None and self._bearing.get("puck") == puck_id:
+            self._bearing = None
+        self._ignore_before[puck_id] = float(now) + float(guard_s)
+        self.published = None
+        self._published_sig = None
+        self._pending_geom, self._pending_n = None, 0
+        self._last_fix = None
 
     def _merge_report(self, rep: dict, t: float) -> None:
         if self.report_t is None or t >= self.report_t:
@@ -194,7 +215,12 @@ class PhoneTrack:
                 est = dict(self.published)
                 est["debug"] = dict(est.get("debug") or {}, held=True, reason="no fresh link: last geometry kept")
             return self._finish(est, ranges, bearing, now, noise)
-        est = locate.estimate(ctx, pucks, ranges, bearing, prior, noise, want_heat=want_heat)
+        # A UWB link joins the solution once it has MIN_LINK_SAMPLES readings (the median then survives one outlier): a
+        # second puck's first reading must not turn a ring into a position. A lone thin link may still draw its ring.
+        solid = [r for r in ranges if r["kind"] != "uwb" or int(r.get("n") or 0) >= MIN_LINK_SAMPLES]
+        use = solid if any(r["kind"] == "uwb" for r in solid) else ranges
+        use_bearing = bearing if (bearing is not None and any(r["puck"] == bearing["puck"] for r in use)) else None
+        est = locate.estimate(ctx, pucks, use, use_bearing, prior, noise, want_heat=want_heat)
         g = est["geometry"]
         by_id = {p["id"]: p for p in pucks or []}
         sig = (frozenset((r["puck"], r["kind"], round(float(by_id[r["puck"]]["x"]), 1), round(float(by_id[r["puck"]]["y"]), 1)) for r in ranges),

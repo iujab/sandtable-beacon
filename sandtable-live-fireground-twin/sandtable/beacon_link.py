@@ -209,7 +209,8 @@ class BeaconLink:
         self._key = key
         obj = apply_searches(obj, searches)
         if self.placed and obj.get("pucks"):
-            obj = {**obj, "pucks": [{**p, "placed": self.placed[p["id"]]} if p.get("id") in self.placed else p for p in obj["pucks"]]}
+            obj = {**obj, "pucks": [{**p, "placed": self.placed[p["id"]], **({"source": "hand"} if self.placed[p["id"]] == "by hand" else {})}
+                                    if p.get("id") in self.placed else p for p in obj["pucks"]]}
         self.beacons = obj
         self.emit({**obj, "type": "beacons", "link": self.link_info()})
         if self.incident is not None:
@@ -248,7 +249,9 @@ class BeaconLink:
             self.refresh()
             await self.poll_once()
             return {"ok": True, "reason": "replay of a recorded run: nothing sent to a Beacon server" if self.story is not None else "not sent"}
-        out = await self.remote("POST", "/api/pucks", {**body, "pucks": [{k: p[k] for k in ("id", "x", "y", "sigma_m") if k in p} for p in body["pucks"]]}
+        out = await self.remote("POST", "/api/pucks", {**body, "pucks": [{**{k: p[k] for k in ("id", "x", "y", "sigma_m") if k in p},
+                                                                         **({"source": "hand"} if self.placed.get(str(p.get("id"))) == "by hand" else {})}
+                                                                        for p in body["pucks"]]}
                                 if body.get("pucks") else body)
         if not out["ok"]:
             out["source"] = "sample" if self._sample is not None else None

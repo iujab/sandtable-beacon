@@ -51,6 +51,7 @@ LIVE_LINK_STALE_S = 25.0    # live: the stock puck firmware serves one phone at 
 LIVE_STALE_MIN_S = 40.0     # live: a phone is not marked stale before this much silence (BEACON_FEED A8)
 BEARING_FRESH_S = 3.0
 STATUSES = ("trapped", "injured", "sheltering", "ok", "unknown")
+PUCK_MOVED_M = 0.30      # a puck placed more than this from where it was has moved: ranges buffered for it are forgotten
 KINDS = ("cold", "sos", "uwb", "bearing", "report", "bye", "host", "uwb_puck")
 NO_EID_KINDS = ("cold", "host", "uwb_puck")
 HOST_SILENT_S = 20.0        # a puck host silent this long is dropped from its puck (BEACON_FEED A7)
@@ -501,6 +502,7 @@ class BeaconSession:
             self.twin.room(room)
         if floor is not None:
             self.twin.floor(floor)
+        previous = {p["id"]: p for p in self.pucks}
         table = {p["id"]: p for p in self.pucks} if merge else {}
         for p in clean:
             old = table.get(p["id"]) or {}
@@ -519,6 +521,13 @@ class BeaconSession:
                 self._accessories[acc] = p["id"]
                 self._unplaced.pop(acc, None)
         self.pucks = sorted(table.values(), key=lambda q: q["id"])
+        # A puck that moved (or left): every range buffered for it was measured against the old position. Forget them,
+        # so that no phone is drawn from stale ranges and the new position (PUCK_MOVED_M: more than a placement jitter).
+        moved = [pid for pid, old in previous.items()
+                 if pid not in table or old.get("floor") != table[pid].get("floor")
+                 or math.hypot(old["x"] - table[pid]["x"], old["y"] - table[pid]["y"]) > PUCK_MOVED_M]
+        if moved:
+            self._forget_pucks(moved, now)
         if room is None and self.pucks and (not merge or self.room is None):
             rooms = [q["room"] for q in self.pucks if q["room"]]
             room = max(set(rooms), key=rooms.count) if rooms else None
@@ -531,10 +540,26 @@ class BeaconSession:
             self._event("pucks_changed", None, f"Pucks: {ids} ({label})", now)
         return {"pucks": copy.deepcopy(self.pucks), "room": self.room, "floor": self.floor}
 
+    def _forget_pucks(self, puck_ids: list[str], now: float) -> None:
+        """Drop every buffered range to these pucks (they moved, left, or the exercise scale changed)."""
+        ids = set(puck_ids)
+        self._pending = type(self._pending)((o, origin) for (o, origin) in self._pending
+                                            if not (o.get("kind") in ("uwb", "sos", "bearing", "uwb_puck") and o.get("puck") in ids))
+        for ph in list(self._phones.values()):
+            for pid in ids:
+                try:
+                    ph.track.forget_puck(pid, now)
+                except Exception:
+                    log.exception("could not forget puck %s for %s", pid, ph.id)
+            ph.last_spatial, ph.last_spatial_t = None, None
+
     def set_rig_scale(self, scale: float) -> None:
         s = _finite(scale, "scale", 0.0, 100.0, open_lo=True)
         with self._lock:
+            changed = abs(s - self.rig_scale) > 1e-9
             self.rig_scale = s
+            if changed:                     # buffered ranges were scaled with the old value
+                self._forget_pucks([p["id"] for p in self.pucks], time.time())
             self._persist()
 
     # ---- observations

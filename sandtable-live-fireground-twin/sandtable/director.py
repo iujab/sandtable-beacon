@@ -231,6 +231,11 @@ class Director:
                     if u["_was_interior"] and u["status"] == "interior" and (u["assignment"] or {}).get("task") != "exit":
                         self._script_fallback(f"{u['label']} withdraws with the others")
                         inc.assign(u["id"], "exit", "exit", source="script-fallback")
+                if all(u["status"] == "out" for u in inc.units.values() if u["_was_interior"]):
+                    for pid, v in sorted(inc.phones.items()):  # every crew is out: a phone nobody brought out is handed over, never silently dropped
+                        if v["status"] not in ("out", "handed_over"):
+                            self._script_fallback(f"{pid} handed over to the incoming crews")
+                            inc.hand_over(pid, "every crew is out and this phone was not brought out; incoming crews take over")
             await asyncio.sleep(0.5)
         if inc.phase != "terminated":
             log.warning("storyboard: timed out waiting for all crews out")

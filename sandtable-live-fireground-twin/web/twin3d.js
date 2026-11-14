@@ -173,11 +173,12 @@ export class Twin3D {
       const st = this.twin.stairs.find((s) => s.id === t[key]); if (!st) continue;
       const r = this.twin.rooms.find((q) => q.id === st.room), door = this.twin.doors.find((d) => d.id === st.door);
       if (r?.kind !== "stair" && door) {
-        // the scan has no stair: the way in and out is the suite entrance, marked at its door, not by painting a room
-        const n = seen[st.id] = (seen[st.id] || 0) + 1;
+        // the scan has no stair: the way in and out is the suite entrance, marked once at its door, not by painting a room
+        if (seen[st.id]) { const old = seen[st.id]; this.pre.remove(old); const s2 = label(`ATTACK + EVAC: ${st.label}`, "#0b0e12", 44, "#ffc247", true); s2.scale.multiplyScalar(0.024 / s2.scale.y); s2.position.copy(old.position); this.pre.add(s2); continue; }
+        const n = 1;
         const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false }));
         ring.rotation.x = -Math.PI / 2; ring.position.copy(this.V(door.at[0], door.at[1], 0.08)); ring.renderOrder = 16; this.pre.add(ring);
-        const s = label(`${word}: ${st.label}`, "#0b0e12", 44, "#" + color.toString(16).padStart(6, "0"), true); s.scale.multiplyScalar(0.024 / s.scale.y); s.position.copy(this.V(door.at[0], door.at[1], 1.2 + 0.7 * n)); this.pre.add(s);
+        const s = label(`${word}: ${st.label}`, "#0b0e12", 44, "#" + color.toString(16).padStart(6, "0"), true); s.scale.multiplyScalar(0.024 / s.scale.y); s.position.copy(this.V(door.at[0], door.at[1], 1.2 + 0.7 * n)); this.pre.add(s); seen[st.id] = s;
         continue;
       }
       this.pre.add(this._poly(r.polygon, 0.04, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28 })));

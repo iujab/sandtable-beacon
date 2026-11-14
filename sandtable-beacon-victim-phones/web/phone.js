@@ -13,6 +13,10 @@ if (!key) { key = "tab-" + Array.from(crypto.getRandomValues(new Uint8Array(4)),
 const S = Object.assign({ status: null, people: 1, can_move: null, text: "", floor: null, suite: "", opt_in: true, uwb: true, chip: "U1", pointing: false, camera_assist: false, battery: 80, x: null, y: null },
   store.get("beacon.phone.state") || {});
 let bundle = null, beacons = null, view = null, simOk = true, lastAck = null, joined = false;
+// The phone joins the simulation only when the presenter places it on the plan or presses a status button
+// (opening the page must not add a phone to the board), and leaves it when the tab closes.
+let armed = false;
+function arm() { if (!armed) { armed = true; $("mp-hint").textContent = "Drag the phone to move it."; } }
 
 // ---------------------------------------------------------------- sending
 let sendTimer = null, sending = false, again = false;
@@ -27,14 +31,16 @@ function report() {
   };
 }
 async function send() {
+  if (!armed) { renderAck(null); return; }
   if (sending) { again = true; return; }
   if (!isNum(S.x)) return;
   sending = true;
   try {
     const r = report();
-    await postJSON("/api/sim/phone", { key, x: +S.x.toFixed(2), y: +S.y.toFixed(2), floor: view ? view.floorId : undefined, opt_in: S.opt_in, uwb: S.uwb, pointing: S.pointing, camera_assist: S.uwb && S.pointing && S.camera_assist, chip: r.chip, model: r.model, report: r });
+    // one tick on the page: holding the phone up and moving it with camera assistance (iPhone 14 and later give a direction only so)
+    await postJSON("/api/sim/phone", { key, x: +S.x.toFixed(2), y: +S.y.toFixed(2), floor: view ? view.floorId : undefined, opt_in: S.opt_in, uwb: S.uwb, pointing: S.uwb && S.pointing, camera_assist: S.uwb && S.pointing, chip: r.chip, model: r.model, report: r });
     simOk = true; joined = true;
-    setState(S.opt_in ? "Sent to the simulator." : "Sent: a cold phone (no app), counted as a device only.");
+    setState(S.opt_in ? "In the simulation: the board shows this phone." : "In the simulation as a cold phone: no app, counted as a device only, not on the board's phone list.");
   } catch (e) {
     simOk = e.status !== 409;
     setState(e.status === 409 ? "The server is not running the simulator (it is playing a sample or real hardware), so this phone cannot join. Start the demo with the simulator." : `Could not reach the simulator: ${e.message}`, true);
@@ -61,8 +67,9 @@ function renderAck(res, err) {
   const box = $("ack"), main = $("ack-main"), sub = $("ack-sub");
   $("beacon-dot").classList.toggle("on", !!(S.opt_in && joined && simOk));
   if (!simOk) { box.className = "ack none"; main.textContent = "Not connected to the simulator"; sub.textContent = "This page needs the Beacon server running its simulator."; return; }
-  if (!S.opt_in) { box.className = "ack cold"; main.textContent = "No app: no SOS is sent"; sub.textContent = "Rescue beacons can only count this phone as one more Bluetooth device. They cannot see your status or find you."; return; }
-  if (err === 404 || !res) { box.className = "ack none"; main.textContent = joined ? "This phone left the simulation" : "Starting your SOS beacon…"; sub.textContent = joined ? "The board was reset. Tap anything to send your SOS again." : ""; if (joined && err === 404) joined = false; $("beacon-dot").classList.remove("on"); return; }
+  if (!armed) { box.className = "ack none"; main.textContent = "Not sharing yet"; sub.textContent = "Press what is happening to send your SOS. (Presenter: or tap the plan to place this phone.)"; $("beacon-dot").classList.remove("on"); return; }
+  if (!S.opt_in) { box.className = "ack cold"; main.textContent = "You are no longer shared"; sub.textContent = "Without the app no SOS is sent: rescue beacons can only count this phone as one more Bluetooth device. They cannot see your status or find you."; return; }
+  if (!res) { box.className = "ack none"; main.textContent = "Starting your SOS beacon…"; sub.textContent = ""; $("beacon-dot").classList.remove("on"); return; }
   const ack = res.ack || {}, ph = res.phone, n = (ack.heard_by || []).length;
   if (!n && !ph) { box.className = "ack none"; main.textContent = "No rescue beacon hears you yet"; sub.textContent = "Keep the app open. Beacons are thrown into the building as crews arrive."; return; }
   box.className = "ack";
@@ -71,14 +78,23 @@ function renderAck(res, err) {
   const g = (ack.geometry || (ph && ph.geometry));
   sub.textContent = !ack.text ? occupantGeometry(ph, ack)
     : S.status === "out" ? "You are marked safe outside. Rescuers will not search for you."
-    : (g === "ring" || g === "candidates") && S.uwb && !S.pointing ? "Hold the phone up and point it at the door: it helps them find you."
+    : (g === "ring" || g === "candidates") && S.uwb && !S.pointing ? "If there is light, hold the phone up and move it slowly: it can help them find you."
     : "Keep the app open so they keep hearing you.";
   lastAck = res;
 }
 async function pollAck() {
-  if (!isNum(S.x)) return;
+  if (!armed || !isNum(S.x)) return;     // nothing to ask before the phone exists (no 404 on load)
   try { const r = await getJSON(`/api/sim/phone/${encodeURIComponent(key)}`); simOk = true; renderAck(r); }
-  catch (e) { if (e.status === 409) simOk = false; renderAck(null, e.status); }
+  catch (e) {
+    if (e.status === 409) simOk = false;
+    if (e.status === 404) {
+      // the board was reset (or the server forgot the phone): stop asking until the presenter acts again
+      armed = false; joined = false;
+      $("mp-hint").textContent = "Tap the plan to place this phone; drag it to move it.";
+      setState("This phone left the simulation (the board was reset). Press a status or tap the plan to send the SOS again.");
+    }
+    renderAck(null, e.status);
+  }
 }
 
 // ---------------------------------------------------------------- the app's controls
@@ -91,15 +107,15 @@ function renderApp() {
   $("fl").textContent = isNum(S.floor) ? S.floor : "?";
   $("suite").value = S.suite || "";
   // simulation controls
-  $("opt-in").checked = S.opt_in; $("uwb").checked = S.uwb; $("pointing").checked = S.pointing; $("camera").checked = S.camera_assist;
+  $("opt-in").checked = S.opt_in; $("uwb").checked = S.uwb; $("pointing").checked = S.pointing;
   for (const r of document.querySelectorAll('input[name="model"]')) r.checked = r.value === S.chip;
   $("models").classList.toggle("off", !S.uwb);
-  $("cam-row").classList.toggle("off", !(S.uwb && S.pointing));
+  $("dir-row").classList.toggle("off", !S.uwb);
   $("bat").value = S.battery; $("bat-v").textContent = `${S.battery}%`;
   drawMe();
 }
 function wire() {
-  for (const b of document.querySelectorAll(".st")) b.onclick = () => { S.status = b.dataset.st; if (S.status === "out") S.can_move = true; renderApp(); queueSend(0); };
+  for (const b of document.querySelectorAll(".st")) b.onclick = () => { S.status = b.dataset.st; if (S.status === "out") S.can_move = true; arm(); renderApp(); queueSend(0); };
   $("ppl-minus").onclick = () => { S.people = Math.max(1, S.people - 1); renderApp(); queueSend(); };
   $("ppl-plus").onclick = () => { S.people = Math.min(50, S.people + 1); renderApp(); queueSend(); };
   for (const b of document.querySelectorAll("[data-move]")) b.onclick = () => { S.can_move = b.dataset.move === "yes"; renderApp(); queueSend(0); };
@@ -112,10 +128,9 @@ function wire() {
   $("uwb").onchange = (e) => { S.uwb = e.target.checked; renderApp(); queueSend(0); };
   for (const r of document.querySelectorAll('input[name="model"]')) r.onchange = () => { S.chip = r.value; renderApp(); queueSend(0); };
   $("pointing").onchange = (e) => { S.pointing = e.target.checked; renderApp(); queueSend(0); };
-  $("camera").onchange = (e) => { S.camera_assist = e.target.checked; queueSend(0); };
   $("bat").oninput = (e) => { S.battery = Number(e.target.value); $("bat-v").textContent = `${S.battery}%`; queueSend(300); };
   $("btn-remove").onclick = async () => {
-    try { await postJSON("/api/sim/phone", { key, remove: true }); joined = false; setState("Removed from the simulation. Tap anything in the app to send the SOS again."); renderAck(null, 404); }
+    try { await postJSON("/api/sim/phone", { key, remove: true }); joined = false; armed = false; $("mp-hint").textContent = "Tap the plan to place this phone; drag it to move it."; setState("Removed from the simulation. Press a status or tap the plan to send the SOS again."); renderAck(null); }
     catch (e) { setState(`Could not remove: ${e.message}`, true); }
   };
 }
@@ -205,7 +220,7 @@ function wirePlan() {
     const now = performance.now();
     if (final || now - lastSend > 250) { lastSend = now; queueSend(0); }
   };
-  svg.addEventListener("pointerdown", (ev) => { if (!view) return; drag = true; try { svg.setPointerCapture(ev.pointerId); } catch { /* ignore */ } moveTo(ev); ev.preventDefault(); });
+  svg.addEventListener("pointerdown", (ev) => { if (!view) return; arm(); drag = true; try { svg.setPointerCapture(ev.pointerId); } catch { /* ignore */ } moveTo(ev); ev.preventDefault(); });
   svg.addEventListener("pointermove", (ev) => { if (drag) moveTo(ev); });
   svg.addEventListener("pointerup", (ev) => { if (drag) { drag = false; moveTo(ev, true); } });
   svg.addEventListener("pointercancel", () => { drag = false; });
@@ -226,6 +241,14 @@ async function loadDirectory() {
 async function refreshBeacons() {
   try { beacons = await getJSON("/api/beacons"); buildView(); drawPucks(); } catch { /* keep the last one */ }
 }
+// closing the tab takes the phone out of the simulation (sendBeacon survives the unload; keepalive fetch as a fallback)
+window.addEventListener("pagehide", () => {
+  if (!armed) return;
+  const body = JSON.stringify({ key, remove: true });
+  let ok = false;
+  try { ok = navigator.sendBeacon("/api/sim/phone", new Blob([body], { type: "text/plain" })); } catch { /* fall through */ }
+  if (!ok) { try { fetch("/api/sim/phone", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body }); } catch { /* nothing more to do */ } }
+});
 (async () => {
   $("sim-key").textContent = `· ${key}`;
   wire(); wirePlan();
@@ -234,11 +257,10 @@ async function refreshBeacons() {
   const p = (bundle.site && bundle.site.property) || {};
   $("app-sub").textContent = p.address ? `${p.address}${p.city ? ", " + p.city : ""}` : "Building on record";
   await Promise.all([loadDirectory(), refreshBeacons()]);
-  try { const r = await getJSON(`/api/sim/phone/${encodeURIComponent(key)}`); if (r.truth && isNum(r.truth.x)) { S.x = r.truth.x; S.y = r.truth.y; } joined = true; } catch { /* new phone */ }
   if (!view) buildView();
   renderApp();
-  await send();
-  pollAck();
-  setInterval(pollAck, 1000);
+  renderAck(null);
+  setState("Not in the simulation yet: tap the plan to place this phone, or press a status in the app.");
+  setInterval(pollAck, 1000);         // while shared: the server forgets phones nobody polls
   setInterval(refreshBeacons, 2500);
 })();

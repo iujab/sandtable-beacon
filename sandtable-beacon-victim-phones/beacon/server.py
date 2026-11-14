@@ -209,6 +209,9 @@ class AppState:
         self._fake_key: str | None = None
         self._fake_last = 0.0
         self._lock = threading.Lock()
+        self.sim_created: dict[str, float] = {}       # phones created through POST /api/sim/phone -> last time a page asked for them
+        self._plan_seen: dict = {"plan": None, "t": None, "sig": None}
+        self._agent_run: dict = {"busy": False, "t": None, "sig": None}
         self._init_engine()
         self.agent = None
         self.agent_note: str | None = None
@@ -339,9 +342,11 @@ class AppState:
              "labels": self.labels, "noise": noise, "notice": self.notice,
              "rig": {"scale": self.session.rig_scale if self.session else 1.0},
              "search_room": self.session.search_room_obj() if self.session else None}
+        if self.world is not None:
+            h["sim_model"] = getattr(self.world, "sim_model", None)
         if self.story is not None:
             st = self.story.status()
-            h["story"] = {k: st[k] for k in ("running", "done", "script", "step", "title", "error")}
+            h["story"] = {k: st.get(k) for k in ("running", "done", "script", "step", "title", "error", "expected_s")}
         return h
 
     def beacons(self) -> dict:
@@ -427,8 +432,15 @@ class AppState:
 
     async def _sim_loop(self) -> None:
         period = 1.0 / config.SIM_HZ
+        next_expiry = 0.0
         while True:
             t0 = time.time()
+            if t0 >= next_expiry:
+                next_expiry = t0 + 1.0
+                try:
+                    self.expire_sim_phones(t0)
+                except Exception:
+                    log.exception("expiring simulated phones")
             try:
                 with self._lock:
                     obs = self.world.step(t0)
@@ -482,12 +494,26 @@ class AppState:
             log.warning(self.agent_note)
             return
 
-        def status():
+        def status(b: dict | None = None):
             a = self.agent
+            busy = bool(getattr(a, "busy", False))
+            sig = _situation_signature(b) if b is not None else None
+            if busy and not self._agent_run["busy"]:            # a run starts: the situation it reads
+                self._agent_run = {"busy": True, "t": time.time(), "sig": sig}
+            elif not busy and self._agent_run["busy"]:
+                self._agent_run = dict(self._agent_run, busy=False)
             last = getattr(a, "last", None)
             if not last:
                 return None
-            return {"busy": bool(getattr(a, "busy", False)), "backend": getattr(a, "backend", None), "summary": last.get("summary")}
+            if self._plan_seen["plan"] is not last:             # a new plan: it was made from the situation at its run's start
+                run = self._agent_run
+                fresh_run = run["t"] is not None and (self._plan_seen["t"] is None or run["t"] > self._plan_seen["t"])
+                self._plan_seen = {"plan": last, "t": run["t"] if fresh_run else time.time(), "sig": run["sig"] if fresh_run else sig}
+            seen = self._plan_seen
+            out = {"busy": busy, "backend": getattr(a, "backend", None), "summary": last.get("summary"),
+                   "as_of_t": round(seen["t"], 3) if seen["t"] else None,
+                   "stale": bool(seen["sig"] is not None and sig is not None and sig != seen["sig"])}
+            return out
         self.session.agent_status = status
 
     def session_room(self) -> str | None:
@@ -512,6 +538,38 @@ class AppState:
                 return r["id"]
         return next(r["id"] for r in self.twin.rooms("suite") if r.get("floor") == floor)
 
+    # ---- simulated phones created by a page (web/phone.html): they live only while something asks for them
+    def _sim_phone_truth(self, key: str) -> dict | None:
+        with self._lock:
+            truth = self.world.truth()
+        return next((p for p in truth.get("phones", []) if p.get("key") == key), None)
+
+    def sim_bye(self, eid: str | None, now: float | None = None) -> None:
+        """The simulated phone stopped sharing (app unticked, removed, or its page went away): drop it from the session now."""
+        if eid and self.session is not None:
+            try:
+                self.session.ingest({"kind": "bye", "t": now or time.time(), "eid": eid})
+            except ValueError:
+                pass
+
+    def expire_sim_phones(self, now: float) -> list[str]:
+        """Phones created through POST /api/sim/phone expire when nothing polled GET /api/sim/phone/{key} (or re-posted)
+        for SIM_PHONE_TTL_S. Scenario and walk-through phones are never in this table and never expire."""
+        gone = [k for k, t in list(self.sim_created.items()) if now - t > SIM_PHONE_TTL_S]
+        for key in gone:
+            self.sim_created.pop(key, None)
+            truth = self._sim_phone_truth(key)
+            if truth is None:
+                continue
+            with self._lock:
+                try:
+                    self.world.remove_phone(key)
+                except ValueError:
+                    pass
+            self.sim_bye(truth.get("eid") if truth.get("opt_in") else None, now)
+            log.info("simulated phone %r expired: no page asked for it for %g s", key, SIM_PHONE_TTL_S)
+        return gone
+
     def require_sim(self):
         if self.engine != "sim" or self.world is None:
             raise HTTPException(409, f"simulator only: the source is {self.source!r}" + (" (hand-made sample)" if self.engine == "fake" else ""))
@@ -527,6 +585,7 @@ class AppState:
         if self.world is not None:
             with self._lock:
                 self.world.clear()
+        self.sim_created.clear()
         self.session.reset()
 
     def throw_pucks(self, room: str, n: int, seed: int | None, strategy: str | None = None) -> list[dict]:
@@ -574,6 +633,7 @@ class AppState:
         if self.story is not None:
             self.story.stop()
         self.session.reset()
+        self.sim_created.clear()
         with self._lock:
             world.clear()
             world.load_scenario(data)
@@ -600,6 +660,16 @@ class AppState:
             if ph.get("key") == key:
                 return ph, ph.get("eid")
         return None, None
+
+
+SIM_PHONE_TTL_S = 15.0          # a phone created by a page is removed when nothing asked for it for this long
+
+
+def _situation_signature(b: dict) -> str:
+    """What an agent plan depends on: the phones' geometry kinds and statuses, and the puck set (no times, no positions)."""
+    phones = sorted((p.get("id"), p.get("geometry"), (p.get("report") or {}).get("status"), bool((p.get("report") or {}).get("safe_outside")),
+                     bool(p.get("stale"))) for p in b.get("phones") or [])
+    return json.dumps([phones, sorted(p.get("id") for p in b.get("pucks") or [])])
 
 
 STATE: AppState | None = None
@@ -862,9 +932,12 @@ async def api_sim_phone(request: Request):
     if not isinstance(key, str) or not key or len(key) > 64:
         raise HTTPException(400, "key must be a non-empty string (at most 64 characters)")
     try:
+        before = s._sim_phone_truth(key)
         if body.get("remove"):
             with s._lock:
                 world.remove_phone(key)
+            s.sim_created.pop(key, None)
+            s.sim_bye(before.get("eid") if before and before.get("opt_in") else None)
             return {"ok": True, "removed": key}
         x, y = float(body["x"]), float(body["y"])
         if not (math.isfinite(x) and math.isfinite(y)):
@@ -882,6 +955,10 @@ async def api_sim_phone(request: Request):
                 extra["camera_assist"] = bool(body["camera_assist"])
             ph = world.upsert_phone(key, x, y, floor=body.get("floor"), opt_in=bool(body.get("opt_in", True)),
                                     uwb=bool(body.get("uwb", True)), pointing=bool(body.get("pointing", False)), report=report, **extra)
+        if before is None or key in s.sim_created:
+            s.sim_created[key] = time.time()           # created by a page: lives while the page keeps asking
+        if before and before.get("opt_in") and not ph.get("opt_in"):
+            s.sim_bye(before.get("eid"))                # the app was switched off: stop sharing now (the device still advertises)
     except (KeyError, TypeError) as exc:
         raise HTTPException(400, f"missing or bad field: {exc}")
     except ValueError as exc:
@@ -896,6 +973,8 @@ async def api_sim_phone_get(key: str):
     truth, eid = s.sim_phone_key_eid(key)
     if truth is None:
         raise HTTPException(404, f"no simulated phone {key!r}")
+    if key in s.sim_created:
+        s.sim_created[key] = time.time()
     phone = s.session.phone_by_eid(eid) if eid else None
     return {"key": key, "truth": {"x": truth.get("x"), "y": truth.get("y"), "floor": truth.get("floor")},
             "phone": phone, "ack": s.session.ack(phone)}
@@ -1083,8 +1162,10 @@ def create_app(source: str | None = None, story: bool = False, scenario: str | N
 
 # ---------------------------------------------------------------------------- command agent routes (W4's agent_routes)
 def _get_session():
+    """For the report routes: the session, or in the SAMPLE engine the server state itself (its beacons() is the sample,
+    marked sample: the report is stamped SAMPLE)."""
     s = S()
-    return s.require_session()
+    return s.session if s.session is not None else s
 
 
 def _get_agent():

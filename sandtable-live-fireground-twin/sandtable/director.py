@@ -186,7 +186,10 @@ class Director:
                 self._say(f"{r['label']} walks to {vid}")
                 if r["_follow"] is None and r["route"] and not r["route"].get("done"):
                     inc.drive(rescuer)
-            await self._wait(lambda: person().get("status") in ("reached", "evacuating", "out"), 120 * human, "the rescue team to reach the person")
+            if vid in inc.phones:                          # a phone may need a search at a candidate point first
+                await self._reach(vid, {}, slow, human)
+            else:
+                await self._wait(lambda: person().get("status") in ("reached", "evacuating", "out"), 120 * human, "the rescue team to reach the person")
 
             self._say(f"{vid} reached: the agent plans the way out")
             await self._wait(lambda: person().get("status") in ("evacuating", "out") or not s.agent_busy(),
@@ -384,8 +387,8 @@ class Director:
         def st(pid):
             return inc.phones[pid]["status"]
         self._say(f"{inc.units[r1]['label']} goes to {first}")
-        await self._wait(lambda: st(first) in ("reached", "evacuating", "out"), 120 * human, f"{first} to be reached")
-        await self._exit_with(first, r1, slow)
+        await self._reach(first, scene, slow, human)
+        await self._exit_with(first, inc.phones[first]["rescuer"] or r1, slow)
         await self._wait(lambda: st(first) == "out", 120 * human, f"{first} out")
         if s.beacon.story is not None and "after_rescue" in s.beacon.story["frames"]:
             await s.beacon.story_step("after_rescue")
@@ -400,23 +403,48 @@ class Director:
         self._say(f"{inc.units[r2]['label']} searches for {second}" + (f": {n} candidates, the nearer one first" if n else ""))
         if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
             inc.drive(r2)
-        await self._wait(lambda: bool(inc.phones[second].get("at_candidate")) or st(second) in ("reached", "evacuating", "out"), 90 * human, "the search")
-        at = inc.phones[second].get("at_candidate")
-        if at:
-            idx = sorted(inc.phones).index(second)
-            truth = scene["phones"][idx] if idx < len(scene.get("phones") or []) else None
-            found = truth is not None and math.dist((at["x"], at["y"]), (truth["x"], truth["y"])) <= 1.5
-            inc.report_search(second, r2, found)
-            if not found:
-                self._say(f"nobody at the first point: the search removes that candidate and {second} is a fix at the other")
-                await s.beacon.repoll()
-                await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turn on the fix")
-                if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
-                    inc.drive(r2)
-                await self._wait(lambda: st(second) in ("reached", "evacuating", "out"), 90 * human, f"{second} to be reached")
+        await self._reach(second, scene, slow, human)
         await self._exit_with(second, inc.phones[second]["rescuer"] or r2, slow)
         inc.held_units = set()
         await self._withdraw(human, slow)
+
+    def _truth_for(self, pid: str, scene: dict) -> dict | None:
+        """The simulated phone of the scene this phone is (the one whose truth lies nearest its fix or candidates); None without a scene."""
+        v = self.s.incident.phones.get(pid) or {}
+        raw = v.get("raw") or {}
+        pts = [(c["x"], c["y"]) for c in raw.get("candidates") or []] + ([(raw["x"], raw["y"])] if raw.get("x") is not None else []) + \
+              ([(v["x"], v["y"])] if v.get("x") is not None else [])
+        phones = scene.get("phones") or []
+        if not pts or not phones:
+            return None
+        return min(phones, key=lambda q: min(math.dist((q["x"], q["y"]), p) for p in pts))
+
+    async def _reach(self, pid: str, scene: dict, slow: float, human: float) -> bool:
+        """Wait until a crew reaches phone `pid`. At a candidate point the crew reports what it finds (from the scene's simulated truth):
+        the person, or nobody (that candidate is pruned, the phone becomes a fix at the other, the crew is re-routed). Any geometry,
+        either phone; with the fallback policy too."""
+        s, inc = self.s, self.s.incident
+        busy_t = (config.AGENT_FALLBACK_AFTER_S + 120) * slow
+
+        def st():
+            return inc.phones[pid]["status"]
+        for _ in range(4):
+            await self._wait(lambda: st() in ("reached", "evacuating", "out") or bool(inc.phones[pid].get("at_candidate")), 120 * human, f"{pid} to be reached")
+            at = inc.phones[pid].get("at_candidate")
+            if not at:
+                break
+            truth = self._truth_for(pid, scene)
+            found = truth is None or math.dist((at["x"], at["y"]), (truth["x"], truth["y"])) <= 1.5
+            inc.report_search(pid, at["by"], found)
+            if found:
+                break
+            self._say(f"nobody at the first point: the search removes that candidate and {pid} is a fix at the other")
+            await s.beacon.repoll()
+            await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turn on the fix")
+            u = inc.units.get(inc.phones[pid].get("rescuer") or at["by"])
+            if u and u["_follow"] is None and u["route"] and not u["route"].get("done"):
+                inc.drive(u["id"])
+        return st() in ("reached", "evacuating", "out")
 
     async def _exit_with(self, pid: str, unit: str, slow: float) -> None:
         """After `<pid>` is reached: the agent's exit order, else the labelled fallback."""

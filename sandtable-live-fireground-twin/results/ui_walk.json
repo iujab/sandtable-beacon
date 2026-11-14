@@ -1,27 +1,28 @@
 {
- "exercise": "mayday",
+ "exercise": "beacon",
  "base": "localhost",
- "sponsor_layers_live": [],
- "storyboard_wall_s": 82.5,
+ "storyboard_wall_s": 65.7,
  "console_issues": [],
  "waits_timed_out": [],
  "figures": [
-  "ui_mayday_01_standby.png",
-  "ui_mayday_02_preplan.png",
-  "ui_mayday_03_preplan_document.png",
-  "ui_mayday_03b_preplan_what_the_agent_looked_at.png",
-  "ui_mayday_04_engine1_inside.png",
-  "ui_mayday_05_mayday.png",
-  "ui_mayday_06_rescue_route.png",
-  "ui_mayday_06b_crew_phone.png",
-  "ui_mayday_07_replan_after_hazard.png",
-  "ui_mayday_08_plan_2d.png",
-  "ui_mayday_09_egress.png",
-  "ui_mayday_10_after_action.png",
-  "ui_mayday_11_terminated.png",
-  "ui_mayday_12_1280x720.png"
+  "ui_beacon_01_standby.png",
+  "ui_beacon_02_preplan.png",
+  "ui_beacon_03_pucks_in.png",
+  "ui_beacon_04_phones.png",
+  "ui_beacon_05_located.png",
+  "ui_beacon_06_orders_route.png",
+  "ui_beacon_06b_crew_phone.png",
+  "ui_beacon_07_plan_2d.png",
+  "ui_beacon_08_phone_reached.png",
+  "ui_beacon_10_after_action.png",
+  "ui_beacon_11_terminated.png",
+  "ui_beacon_12_1280x720.png",
+  "ui_beacon_13_dev_sample_place_pucks.png",
+  "ui_beacon_14_dev_sample_two_rings_two_places.png",
+  "ui_beacon_15_dev_sample_wall_rules_out_mirror.png",
+  "ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png"
  ],
- "at": "2026-11-14T19:30:12.613Z",
+ "at": "2026-11-14T18:52:21.255Z",
  "runs": {
   "beacon": {
    "exercise": "beacon",
@@ -52,8 +53,7 @@
   "mayday": {
    "exercise": "mayday",
    "base": "localhost",
-   "sponsor_layers_live": [],
-   "storyboard_wall_s": 82.5,
+   "storyboard_wall_s": 80,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -72,7 +72,7 @@
     "ui_mayday_11_terminated.png",
     "ui_mayday_12_1280x720.png"
    ],
-   "at": "2026-11-14T19:30:12.613Z"
+   "at": "2026-11-14T18:40:40.348Z"
   },
   "scout": {
    "exercise": "scout",

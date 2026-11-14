@@ -19,7 +19,7 @@ export function chipSpot(room, b) {
 }
 export const tagText = (p) => `${p.id} ${p.report?.status && p.report.status !== "unknown" ? p.report.status : "?"}`;
 export const STATUS_WORD = { trapped: "trapped", injured: "injured", sheltering: "sheltering", ok: "ok", unknown: "no status" };
-export const STATE_WORD = { "people-reported": "people reported", "devices-heard": "devices heard", silent: "silent", "vacant-on-record": "vacant on record", unscanned: "not scanned" };
+export const STATE_WORD = { "against-record": "record disagrees", "not-covered": "no puck there", "people-reported": "people reported", "devices-heard": "devices heard", silent: "silent", "vacant-on-record": "vacant on record", unscanned: "not scanned" };
 export const MODES = {
   beacon: { word: "Beacon", line: "Occupants located by their phones: the opt-in app gives a ring or a fix; without it, only a count of devices." },
   scout: { word: "Scout", line: "Simulated radar: pucks listen for a person who breathes or moves. Simulation only: the boards lack the echo firmware." },

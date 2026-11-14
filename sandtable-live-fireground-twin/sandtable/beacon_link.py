@@ -321,12 +321,230 @@ def _outcome(row: dict, here: list[dict]) -> str:
         return "; ".join(parts)
     return {"unscanned": "unscanned: nothing known beyond the record", "silent": "silent: a puck heard nothing (weak evidence of empty, never proof)",
             "vacant-on-record": "vacant on the record", "devices-heard": "devices heard, no opt-in phone (devices are not people)",
-            "people-reported": "people reported, none located"}.get(row.get("state"), str(row.get("state")))
+            "people-reported": "people reported, none located", "against-record": "people or devices where the record has no tenant; none reached yet",
+            "not-covered": "no puck here: nobody accounted for"}.get(row.get("state"), str(row.get("state")))
+
+
+def _record_live(provider) -> bool:
+    return (getattr(provider, "modes", None) or {}).get("costar") == "live"
+
+
+def _suite_key(v) -> str | None:
+    if v is None:
+        return None
+    t = str(v).strip()
+    return t[6:].strip() if t.lower().startswith("suite ") else t
+
+
+def _people_word(n: int) -> str:
+    return f"{n} {'person' if n == 1 else 'people'}"
+
+
+def _phone_room(p: dict) -> str | None:
+    """The room a phone is in as far as its geometry says: a fix or a zone, or candidates that all agree."""
+    if p.get("room"):
+        return p["room"]
+    if (p.get("zone") or {}).get("room"):
+        return p["zone"]["room"]
+    rooms = {c.get("room") for c in p.get("candidates") or []}
+    return rooms.pop() if len(rooms) == 1 else None
+
+
+def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict:
+    """Section 4 of docs/BEACON_BOARD_CONTRACT.md: the record's columns from the provider (this board's record),
+    the phone columns from the Beacon object, one row per suite, the storey's other tenancies as `scope: storey`."""
+    from .scout.session import floor_number
+    storey = floor_number(twin)
+    try:
+        tenants = provider.costar.list_tenants(storey)
+    except Exception:
+        tenants = []
+    try:
+        spaces = provider.costar.list_available_space(storey)
+    except Exception:
+        spaces = []
+    by_tenant: dict = {}
+    for t in tenants:
+        by_tenant.setdefault(_suite_key(t.get("suite")), []).append(t)
+    space_of = {}
+    for a in spaces:
+        space_of.setdefault(_suite_key(a.get("suite")), []).append(a)
+    b = beacons or {}
+    phones = [q for q in b.get("phones") or [] if isinstance(q, dict)]
+    presence = [c for c in b.get("presence") or [] if isinstance(c, dict)]
+    puck_rooms = set()
+    for pk in b.get("pucks") or []:
+        r = twin.locate(pk["x"], pk["y"])["room"] if pk.get("x") is not None else pk.get("room")
+        if r:
+            puck_rooms.add(r)
+
+    groups: dict = {}
+    for r in twin.rooms():
+        if r["kind"] in ("corridor", "stair", "elevator", "restroom", "mechanical") and not r.get("suite"):
+            continue
+        if r["kind"] in ("corridor", "stair"):
+            continue
+        key = ("suite", _suite_key(r.get("suite"))) if r.get("suite") else ("room", r["id"])
+        groups.setdefault(key, []).append(r)
+
+    def record_of(suite):
+        ts = by_tenant.get(suite, []) if suite is not None else []
+        sp = space_of.get(suite, []) if suite is not None else []
+        emp = [int(t["employees"]) for t in ts if t.get("employees") is not None]
+        area_t = sum(int(t.get("sf") or 0) for t in ts)
+        area_s = max((int(a.get("sf") or 0) for a in sp), default=0)
+        if ts:
+            status = "tenant"
+            text = f"{len(ts)} {'tenancy' if len(ts) == 1 else 'tenancies'} on record" + (f", {sum(emp)} employees" if emp else ", head count not in the record")
+        elif sp:
+            status, text = "available", "listed as available space with no current tenant" + (f" ({area_s} sf)" if area_s else "")
+        else:
+            status, text = "vacant", "no current tenant on the record and not listed as available"
+        rec = {"status": status, "tenants": len(ts), "employees": sum(emp) if emp else None, "area_sf": (area_t or area_s or None), "text": text}
+        if emp:
+            n = sum(emp)
+            expd = {"people": n, "low": max(0, round(n * 0.5)), "high": round(n * 1.2), "basis": "employees in the building record"}
+        elif ts:
+            expd = {"people": None, "low": None, "high": None, "basis": "tenant on record, head count not in the record"}
+        else:
+            expd = {"people": 0, "low": 0, "high": 0, "basis": "no current tenant on the record"}
+        name = " / ".join(str(t.get("name")) for t in ts if t.get("name")) or None
+        hz = "; ".join(sorted({t["life_hazard"] for t in ts if t.get("life_hazard")})) or None
+        return rec, expd, name, hz
+
+    rows_in = []
+    for (kind, key), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
+        rs = sorted(rs, key=lambda q: q["id"])
+        ids = [q["id"] for q in rs]
+        suite = key if kind == "suite" else None
+        rec, expd, name, hz = record_of(suite)
+        here = [q for q in phones if _phone_room(q) in ids and not (q.get("report") or {}).get("safe_outside")]
+        n_people = sum(int((q.get("report") or {}).get("people") or 1) for q in here)
+        cold = [c for c in presence if c.get("room") in ids]
+        cold_n = max((int(c.get("count") or 0) for c in cold), default=0)
+        cold_rng = [max((int((c.get("count_range") or [0, 0])[0]) for c in cold), default=0), max((int((c.get("count_range") or [0, 0])[1]) for c in cold), default=0)]
+        safe = sum(1 for q in phones if (q.get("report") or {}).get("safe_outside") and suite is not None and _suite_key((q.get("report") or {}).get("home_suite")) == suite)
+        covered = any(i in puck_rooms for i in ids)
+        if rec["status"] != "tenant" and (n_people or cold_n):
+            state = "against-record"
+            what = (f"{len(here)} phone{'s' if len(here) != 1 else ''} report {_people_word(n_people)} in it" if n_people else f"{cold_n} devices are heard in it (devices, not people)")
+            why = ("the record lists this suite as available space with no tenant; " if rec["status"] == "available" else "the record has no current tenant for this suite; ") + what
+        elif n_people:
+            state, why = "people-reported", f"{len(here)} phone{'s' if len(here) != 1 else ''} report {_people_word(n_people)}; {sum(1 for q in here if q.get('geometry') == 'fix')} located to a point"
+        elif cold_n:
+            state, why = "devices-heard", f"{cold_n} devices heard and no opt-in phone: devices are not people"
+        elif covered:
+            state, why = "silent", "a puck is here and heard nothing: weak evidence of empty, never proof"
+        elif rec["status"] == "tenant":
+            state, why = "not-covered", "a tenancy on record with no puck in it: nobody there is accounted for"
+        else:
+            state, why = "vacant-on-record", "no tenant on the record and no puck here"
+        accounted = n_people + safe
+        if state == "not-covered" or expd["low"] is None:
+            un = {"low": expd["low"], "high": expd["high"]} if expd["low"] is not None else None
+        else:
+            un = {"low": max(0, expd["low"] - accounted), "high": max(0, expd["high"] - accounted)}
+        label = rs[0]["label"] if len(rs) == 1 else f"Suite {suite} ({len(rs)} rooms)"
+        rows_in.append({"suite": suite, "room": ids[0], "rooms": ids, "room_label": label, "tenant": name, "life_hazard": hz, "expected": expd,
+                        "phones_opt_in": len(here), "people_reported": n_people, "located": sum(1 for q in here if q.get("geometry") == "fix"),
+                        "cold_devices": cold_n, "cold_range": cold_rng, "safe_outside": safe, "unaccounted": un, "state": state, "priority": None, "why": why,
+                        "scope": "scan", "record": rec, "covered": covered, "_targets": sorted(q["id"] for q in here)})
+    in_twin = {r["suite"] for r in rows_in if r["suite"] is not None}
+    for suite in sorted((k for k in by_tenant if k is not None and k not in in_twin), key=str):
+        rec, expd, name, hz = record_of(suite)
+        rng = f"about {expd['low']} to {expd['high']} people on record" if expd["low"] is not None else "head count not in the record"
+        rows_in.append({"suite": suite, "room": None, "rooms": [], "room_label": f"Suite {suite}", "tenant": name, "life_hazard": hz, "expected": expd,
+                        "phones_opt_in": 0, "people_reported": 0, "located": 0, "cold_devices": 0, "cold_range": [0, 0], "safe_outside": 0,
+                        "unaccounted": {"low": expd["low"], "high": expd["high"]} if expd["low"] is not None else None, "state": "not-covered", "priority": None,
+                        "why": f"same storey, not in the scan and no puck there: {rng}", "scope": "storey", "record": rec, "covered": False, "_targets": []})
+
+    # priorities: people reported against the record first, then people reported, then tenancies nobody has covered (most people on record first)
+    def rank_key(r):
+        exp_hi = (r["expected"] or {}).get("high") or 0
+        return ({"against-record": 0, "people-reported": 1, "not-covered": 2, "devices-heard": 3}[r["state"]],
+                -(r["people_reported"] or 0) if r["state"] in ("against-record", "people-reported") else -exp_hi, 0 if r.get("life_hazard") else 1, str(r["suite"] or r["room"]))
+    ranked = sorted((r for r in rows_in if r["state"] in ("against-record", "people-reported", "not-covered", "devices-heard")
+                     and not (r["state"] == "against-record" and not r["people_reported"] and not r["cold_devices"])), key=rank_key)
+    priorities = []
+    for i, r in enumerate(ranked, 1):
+        r["priority"] = i
+        priorities.append({"rank": i, "suite": r["suite"], "room": r["room"], "target": (r["_targets"] or [None])[0], "text": f"{r['room_label']}: {r['why']}"})
+
+    nc = [r for r in rows_in if r["state"] == "not-covered"]
+    nc_storey = [r for r in nc if r["scope"] == "storey"]
+    st_low = sum(int((r["expected"] or {}).get("low") or 0) for r in nc)
+    st_high = sum(int((r["expected"] or {}).get("high") or 0) for r in nc)
+    storey_label = str(twin.floor().get("label") or storey)
+    against = [r for r in rows_in if r["state"] == "against-record" and r["people_reported"]]
+    parts = []
+    for r in against:
+        word = "available space with no tenant" if r["record"]["status"] == "available" else "without a current tenant"
+        parts.append(f"The record lists {r['room_label']} as {word}; the phones say {_people_word(r['people_reported'])} {'is' if r['people_reported'] == 1 else 'are'} in it.")
+    if not against:
+        rep = sum(r["people_reported"] for r in rows_in)
+        parts.append(f"Phones report {_people_word(rep)} on this storey." if rep else "No phone reports anyone on this storey yet.")
+    if nc:
+        parts.append(f"{len(nc)} {'tenancy' if len(nc) == 1 else 'tenancies'} on storey {storey_label} {'has' if len(nc) == 1 else 'have'} no puck: "
+                     + (f"about {st_low} to {st_high} people on record, nobody accounted for." if st_high else "head counts not in the record, nobody accounted for."))
+    headline = " ".join(parts)
+
+    people = list(incident.phones.values()) + list(incident.victims.values())
+    rows = []
+    for r in rows_in:
+        rooms_of = set(r["rooms"])
+        here = [q for q in people if q.get("room") in rooms_of]
+        assigned = sorted({q["rescuer"] for q in here if q.get("rescuer")})
+        rows.append({**{k: r.get(k) for k in ("suite", "room", "room_label", "tenant", "life_hazard", "expected", "phones_opt_in", "people_reported",
+                                              "located", "cold_devices", "unaccounted", "state", "priority", "why")},
+                     "rooms": sorted(rooms_of), "scope": r["scope"], "record": r["record"], "covered": r["covered"],
+                     "cold_range": r["cold_range"], "safe_outside": r["safe_outside"],
+                     "crews": sorted(u["id"] for u in incident.units.values() if u.get("room") in rooms_of),
+                     "hazards": [h["id"] for h in incident.hazards if h["ref"] in rooms_of],
+                     "radar_victims": [v["id"] for v in incident.victims.values() if v.get("room") in rooms_of],
+                     "targets": sorted(q["id"] for q in here),
+                     "assigned": assigned[0] if assigned else None,
+                     "reached": any(q["status"] in ("reached", "evacuating", "out") for q in here),
+                     "out": bool(here) and all(q["status"] == "out" for q in here if q.get("rescuer")) and any(q.get("rescuer") for q in here),
+                     "outcome": _outcome(r, here)})
+    exp = [(r.get("expected") or {}) for r in rows_in]
+    un = [(r.get("unaccounted") or {}) for r in rows_in]
+    totals = {"expected_people": sum(int(e.get("people") or 0) for e in exp), "expected_low": sum(int(e.get("low") or 0) for e in exp),
+              "expected_high": sum(int(e.get("high") or 0) for e in exp), "unaccounted_low": sum(int(u.get("low") or 0) for u in un),
+              "unaccounted_high": sum(int(u.get("high") or 0) for u in un), "safe_outside": sum(r["safe_outside"] for r in rows_in),
+              "phones_opt_in": sum(r["phones_opt_in"] for r in rows_in), "people_reported": sum(r["people_reported"] for r in rows_in),
+              "located": sum(r["located"] for r in rows_in), "cold_devices": sum(r["cold_devices"] for r in rows_in),
+              "suites_unscanned": sum(1 for r in rows_in if not r["covered"]),
+              "against_record_people": sum(r["people_reported"] for r in against), "not_covered_suites": len(nc),
+              "targets": len(people), "assigned": sum(1 for q in people if q.get("rescuer")),
+              "reached": sum(1 for q in people if q["status"] in ("reached", "evacuating", "out")), "out": sum(1 for q in people if q["status"] == "out")}
+    try:
+        lab = provider.labels().get("costar") or {}
+    except Exception:
+        lab = {"real_sponsor_data": True, "text": "Building record: CoStar (live)."}
+    src = {"costar_mode": "live", "real_sponsor_data": bool(lab.get("real_sponsor_data")), "text": lab.get("text"),
+           "beacon": "sample (hand-made, not a result)" if b.get("sample") else ("simulated" if b.get("simulated", True) else "measured") if beacons else "none"}
+    return {"type": "accountability", "schema": "sandtable.accountability/1", "floor": twin.exercise_floor, "rows": rows, "totals": totals, "source": src,
+            "priorities": priorities, "headline": headline,
+            "storey": {"label": storey_label, "tenancies": len(tenants), "in_scan": sum(len(by_tenant.get(sx, [])) for sx in in_twin),
+                       "not_covered": len(nc_storey), "expected_low": st_low, "expected_high": st_high},
+            "limits": ["Expected head counts are employees in the building record, never a census of who is in now",
+                       "Devices are not people: cold counts are device bands",
+                       "A silent suite is weak evidence of empty, never proof",
+                       "Unaccounted is a range: expected minus everybody reported inside or outside"]}
+
+
+def record_vs_phones(acc: dict | None) -> dict | None:
+    """The report's difference between the record and the phones (section 4), or None."""
+    if acc and acc.get("headline") and any(r.get("state") == "against-record" and r.get("people_reported") for r in acc.get("rows") or []):
+        return {"id": "record_vs_phones", "kind": "record_vs_phones", "source": ["costar", "beacon"], "text": acc["headline"]}
+    return None
 
 
 def accountability(beacons: dict | None, incident, twin, provider) -> dict:
     """The Beacon object's accountability (record suites against phones) joined with what only this board knows:
     crews in each room, hazards, radar victims, and who was assigned to and reached whom."""
+    if _record_live(provider):                                   # the record is this board's to read (contract section 4); fixture mode is unchanged
+        return _accountability_live(beacons, incident, twin, provider)
     acc = (beacons or {}).get("accountability") or {}
     rows_in = acc.get("suites") or []
     floor = acc.get("floor") or twin.exercise_floor

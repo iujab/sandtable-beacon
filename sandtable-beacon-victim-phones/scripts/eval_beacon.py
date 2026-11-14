@@ -61,13 +61,22 @@ BASE_SEED = 20261114
 MISMATCH = 1.5
 
 FULL = {"main_trials": 90, "mismatch_trials": 50, "cold_trials": 200, "layout_trials": 50, "layout_bearing_trials": 60,
-        "cadence_check": 60, "tp_positions": 400, "tp_draws": 2, "tp_false_positions": 150, "tp_ref_draws": 1, "tp_cadence_check": 40}
+        "cadence_check": 60, "tp_positions": 400, "tp_draws": 2, "tp_false_positions": 150, "tp_ref_draws": 1, "tp_cadence_check": 40,
+        "los_flag_trials": 90, "two_phone_turns_trials": 50, "two_phone_pairs_trials": 25}
 QUICK = {"main_trials": 2, "mismatch_trials": 1, "cold_trials": 4, "layout_trials": 2, "layout_bearing_trials": 2,
-         "cadence_check": 0, "tp_positions": 6, "tp_draws": 1, "tp_false_positions": 3, "tp_ref_draws": 1, "tp_cadence_check": 0}
+         "cadence_check": 0, "tp_positions": 6, "tp_draws": 1, "tp_false_positions": 3, "tp_ref_draws": 1, "tp_cadence_check": 0,
+         "los_flag_trials": 2, "two_phone_turns_trials": 2, "two_phone_pairs_trials": 1}
 TP_LAYOUTS = ["door-wall", "exterior-wall", "careless"]
 TP_REF = "three-pucks (door-wall pair + far corner)"
 TP_FALSE_REACH_M = 6.0         # false-statement phones: in a neighbouring room, within this distance of the fire room
 WRONG_FIX_M = 1.5
+LOS_FLAG_PUCKS = (2, 3)        # the study arm that shows what a line-of-sight flag would add (not available from an iPhone)
+TWO_PHONE_S = 24.0             # two phones sharing two boards (turns): how long each scene runs
+TWO_PHONE_EST_HZ = 2.0
+TWO_PHONE_LINK_STALE_S = 25.0
+OBSERVATIONS_TEXT = ("live-like: every UWB observation carries a distance only (no los, rssi or fp), as an iPhone's Nearby "
+                     "Interaction session gives; board_sharing 'pairs' (each puck position carries one board per phone) unless an "
+                     "arm says otherwise")
 
 SWEEP = [(0.05, 0.0), (0.05, 0.05), (0.05, 0.10), (0.10, 0.0), (0.10, 0.05), (0.10, 0.10)]
 SPACINGS = [0.1, 0.3, 0.5]                  # two boards on one thrown device
@@ -165,7 +174,8 @@ def simulate(spec: dict) -> list[dict]:
     tw = st["twin"]
     world_noise = spec.get("world_noise") or models.DEFAULT_NOISE
     loc_noise = spec.get("loc_noise") or models.DEFAULT_NOISE
-    w = World(tw, seed=spec["seed"], noise=world_noise, eid_rotate_s=1e9)
+    w = World(tw, seed=spec["seed"], noise=world_noise, eid_rotate_s=1e9, reports_los=bool(spec.get("reports_los", False)),
+              board_sharing=spec.get("board_sharing", "pairs"))
     if spec.get("throw"):
         w.throw_pucks(spec["room"], n=spec["throw"], seed=spec["seed"], strategy=spec.get("strategy", "scatter"))
         believed = w.pucks
@@ -400,6 +410,16 @@ def main_specs(tw, cfg, room, neigh) -> list[dict]:
                 if mism:
                     spec["world_noise"] = scaled_noise(models.DEFAULT_NOISE, MISMATCH)
                 specs.append(spec)
+        if n in LOS_FLAG_PUCKS:
+            for i in range(cfg["los_flag_trials"]):
+                rng = np.random.default_rng([BASE_SEED, 1, n, i])          # the same throws and phones as the main arm
+                seed = int(rng.integers(0, 2 ** 31))
+                where = room if rng.random() < 0.6 else neigh[int(rng.integers(0, len(neigh)))]
+                phone = _point_in_room(rng, tw, where, 0.3)
+                specs.append({"seed": seed, "trial": i, "room": room, "throw": n, "phone": phone, "method": "uwb-twr",
+                              "contexts": [True], "reports_los": True,
+                              "arm": {"exp": "los-flag", "method": "uwb-twr", "pucks": n,
+                                      "phone_room_kind": "fire" if where == room else "neighbour"}})
     return specs
 
 
@@ -452,8 +472,12 @@ def summarize_main(recs: list[dict]) -> dict:
         a = r["arm"]
         groups.setdefault((a["exp"], a["method"], a["pucks"], r["twin"]), []).append(r)
     arms = []
-    for (exp, m, n, twin), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], METHODS.index(kv[0][1]), kv[0][2], not kv[0][3])):
-        row = {"exp": exp, "method": m, "pucks": n, "twin": twin, **aggregate(rs)}
+    exp_order = {"main": 0, "mismatch": 1, "los-flag": 2}
+    for (exp, m, n, twin), rs in sorted(groups.items(), key=lambda kv: (exp_order.get(kv[0][0], 9), METHODS.index(kv[0][1]), kv[0][2], not kv[0][3])):
+        row = {"exp": exp, "method": m, "pucks": n, "twin": twin,
+               "observations": ("STUDY ONLY, not available from an iPhone: UWB with the simulated line-of-sight flag (los, rssi, fp)"
+                                if exp == "los-flag" else "live-like: UWB distance only"),
+               "reports_los": exp == "los-flag", "board_sharing": "pairs", **aggregate(rs)}
         row["fire_room_only"] = aggregate([r for r in rs if r["arm"]["phone_room_kind"] == "fire"])
         arms.append(row)
     return {"arms": arms}
@@ -464,7 +488,16 @@ def _arm(arms, exp, m, n, twin=True):
 
 
 def effects(arms) -> dict:
-    eff = {"bearing": [], "twin_pruning": [], "mismatch": []}
+    eff = {"bearing": [], "twin_pruning": [], "mismatch": [], "los_flag_study": []}
+    for n in LOS_FLAG_PUCKS:
+        a, b = _arm(arms, "main", "uwb-twr", n), _arm(arms, "los-flag", "uwb-twr", n)
+        if a and b:
+            eff["los_flag_study"].append({"pucks": n, "note": "what a line-of-sight flag WOULD add; an iPhone does not report one",
+                                          "fix_share_live_like": a["geometry_share"]["fix"], "fix_share_with_los": b["geometry_share"]["fix"],
+                                          "fix_err_median_live_like_m": a["fix_err_median_m"], "fix_err_median_with_los_m": b["fix_err_median_m"],
+                                          "wrong_fix_rate_live_like": a["wrong_fix_rate_of_trials"], "wrong_fix_rate_with_los": b["wrong_fix_rate_of_trials"],
+                                          "room_accuracy_live_like": a["room_accuracy"], "room_accuracy_with_los": b["room_accuracy"],
+                                          "n_live_like": a["n"], "n_with_los": b["n"]})
     for n in range(1, 6):
         a, b = _arm(arms, "main", "uwb-twr", n), _arm(arms, "main", "uwb-twr+bearing", n)
         if a and b:
@@ -762,7 +795,10 @@ def summarize_two_puck(recs: list[dict], info: dict, neigh: list[str]) -> dict:
     for lay in TP_LAYOUTS + [TP_REF]:
         rs = [r for r in recs if r["layout"] == lay and not r["false_statement"]]
         if rs:
-            res["layouts"][lay] = {**_tp_summary(rs), "pucks": info[lay]}
+            sm = _tp_summary(rs)
+            sm["wrong_fix_rate_of_trials"] = sm["all_fixes"]["wrong_fix_rate_of_trials"]
+            sm["wrong_fix_rate_of_fixes"] = sm["all_fixes"]["wrong_fix_rate_of_fixes"]
+            res["layouts"][lay] = {**sm, "pucks": info[lay]}
     for lay in TP_LAYOUTS:
         rs = [r for r in recs if r["layout"] == lay and r["false_statement"]]
         if rs:
@@ -771,8 +807,107 @@ def summarize_two_puck(recs: list[dict], info: dict, neigh: list[str]) -> dict:
                 sum(r["outcome"] == "statement_fix" and bool(r["wrong_fix"]) for r in rs) / max(1, len(rs)), 3)
             sm["by_true_room"] = {q: _tp_summary([r for r in rs if r["truth_room"] == q])["outcome_share"] for q in neigh
                                   if any(r["truth_room"] == q for r in rs)}
+            sm["published_fixes_wrong_share"] = sm["all_fixes"]["wrong_fix_rate_of_fixes"]
+            sm["published_fixes_share_of_trials"] = sm["all_fixes"]["share_of_trials"]
             res["false_statement"][lay] = sm
     return res
+
+
+# ---- two phones sharing two boards ("turns": one board serves one phone at a time) --------------------------------------
+
+def two_phone_specs(tw: Twin, cfg: dict, room: str) -> list[dict]:
+    specs = []
+    for mode, key in (("turns", "two_phone_turns_trials"), ("pairs", "two_phone_pairs_trials")):
+        for i in range(cfg[key]):
+            rng = np.random.default_rng([BASE_SEED, 61, i])               # the same scenes for both modes
+            a = _point_in_room(rng, tw, room, 0.3)
+            for _ in range(200):
+                b = _point_in_room(rng, tw, room, 0.3)
+                if math.dist(a, b) >= 1.0:
+                    break
+            specs.append({"room": room, "mode": mode, "trial": i, "seed": int(rng.integers(0, 2 ** 31)), "phones": [a, b]})
+    return specs
+
+
+def two_phone_trial(spec: dict) -> list[dict]:
+    """Door-wall pucks, two still U1 phones in the fire room, live-like UWB only; each tracker keeps a range 25 s
+    (link_stale_s, as the session does for live phones). Times are measured from the moment both phones start sharing."""
+    st = _state()
+    tw = st["twin"]
+    room = spec["room"]
+    w = World(tw, seed=spec["seed"], eid_rotate_s=1e9, board_sharing=spec["mode"])
+    believed = w.throw_pucks(room, n=2, seed=spec["seed"], strategy="door-wall")
+    keys = ["A", "B"]
+    for k, (x, y) in zip(keys, spec["phones"]):
+        w.upsert_phone(k, x, y, uwb=True, chip="U1", report={"status": "trapped"})
+    eid_of = {p["eid"]: p["key"] for p in w.truth()["phones"]}
+    trs = {}
+    for k in keys:
+        tr = PhoneTrack("x") if PhoneTrack else _DirectTrack("x")
+        if hasattr(tr, "link_stale_s"):
+            tr.link_stale_s = TWO_PHONE_LINK_STALE_S
+        trs[k] = tr
+    ctx = st["ctx"][True]
+    label = tw.room(room)["label"]
+    t0 = 1_800_000_000.0 + (spec["seed"] % 100000)
+    first_two = {k: None for k in keys}
+    first_fix = {k: None for k in keys}
+    last = {}
+    steps = int(round(TWO_PHONE_S * SIM_HZ))
+    every = int(round(SIM_HZ / TWO_PHONE_EST_HZ))
+    for i in range(1, steps + 1):
+        now = t0 + i / SIM_HZ
+        for o in w.step(now):
+            if o["kind"] == "uwb":
+                trs[eid_of[o["eid"]]].add({"kind": "uwb", "t": o["t"], "puck": o["puck"], "eid": o["eid"], "d_m": o["d_m"]})
+        if i % every:
+            continue
+        for k in keys:
+            e = trs[k].estimate(ctx, believed, now)
+            s = prune.apply_statement(e, room, label, f"the occupant says they are in {label}", "occupant-statement")
+            n_p = len({r["puck"] for r in (e.get("ranges") or []) if r.get("kind") == "uwb"})
+            if first_two[k] is None and n_p >= 2:
+                first_two[k] = round(now - t0, 2)
+            if first_fix[k] is None and s["geometry"] == "fix":
+                first_fix[k] = round(now - t0, 2)
+            last[k] = (e, s)
+    out = []
+    for k, (x, y) in zip(keys, spec["phones"]):
+        e, s = last[k]
+        g0, g1 = e["geometry"], s["geometry"]
+        outcome = ("twin_fix" if g0 == "fix" else "statement_fix" if (g0 == "candidates" and g1 == "fix")
+                   else "cannot_choose" if g1 == "candidates" else "ring_or_other")
+        pub = e if g0 == "fix" else s
+        err = math.hypot(pub["x"] - x, pub["y"] - y) if pub["geometry"] == "fix" else None
+        sig = float(pub.get("sigma_m") or 0.0) if err is not None else None
+        out.append({"mode": spec["mode"], "trial": spec["trial"], "phone": k, "first_two_puck_s": first_two[k],
+                    "first_fix_s": first_fix[k], "outcome": outcome, "fix_err_m": None if err is None else round(err, 3),
+                    "wrong_fix": None if err is None else bool(err > 3.0 * sig or err > WRONG_FIX_M)})
+    return out
+
+
+def summarize_two_phone(recs: list[dict]) -> dict:
+    out = {"setup": f"door-wall pucks, two still U1 phones in the fire room (>= 1 m apart, the same scenes in both modes), live-like UWB "
+                    f"only, trackers keep a range {TWO_PHONE_LINK_STALE_S:g} s (link_stale_s), estimates at {TWO_PHONE_EST_HZ:g} Hz, "
+                    f"{TWO_PHONE_S:g} s per scene; occupant's statement = the fire room",
+           "modes": {k: SIM_MODEL["board_sharing_modes"][k] for k in ("turns", "pairs")}}
+    for mode in ("turns", "pairs"):
+        rs = [r for r in recs if r["mode"] == mode]
+        if not rs:
+            continue
+        n = len(rs)
+
+        def wait(field, rs=rs):
+            v = [r[field] for r in rs if r[field] is not None]
+            return {"median_s": _q(v, 0.5), "p90_s": _q(v, 0.9), "never_within_scene": round(sum(r[field] is None for r in rs) / n, 3)}
+        fx = [r for r in rs if r["fix_err_m"] is not None]
+        out[mode] = {"phone_scenes": n, "wait_first_two_puck_ranges": wait("first_two_puck_s"), "wait_first_fix": wait("first_fix_s"),
+                     "outcome_share_at_end": {o: round(sum(r["outcome"] == o for r in rs) / n, 3)
+                                              for o in ("twin_fix", "statement_fix", "cannot_choose", "ring_or_other")},
+                     "wrong_fix_rate_of_fixes": _rate([r["wrong_fix"] for r in fx]),
+                     "wrong_fix_rate_of_trials": round(sum(bool(r["wrong_fix"]) for r in rs) / n, 3),
+                     "fix_err_median_m": _q([r["fix_err_m"] for r in fx], 0.5)}
+    return out
 
 
 def main(argv=None) -> int:
@@ -809,7 +944,7 @@ def main(argv=None) -> int:
     common = {"simulated": True, "generated_by": cmd,
               "noise_model": {"noise": copy.deepcopy(models.DEFAULT_NOISE), "sim": copy.deepcopy(SIM_MODEL),
                               "text": "see the beacon/sim.py module docstring (stated model); radio constants: models.DEFAULT_NOISE"},
-              "pipeline": PIPELINE, "obs_s": OBS_S, "sim_hz": SIM_HZ, "estimate_hz": EST_HZ, "estimate_last_s": EST_LAST_S,
+              "observations": OBSERVATIONS_TEXT, "pipeline": PIPELINE, "obs_s": OBS_S, "sim_hz": SIM_HZ, "estimate_hz": EST_HZ, "estimate_last_s": EST_LAST_S,
               "base_seed": BASE_SEED, "fire_room": room, "neighbours": neigh, "trial_counts": cfg, "quick": bool(args.quick),
               "locator_rules": {k: v for k, v in locate.geometry_rules.items() if k != "text"}}
     mrecs = crecs = lrecs = tprecs = None
@@ -844,6 +979,9 @@ def main(argv=None) -> int:
             tspecs, tp_info = two_puck_specs(tw, cfg, room, neigh)
             tprecs = _run(pool, two_puck_trial, tspecs, chunks=8)
             timings["two_puck_s"] = round(time.time() - t, 1)
+            t = time.time()
+            two_recs = _run(pool, two_phone_trial, two_phone_specs(tw, cfg, room), chunks=2)
+            timings["two_phone_s"] = round(time.time() - t, 1)
             if cfg.get("tp_cadence_check"):
                 t = time.time()
                 chk = [dict(sp, est_last_s=0) for sp in tspecs if not sp["false_statement"]][: cfg["tp_cadence_check"]]
@@ -911,7 +1049,7 @@ def main(argv=None) -> int:
                                     f"false statement: {cfg['tp_false_positions']} positions x {cfg['tp_draws']} draws",
                        "pucks": "placed by hand at beacon.layout.recommend's spots: the locator gets those spots, the truth is within "
                                 "a few cm (N(0, 0.03 m) per axis)"},
-                   **tp, "cadence_check": tp_cadence}
+                   **tp, "two_phones": summarize_two_phone(two_recs), "cadence_check": tp_cadence}
         if figs:
             t = time.time()
             two_puck_figures(tp_json, tprecs, fig_dir, tw, room)

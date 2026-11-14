@@ -29,6 +29,11 @@ from . import config
 
 log = logging.getLogger("beacon.story")
 
+# Measured, not estimated: wall-clock length of the suite-310 walk-through, from the start request to "done", on the
+# simulator with the replay/fallback agent (steps wait for conditions, so a run varies by a few seconds).
+EXPECTED_S = 0.0
+EXPECTED_BASIS = "not measured yet"
+
 
 class Story:
     def __init__(self, state, script: str | None = None):
@@ -42,6 +47,7 @@ class Story:
         self.running = False
         self.done = False
         self.error: str | None = None
+        self.duration_s: float | None = None
         self.scenario = self._load()
 
     # ---- scenario and layout
@@ -151,7 +157,8 @@ class Story:
     def status(self) -> dict:
         return {"running": self.running, "done": self.done, "script": self.script, "step": self.step, "title": self.title,
                 "t_s": round(time.time() - self.t0, 1) if self.t0 else None, "log": self.log[-12:], "error": self.error,
-                "pucks": 2, "simulated": True}
+                "pucks": 2, "simulated": True, "expected_s": EXPECTED_S, "expected_basis": EXPECTED_BASIS,
+                "last_duration_s": self.duration_s}
 
     # ---- helpers
     def _say(self, step: int, title: str, text: str) -> None:
@@ -162,6 +169,13 @@ class Story:
                          "step": step, "simulated": True})
         # with an external bundle the text may name rooms or tenants of a private building: keep it out of logs
         log.info("story step %d%s", step, "" if config.EXTERNAL_BUNDLE else ": " + str(text))
+
+    def _sharing_note(self) -> str:
+        """How the simulator lets two phones use one board (W2's sim_model.board_sharing), said plainly."""
+        mode = ((getattr(self.state.world, "sim_model", None) or {}).get("board_sharing") or "pairs")
+        if mode == "turns":
+            return "(simulated taking turns: one board serves one phone at a time, so each phone's range is refreshed less often)"
+        return "(simulated as a second board at each puck position: one board serves one phone at a time)"
 
     def _phone(self, key: str) -> dict | None:
         _truth, eid = self.state.sim_phone_key_eid(key)
@@ -201,6 +215,9 @@ class Story:
 
     def _setup_world(self) -> None:
         st = self.state
+        created = getattr(st, "sim_created", None)
+        if isinstance(created, dict):
+            created.clear()                     # phones a page had created are gone with the world
         with st._lock:
             st.world.clear()
             # everything that only advertises: phones with no app, wearables, laptops, and the occupants' phones (app closed)
@@ -271,7 +288,8 @@ class Story:
                 self._upsert(self.neighbour)
                 nlabel = tw.room(self.neighbour["room"])["label"] if self.neighbour.get("room") else "the next room"
                 model = self.neighbour.get("model") or "phone"
-                self._say(5, "second phone", f"a second phone ({model}) reports from {nlabel}: it resolves the same way")
+                self._say(5, "second phone", f"a second phone ({model}) reports from {nlabel}: it resolves the same way "
+                                             f"{self._sharing_note()}")
                 got = await self._wait(lambda: self._geom(nk) == "fix", 4.0, 8.0)
                 if not got:
                     # No bearing fallback: an iPhone 14 or 15 reports no direction to an accessory. A ring stays a ring.
@@ -298,7 +316,8 @@ class Story:
                 except Exception:
                     log.exception("the command agent failed during the walk-through")
             self.done = True
-            self._say(9, "done", "walk-through complete")
+            self.duration_s = round(time.time() - self.t0, 1)
+            self._say(9, "done", f"walk-through complete ({self.duration_s:g} s)")
         except asyncio.CancelledError:
             raise
         except Exception as exc:

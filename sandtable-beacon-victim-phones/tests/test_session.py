@@ -174,15 +174,31 @@ def test_safe_outside_is_none(twin_raw, site_raw):
 
 
 def test_stale_then_dropped(twin_raw, site_raw):
+    """A stale phone is never a dot: its position is withdrawn, only the room where it was last located is kept."""
     s, events = _session(twin_raw, site_raw, stale_s=20.0, retention_s=60.0)
     s.set_pucks(P3, room="r310")
+    s.ingest({"kind": "report", "t": T0, "eid": EID, "prev_eid": None, "report": {"status": "trapped", "people": 2, "home_suite": "310"}})
     b = _run(s, P3)
-    sig0 = b["phones"][0]["sigma_m"]
+    assert b["phones"][0]["geometry"] == "fix"
     b = s.step(T0 + 30)
     p = b["phones"][0]
-    assert p["stale"] is True and p["geometry"] == "fix" and p["sigma_m"] > sig0
-    assert "Not heard" in p["text"]
+    assert p["stale"] is True and p["geometry"] == "none"
+    for k in ("x", "y", "sigma_m", "cov", "geo", "node", "ring", "zone"):
+        assert p[k] is None, k
+    assert p["candidates"] == []
+    assert p["last_known"]["geometry"] == "fix" and p["last_known"]["room"] == "r310" and p["last_known"]["age_s"] >= 20
+    assert set(p["last_known"]) <= {"geometry", "room", "room_label", "age_s", "puck"}          # never coordinates
+    assert "Not heard for 2" in p["text"] and "last located in Suite 310" in p["text"]
     assert any(e.get("name") == "phone_lost" for e in events)
+    if "accountability" in b:
+        row = next(r for r in b["accountability"]["suites"] if r["room"] == "r310" or "r310" in (r.get("rooms") or []))
+        assert row["people_reported"] >= 2 and row["located"] == 0
+        assert "B1" in row.get("stale_phones", []) and "not heard for" in row["why"]
+    from beacon import feeds
+    fc = feeds.beacons_to_geojson(b)
+    assert not [f for f in fc["features"] if f["properties"]["kind"] in ("phone", "phone-candidate", "phone-ring")]
+    lk = [f for f in fc["features"] if f["properties"]["kind"] == "phone-last-known"]
+    assert lk and lk[0]["geometry"]["type"] == "Polygon"
     b = s.step(T0 + 70)
     assert b["phones"] == []
     assert sum(1 for e in events if e.get("name") == "phone_lost") == 2

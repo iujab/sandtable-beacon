@@ -570,28 +570,42 @@ function renderBeaconHead() {
     (lim.length ? `<div class="st2" title="${esc(lim.join("; "))}"><b>Cannot tell:</b> ${lim.map(esc).join("; ")}</div>` : "");
 }
 function renderAcc() {
-  const el = $("tab-acc"), rows = mergeSuites(beacon.rows()), tot = beacon.foreign || (beacon.acc?.rows && rows.length !== beacon.acc.rows.length) ? null : beacon.totals();
-  if (!rows.length) {
+  const el = $("tab-acc"), acc = beacon.acc || {}, all = beacon.rows();
+  // the server merges the rooms of one suite in live mode (rows carry `rooms` / `scope`); otherwise merge here
+  const merged = all.some((r) => Array.isArray(r.rooms) || r.scope) ? all : mergeSuites(all);
+  const rows = merged.filter((r) => r.scope !== "storey"), storey = merged.filter((r) => r.scope === "storey");
+  const tot = beacon.foreign || (beacon.acc?.rows && merged.length !== beacon.acc.rows.length && !all.some((r) => r.scope)) ? null : beacon.totals();
+  if (!merged.length) {
     el.innerHTML = `<div class="sc-empty"><p>The building record's suites against the phones heard: who the record expects, who reported in, who is still unaccounted for.</p><p>${beacon.foreign ? "<b>The Beacon module is set up for another building</b>: its suites are not in this twin." : beacon.connected ? "No pucks in a room yet." : "<b>Beacon module not connected.</b> No phone data; the record is in the Record tab."}</p></div>`;
     return;
   }
   const rungs = beacon.b?.rungs || {};
   const rw = beacon.b ? `<div class="acc-rungs" title="What the current Beacon source can deliver">${[["cold", "device count"], ["ble", "Bluetooth"], ["uwb", "UWB"], ["bearing", "bearing"]].map(([k, w]) => `<span class="rung ${rungs[k] ? "on" : "off"}">${w}</span>`).join("")}</div>` : "";
-  const order = rows.slice().sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9) || String(a.suite).localeCompare(String(b.suite)));
+  const order = (xs) => xs.slice().sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9) || String(a.suite).localeCompare(String(b.suite)));
   const range = (r) => (r ? (r.low === r.high ? `${r.low}` : `${r.low}–${r.high}`) : "?");
-  el.innerHTML = rw + (tot ? `<div class="acc-tot"><div><b>${tot.people_reported ?? 0}</b> ${tot.people_reported === 1 ? "person" : "people"} reported by <b>${tot.phones_opt_in ?? 0}</b> phone${tot.phones_opt_in === 1 ? "" : "s"}, <b>${tot.located ?? 0}</b> located to a point</div><div>${tot.expected_people != null ? `about ${tot.expected_people} expected on the floor (an estimate from the record)` : "no occupancy estimate without the Beacon module"}${tot.cold_devices ? `; ${tot.cold_devices} devices heard (not people)` : ""}${tot.suites_unscanned ? `; ${tot.suites_unscanned} suites not scanned` : ""}</div></div>` : "") +
-    `<div class="acc-rows">` + order.map((r) => {
-      const crew = r.reached ? `${esc(r.assigned || (r.crews || [])[0] || "crew")} reached` : r.assigned ? `${esc(r.assigned)} sent` : (r.crews || []).length ? `${esc(r.crews.join(", "))} inside` : "";
-      return `<div class="acc-row st-${esc(r.state)}${r.out ? " out" : ""}" data-suite="${esc(r.suite)}" title="${esc(r.expected?.basis ? `Expected: ${r.expected.basis}` : "")}${r.why ? `\n${esc(r.why)}` : ""}">` +
-        `<div class="su">${esc(r.suite)}${r.priority != null && r.priority <= 2 ? `<span class="prio">P${r.priority}</span>` : ""}</div>` +
-        `<div class="mid"><div class="tn">${esc(r.tenant || r.industry || (r.vacant ? "vacant on record" : "no tenant on record"))}</div>${r.life_hazard ? `<div class="hz">${esc(r.life_hazard)}</div>` : ""}` +
-        `<div class="nn">${r.expected ? `<span>expects ${range(r.expected)}</span>` : ""}${r.phones_opt_in ? `<span class="ph">${r.phones_opt_in} phone${r.phones_opt_in > 1 ? "s" : ""}, ${r.people_reported} reported${r.located ? `, ${r.located} located` : ""}</span>` : ""}${r.cold_devices ? `<span>${r.cold_devices} devices</span>` : ""}</div></div>` +
-        `<div class="rt"><div class="un">${range(r.unaccounted)}</div><div class="ul">unaccounted</div><div class="stw">${esc(STATE_WORD[r.state] || r.state || "")}</div>${crew ? `<div class="crew">${crew}${r.out ? ", out" : ""}</div>` : ""}</div></div>`;
-    }).join("") + `</div>` + ((beacon.acc?.limits || beacon.b?.limits || []).length ? `<div class="acc-lim">${(beacon.acc?.limits || []).concat(["Unaccounted is a range: the record's expected occupancy is an estimate"]).slice(0, 3).map(esc).join(". ")}.</div>` : "");
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  // the record's status beside what the phones say: a disagreement is a finding, not an empty cell
+  const recordWords = (rec) => rec.text || ({ available: "available space, no tenant", vacant: "no current tenant" }[rec.status] || `${n(rec.tenants || 1, "tenant", "tenants")}${rec.employees != null ? `, ${rec.employees} employees` : ""}`);
+  const phoneWords = (r) => (r.phones_opt_in ? `${n(r.people_reported || 0, "person", "people")} reported by ${n(r.phones_opt_in, "phone", "phones")}${r.located ? `, ${r.located} located` : ""}` : r.cold_devices ? `${n(r.cold_devices, "device", "devices")} heard, no app (not people)` : r.covered === false ? "no puck in this suite" : "no phone heard");
+  const rowHtml = (r) => {
+    const crew = r.reached ? `${esc(r.assigned || (r.crews || [])[0] || "crew")} reached` : r.assigned ? `${esc(r.assigned)} sent` : (r.crews || []).length ? `${esc(r.crews.join(", "))} inside` : "";
+    const vs = r.record ? `<div class="vs${r.state === "against-record" ? " against" : ""}"><div><span class="k">Record</span>${esc(recordWords(r.record))}</div><div><span class="k">Phones</span>${esc(phoneWords(r))}</div></div>` : "";
+    return `<div class="acc-row st-${esc(r.state)}${r.out ? " out" : ""}${r.scope ? " sc-" + esc(r.scope) : ""}" data-suite="${esc(r.suite)}" title="${esc(r.expected?.basis ? `Expected: ${r.expected.basis}` : "")}${r.why ? `\n${esc(r.why)}` : ""}">` +
+      `<div class="su">${esc(r.suite)}${r.priority != null && r.priority <= 2 ? `<span class="prio">P${r.priority}</span>` : ""}</div>` +
+      `<div class="mid"><div class="tn">${esc(r.tenant || r.industry || (r.vacant ? "vacant on record" : "no tenant on record"))}${r.rooms?.length > 1 ? ` <small>(${r.rooms.length} rooms)</small>` : ""}</div>${r.life_hazard ? `<div class="hz">${esc(r.life_hazard)}</div>` : ""}${vs}` +
+      `<div class="nn">${r.expected ? `<span>expects ${r.expected.people == null ? "an unknown number" : range(r.expected)}</span>` : ""}${!r.record && r.phones_opt_in ? `<span class="ph">${r.phones_opt_in} phone${r.phones_opt_in > 1 ? "s" : ""}, ${r.people_reported} reported${r.located ? `, ${r.located} located` : ""}</span>` : ""}${!r.record && r.cold_devices ? `<span>${r.cold_devices} devices</span>` : ""}</div></div>` +
+      `<div class="rt"><div class="un">${range(r.unaccounted)}</div><div class="ul">unaccounted</div><div class="stw">${esc(STATE_WORD[r.state] || r.state || "")}</div>${crew ? `<div class="crew">${crew}${r.out ? ", out" : ""}</div>` : ""}</div></div>`;
+  };
+  const st = acc.storey || {};
+  const lo = st.expected_low ?? storey.reduce((a, r) => a + (r.expected?.low || 0), 0), hi = st.expected_high ?? storey.reduce((a, r) => a + (r.expected?.high || 0), 0);
+  const group = storey.length ? `<details class="acc-storey"><summary>Same storey, no pucks there: ${n(st.not_covered ?? storey.length, "tenancy", "tenancies")}, about ${lo} to ${hi} people on record</summary>${order(storey).map(rowHtml).join("")}</details>` : "";
+  el.innerHTML = rw + (acc.headline ? `<div class="acc-headline">${esc(acc.headline)}</div>` : "") +
+    (tot ? `<div class="acc-tot"><div><b>${tot.people_reported ?? 0}</b> ${tot.people_reported === 1 ? "person" : "people"} reported by <b>${tot.phones_opt_in ?? 0}</b> phone${tot.phones_opt_in === 1 ? "" : "s"}, <b>${tot.located ?? 0}</b> located to a point</div><div>${tot.expected_people != null ? `about ${tot.expected_people} expected on the floor (an estimate from the record)` : "no occupancy estimate without the Beacon module"}${tot.cold_devices ? `; ${tot.cold_devices} devices heard (not people)` : ""}${tot.suites_unscanned ? `; ${tot.suites_unscanned} suites not scanned` : ""}</div></div>` : "") +
+    `<div class="acc-rows">` + order(rows).map(rowHtml).join("") + group + `</div>` + ((beacon.acc?.limits || beacon.b?.limits || []).length ? `<div class="acc-lim">${(beacon.acc?.limits || []).concat(["Unaccounted is a range: the record's expected occupancy is an estimate"]).slice(0, 3).map(esc).join(". ")}.</div>` : "");
   for (const row of el.querySelectorAll(".acc-row")) {
     row.onmouseenter = () => highlightSuite(row.dataset.suite, true);
     row.onmouseleave = () => highlightSuite(row.dataset.suite, false);
-    row.onclick = () => { const r = S.bundle.twin.rooms.find((q) => q.suite === row.dataset.suite); const p = beacon.phones().find((q) => (q.room || q.zone?.room) === r?.id); if (p) onPick(p.id); };
+    row.onclick = () => { const rs = S.bundle.twin.rooms.filter((q) => q.suite === row.dataset.suite).map((q) => q.id); const p = beacon.phones().find((q) => rs.includes(q.room || q.zone?.room)); if (p) onPick(p.id); };
   }
 }
 // ---------------------------------------------------------------- placing pucks by hand (tape-measured positions)
@@ -679,9 +693,19 @@ function setView(v) {
   $("twin3d").hidden = v !== "3d"; $("plan").toggleAttribute("hidden", v !== "2d"); $("scanview").hidden = v !== "scan";
   $("twin3d").parentElement.classList.toggle("scanmode", v === "scan");
   if (v === "scan" && !$("scanview").firstChild) {
-    const f = document.createElement("iframe");
-    f.src = "/mp.html"; f.title = "Matterport scan of the suite (Showcase SDK)"; f.allow = "fullscreen; xr-spatial-tracking";
-    $("scanview").appendChild(f); S.scan.frame = f;
+    // the Showcase SDK key is restricted to the host name "localhost": anywhere else, say so instead of trying
+    if (location.hostname !== "localhost") {
+      const url = `http://localhost:${location.port || 80}/`;
+      $("scanview").innerHTML = `<div class="scan-note"><p>The Matterport scan view loads only at <a href="${esc(url)}">${esc(url)}</a> on the machine that runs the board (the SDK key is restricted to localhost).</p><p>The plan and the 3D twin here are built from the same scan.</p></div>`;
+    } else {
+      const f = document.createElement("iframe");
+      f.src = "/mp.html"; f.title = "Matterport scan of the suite (Showcase SDK)"; f.allow = "fullscreen; xr-spatial-tracking";
+      $("scanview").appendChild(f); S.scan.frame = f;
+      S.scan.timer = setTimeout(() => {
+        if (S.scan.ready) return;
+        $("scanview").insertAdjacentHTML("beforeend", `<div class="scan-note over"><p>The Matterport scan did not connect within 15 seconds: the Matterport service may be out of reach from this machine, or it refused the key.</p><p>The plan and the 3D twin are built from the same scan.</p></div>`);
+      }, 15000);
+    }
   }
   for (const b of $("view-seg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.view === v);
   if (v === "3d") twin3d.resize();
@@ -701,7 +725,7 @@ async function initScan() {
   addEventListener("message", (ev) => {
     const m = ev.data || {};
     if (!S.scan || !String(m.type || "").startsWith("mp.")) return;
-    if (m.type === "mp.ready") { S.scan.ready = true; for (const q of S.scan.queue.splice(0)) S.scan.frame?.contentWindow?.postMessage(q, "*"); }
+    if (m.type === "mp.ready") { S.scan.ready = true; clearTimeout(S.scan.timer); document.querySelector("#scanview .scan-note.over")?.remove(); for (const q of S.scan.queue.splice(0)) S.scan.frame?.contentWindow?.postMessage(q, "*"); }
     else if (m.type === "mp.moved") toast(m.ok ? `Scan: moved to the nearest scan position (${m.dist_m != null ? m.dist_m.toFixed(1) + " m away" : "nearest"})` : `Scan: ${m.error || "could not move"}`);
     else if (m.type === "mp.error") toast(`Scan: ${m.text}`);
   });
@@ -712,6 +736,7 @@ function lookInScan(x, y) {
   setView("scan");
   const msg = { type: "mp.goto", x, y, floor: S.bundle.twin.exercise_floor };
   if (S.scan.ready) S.scan.frame?.contentWindow?.postMessage(msg, "*"); else S.scan.queue = [msg];
+  if (location.hostname !== "localhost") toast("The scan view needs the board opened at localhost; the plan and the twin show the same place");
 }
 const lookBtn = (x, y) => (S.scan && x != null ? `<button class="mini lookscan" data-look="${x.toFixed(2)},${y.toFixed(2)}" title="Open the Matterport scan at the nearest scan position">Look here in the scan</button>` : "");
 function wireLook() { for (const b of $("here").querySelectorAll("[data-look]")) b.onclick = () => { const [x, y] = b.dataset.look.split(",").map(Number); lookInScan(x, y); }; }
@@ -774,6 +799,7 @@ async function main() {
   });
   aerial = new Aerial($("aerial-img"), $("aerial-svg"), $("aerial-seg"), $("aerial-src"), S.bundle, UNIT_COLOR, { sidesEl: $("aerial-sides"), onOblique: showOblique });
   renderRecord();
+  window.liveMarker?.(["costar", "matterport", "vexcel"].some((k) => S.bundle.labels[k]?.mode === "live"));
   scout = new ScoutModel(S.bundle, onScoutChange);
   beacon = new BeaconModel(S.bundle, onBeaconChange);
   plan.setOutside(S.bundle.aerial.images.find((i) => i.id === "ortho") || S.bundle.aerial.images[0]);

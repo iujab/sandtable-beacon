@@ -1,0 +1,658 @@
+{
+ "simulated": true,
+ "generated_by": "scripts/honesty_check.py",
+ "what": "adversarial watchdog: beacon.sim.World + beacon.session.BeaconSession on a simulated clock, the judge's moves",
+ "thresholds": {
+  "wrong_fix": "error > max(3 sigma_m, 1.0 m)",
+  "max_wrong_share_of_fix_steps": 0.03
+ },
+ "invariants": [
+  "coordinates (x, y, cov, geo, node) only with geometry == 'fix'",
+  "a stale phone has no dot",
+  "a phone that said bye is not published again",
+  "a safe-outside phone has geometry 'none'",
+  "a silent phone is dropped after the retention time",
+  "every simulated observation is accepted"
+ ],
+ "observations": "live-like: UWB distance only (no los/rssi/fp), as from an iPhone",
+ "seeds": {
+  "values": [
+   310,
+   20261114
+  ],
+  "text": "each scene runs twice: with the demo scenario's seed (what the board shows) and with one other seed"
+ },
+ "noise_model": {
+  "uwb": {
+   "sigma_los_m": 0.1,
+   "link_bias_sigma_m": 0.1,
+   "wall_bias_m": 0.3,
+   "wall_extra_sigma_m": 0.35,
+   "body_bias_m": 0.3,
+   "body_extra_sigma_m": 0.3,
+   "body_block_prob": 0.25,
+   "outlier_prob": 0.02,
+   "outlier_m": 2.0,
+   "dropout_prob": 0.05,
+   "max_range_m": 15.0,
+   "max_walls": 1
+  },
+  "ble": {
+   "tx_1m_dbm": -62.0,
+   "tx_spread_db": 4.5,
+   "n_los": 2.5,
+   "wall_loss_db": 5.0,
+   "shadow_sigma_db": 6.0,
+   "fast_fading_sigma_db": 4.0,
+   "body_loss_db": 11.5,
+   "sensitivity_dbm": -95.0
+  },
+  "bearing": {
+   "sigma_deg": 25.0,
+   "fov_deg": 120.0,
+   "available_only_when_pointing": true
+  },
+  "puck": {
+   "position_sigma_m": 0.08
+  }
+ },
+ "locator_mirror_guarantee": false,
+ "scenarios": {
+  "walkthrough": {
+   "name": "walkthrough",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 950,
+   "phone_steps": 1400,
+   "fix_steps": 717,
+   "wrong_fix_steps": 0,
+   "duration_s": 190.0,
+   "fix_share_of_phone_steps": 0.512,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.414,
+    "t_s": 87.6,
+    "phone": "B1",
+    "truth_key": "trapped-310",
+    "err_m": 0.758,
+    "sigma_m": 0.61,
+    "threshold_m": 1.83,
+    "published": [
+     2.55,
+     1.19
+    ],
+    "truth": [
+     2.1,
+     1.8
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "a phone outside presses 'I am out'",
+    "since_s": 7.6,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 475,
+     "fix_steps": 446,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: puck 1 placed at the door",
+      "t=5.0 s: trapped phone starts sharing",
+      "t=20.0 s: careless puck 2 dropped mid-room",
+      "t=40.0 s: puck 2 slid to the door wall",
+      "t=60.0 s: second phone starts sharing",
+      "t=80.0 s: a phone outside presses 'I am out'"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 475,
+     "fix_steps": 271,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: puck 1 placed at the door",
+      "t=5.0 s: trapped phone starts sharing",
+      "t=20.0 s: careless puck 2 dropped mid-room",
+      "t=40.0 s: puck 2 slid to the door wall",
+      "t=60.0 s: second phone starts sharing",
+      "t=80.0 s: a phone outside presses 'I am out'"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "careless-hold-120s": {
+   "name": "careless-hold-120s",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 1200,
+   "phone_steps": 2400,
+   "fix_steps": 600,
+   "wrong_fix_steps": 0,
+   "duration_s": 240.0,
+   "fix_share_of_phone_steps": 0.25,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.124,
+    "t_s": 87.4,
+    "phone": "B1",
+    "truth_key": "trapped-310",
+    "err_m": 0.242,
+    "sigma_m": 0.65,
+    "threshold_m": 1.95,
+    "published": [
+     2.32,
+     1.9
+    ],
+    "truth": [
+     2.1,
+     1.8
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "second phone sharing",
+    "since_s": 87.4,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 600,
+     "fix_steps": 600,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: both pucks mid-room (careless layout)",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 600,
+     "fix_steps": 0,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: both pucks mid-room (careless layout)",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "puck-moved-while-ranging": {
+   "name": "puck-moved-while-ranging",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 900,
+   "phone_steps": 1800,
+   "fix_steps": 646,
+   "wrong_fix_steps": 0,
+   "duration_s": 180.0,
+   "fix_share_of_phone_steps": 0.359,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.497,
+    "t_s": 5.0,
+    "phone": "B2",
+    "truth_key": "iphone15-310",
+    "err_m": 0.805,
+    "sigma_m": 0.54,
+    "threshold_m": 1.62,
+    "published": [
+     3.74,
+     7.13
+    ],
+    "truth": [
+     3.4,
+     6.4
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "second phone sharing",
+    "since_s": 5.0,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 450,
+     "fix_steps": 434,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing",
+      "t=15.0 s: P2 moved far (3.5 m into the room)",
+      "t=30.0 s: P2 nudged 0.4 m",
+      "t=45.0 s: P1 moved far (to the far wall)",
+      "t=60.0 s: P1 nudged 0.3 m",
+      "t=75.0 s: both back on the door wall"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 450,
+     "fix_steps": 212,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing",
+      "t=15.0 s: P2 moved far (3.5 m into the room)",
+      "t=30.0 s: P2 nudged 0.4 m",
+      "t=45.0 s: P1 moved far (to the far wall)",
+      "t=60.0 s: P1 nudged 0.3 m",
+      "t=75.0 s: both back on the door wall"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "phone-dragged-into-next-room": {
+   "name": "phone-dragged-into-next-room",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 780,
+   "phone_steps": 1090,
+   "fix_steps": 347,
+   "wrong_fix_steps": 67,
+   "duration_s": 156.0,
+   "fix_share_of_phone_steps": 0.318,
+   "wrong_share_of_fix_steps": 0.1931,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 3.818,
+    "t_s": 31.8,
+    "phone": "B1",
+    "truth_key": "dragged",
+    "err_m": 3.818,
+    "sigma_m": 0.31,
+    "threshold_m": 1.0,
+    "published": [
+     7.3,
+     6.73
+    ],
+    "truth": [
+     10.7,
+     8.47
+    ],
+    "truth_room": "rcW",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "dragged dragged to (10.7, 8.5) in West corridor",
+    "since_s": 0.3,
+    "seed": 20261114
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 390,
+     "fix_steps": 208,
+     "wrong_fix_steps": 46,
+     "wrong_share_of_fix_steps": 0.2212,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: phone placed deep in the room",
+      "t=8.0 s: phone dragged across the room, through the door and up the corridor",
+      "t=47.0 s: second phone placed",
+      "t=55.0 s: second phone dragged straight through the wall into Suite 309"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 390,
+     "fix_steps": 139,
+     "wrong_fix_steps": 21,
+     "wrong_share_of_fix_steps": 0.1511,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: phone placed deep in the room",
+      "t=8.0 s: phone dragged across the room, through the door and up the corridor",
+      "t=47.0 s: second phone placed",
+      "t=55.0 s: second phone dragged straight through the wall into Suite 309"
+     ]
+    }
+   ],
+   "pass": false
+  },
+  "exercise-scale-changed": {
+   "name": "exercise-scale-changed",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 600,
+   "phone_steps": 600,
+   "fix_steps": 291,
+   "wrong_fix_steps": 0,
+   "duration_s": 120.0,
+   "fix_share_of_phone_steps": 0.485,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.237,
+    "t_s": 43.6,
+    "phone": "B1",
+    "truth_key": "trapped-310",
+    "err_m": 0.44,
+    "sigma_m": 0.62,
+    "threshold_m": 1.86,
+    "published": [
+     2.09,
+     2.24
+    ],
+    "truth": [
+     2.1,
+     1.8
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "exercise scale set to 1",
+    "since_s": 3.6,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 300,
+     "fix_steps": 291,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=20.0 s: exercise scale set to 3",
+      "t=40.0 s: exercise scale set to 1"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 300,
+     "fix_steps": 0,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=20.0 s: exercise scale set to 3",
+      "t=40.0 s: exercise scale set to 1"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "phone-stops-stale-then-dropped": {
+   "name": "phone-stops-stale-then-dropped",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 900,
+   "phone_steps": 748,
+   "fix_steps": 71,
+   "wrong_fix_steps": 0,
+   "duration_s": 180.0,
+   "fix_share_of_phone_steps": 0.095,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.124,
+    "t_s": 2.8,
+    "phone": "B1",
+    "truth_key": "trapped-310",
+    "err_m": 0.242,
+    "sigma_m": 0.65,
+    "threshold_m": 1.95,
+    "published": [
+     2.13,
+     2.04
+    ],
+    "truth": [
+     2.1,
+     1.8
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "trapped phone sharing",
+    "since_s": 2.8,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 450,
+     "fix_steps": 71,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=15.0 s: the phone stops (battery dead): no more observations"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 450,
+     "fix_steps": 0,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=15.0 s: the phone stops (battery dead): no more observations"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "bye": {
+   "name": "bye",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 300,
+   "phone_steps": 450,
+   "fix_steps": 367,
+   "wrong_fix_steps": 0,
+   "duration_s": 60.0,
+   "fix_share_of_phone_steps": 0.816,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.497,
+    "t_s": 5.0,
+    "phone": "B2",
+    "truth_key": "iphone15-310",
+    "err_m": 0.805,
+    "sigma_m": 0.54,
+    "threshold_m": 1.62,
+    "published": [
+     3.74,
+     7.13
+    ],
+    "truth": [
+     3.4,
+     6.4
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "second phone sharing",
+    "since_s": 5.0,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 150,
+     "fix_steps": 221,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing",
+      "t=15.0 s: trapped phone pressed 'Stop sharing' (bye)"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 150,
+     "fix_steps": 146,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing",
+      "t=15.0 s: trapped phone pressed 'Stop sharing' (bye)"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "two-phones-board-sharing-pairs": {
+   "name": "two-phones-board-sharing-pairs",
+   "board_sharing": "pairs",
+   "reports_los": false,
+   "steps": 600,
+   "phone_steps": 1200,
+   "fix_steps": 892,
+   "wrong_fix_steps": 0,
+   "duration_s": 120.0,
+   "fix_share_of_phone_steps": 0.743,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.534,
+    "t_s": 42.4,
+    "phone": "B2",
+    "truth_key": "iphone15-310",
+    "err_m": 0.865,
+    "sigma_m": 0.54,
+    "threshold_m": 1.62,
+    "published": [
+     3.73,
+     7.2
+    ],
+    "truth": [
+     3.4,
+     6.4
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "second phone sharing",
+    "since_s": 42.4,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 300,
+     "fix_steps": 596,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 300,
+     "fix_steps": 296,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    }
+   ],
+   "pass": true
+  },
+  "two-phones-board-sharing-turns": {
+   "name": "two-phones-board-sharing-turns",
+   "board_sharing": "turns",
+   "reports_los": false,
+   "steps": 600,
+   "phone_steps": 1200,
+   "fix_steps": 601,
+   "wrong_fix_steps": 0,
+   "duration_s": 120.0,
+   "fix_share_of_phone_steps": 0.501,
+   "wrong_share_of_fix_steps": 0.0,
+   "invariant_violations": {},
+   "worst_fix": {
+    "ratio": 0.547,
+    "t_s": 25.8,
+    "phone": "B2",
+    "truth_key": "iphone15-310",
+    "err_m": 0.886,
+    "sigma_m": 0.54,
+    "threshold_m": 1.62,
+    "published": [
+     3.76,
+     7.21
+    ],
+    "truth": [
+     3.4,
+     6.4
+    ],
+    "truth_room": "r310",
+    "published_room": "r310",
+    "assumptions": [],
+    "after": "second phone sharing",
+    "since_s": 25.8,
+    "seed": 310
+   },
+   "per_seed": [
+    {
+     "seed": 310,
+     "steps": 300,
+     "fix_steps": 392,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    },
+    {
+     "seed": 20261114,
+     "steps": 300,
+     "fix_steps": 209,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
+     "events": [
+      "t=0.0 s: door-wall pucks",
+      "t=0.0 s: trapped phone sharing",
+      "t=0.0 s: second phone sharing"
+     ]
+    }
+   ],
+   "pass": true
+  }
+ },
+ "pass": false,
+ "failed": [
+  "phone-dragged-into-next-room"
+ ],
+ "runtime_s": 10.6
+}

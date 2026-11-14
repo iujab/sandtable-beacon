@@ -147,3 +147,19 @@ def test_gitignore_keeps_live_data_and_env_files_out():
         pytest.skip("not a git checkout")
     assert len(out.stdout.split()) == 5
     assert subprocess.run(["git", "check-ignore", "-q", ".env.example"], cwd=config.ROOT).returncode == 1
+
+
+def test_the_drop_zone_gives_credentials_but_never_switches_a_process_live(tmp_path):
+    """The bench drop zone holds env files for several machines (one is the laptop's .env, which says live). Reading it must
+    not change which data or which model backend a process on this machine uses: only the command's environment or the
+    project's own .env may."""
+    zone = tmp_path / ".secrets"
+    zone.mkdir()
+    (zone / "laptop.env").write_text("SANDTABLE_DATA_MODE=live\nVEXCEL_MODE=live\nLLM_BACKEND=anthropic\nINVENTED_API_KEY=abc123\nEMPTY_ONE=\n", encoding="utf-8")
+    environ: dict = {}
+    config._load_env_files(project_env=tmp_path / ".env", drop_zone=zone, environ=environ)
+    assert environ == {"INVENTED_API_KEY": "abc123"}
+    (tmp_path / ".env").write_text("SANDTABLE_DATA_MODE=live\nLLM_BACKEND=anthropic\n", encoding="utf-8")
+    environ = {"LLM_BACKEND": "replay"}
+    config._load_env_files(project_env=tmp_path / ".env", drop_zone=zone, environ=environ)
+    assert environ["SANDTABLE_DATA_MODE"] == "live" and environ["LLM_BACKEND"] == "replay"   # own .env counts; the command wins

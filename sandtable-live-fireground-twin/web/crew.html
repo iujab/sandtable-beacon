@@ -52,6 +52,7 @@ button.may { background: #ff3b30; border-color: #ff3b30; color: #fff; }
 <div class="feed" id="feed" hidden><h2><span>Located people</span><span class="src" id="feed-src">from the feed</span></h2><div id="feed-list"></div></div>
 <div class="radio" id="radio"></div>
 <div class="row"><button id="voice">Voice off</button><button class="may" id="may">Mayday</button></div>
+<script src="live_marker.js"></script>
 <script>
 const unit = new URLSearchParams(location.search).get("unit") || "RIT";
 const $ = (id) => document.getElementById(id);
@@ -107,7 +108,7 @@ function connect() {
   live = false; setTimeout(() => (live = true), 1500);
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
-    if (m.type === "hello") $("sim").hidden = !m.simulated;
+    if (m.type === "hello") { $("sim").hidden = !m.simulated; window.liveMarker?.(["costar", "matterport", "vexcel"].some((k) => (m.modes || {})[k] === "live")); }
     if (m.type === "reset") { $("radio").innerHTML = ""; beacons = null; renderTarget(); document.getElementById("feed").hidden = true; }
     if (m.type === "beacons") { beacons = m; renderTarget(); }
     if (m.type === "state") {

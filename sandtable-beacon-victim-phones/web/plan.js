@@ -377,7 +377,7 @@ export class Plan {
     }
   }
   _updateZones(phones) {
-    const zs = phones.filter((p) => p.geometry === "zone" && p.zone && !(p.report && p.report.safe_outside));
+    const zs = phones.filter((p) => p.geometry === "zone" && p.zone && !p.stale && !(p.report && p.report.safe_outside));
     const key = JSON.stringify(zs.map((p) => [p.id, p.zone.room, p.zone.band, p.zone.prob]));
     if (key === this._zoneKey) return;
     this._zoneKey = key;
@@ -642,31 +642,34 @@ export class Plan {
     // label: follows whichever part dominates right now
     const st = statusOf(p.report), n = p.report && isNum(p.report.people) ? p.report.people : null;
     const ppl = n === null ? "" : ` · ${n} ${n === 1 ? "person" : "people"}`;
-    let at = null, lab = "", sub = "", op = 0;
+    let at = null, lab = "", sub = "", op = 0, mark = null;
     const bestC = ck.filter((k) => S[k].op > 0.3).sort((a, b) => S[b].y - S[a].y)[0];   // the top-most candidate on screen
     if (f && f.op > 0.45) {
-      const P = this.P([f.x, f.y]); at = [P[0], P[1] - Math.max(f.ea, f.eb, 10 * u) - 20 * u];
+      const P = this.P([f.x, f.y]); at = [P[0], P[1] - Math.max(f.ea, f.eb, 10 * u) - 20 * u]; mark = P;
       lab = `${ph.id}${ppl}`; sub = `${st.word.toLowerCase()} · ±${num(p.sigma_m)} m`; op = f.op;
     } else if (bestC) {
-      const c = S[bestC], P = this.P([c.x, c.y]), rm = 12 * u; at = [P[0], P[1] - rm - 20 * u];
+      const c = S[bestC], P = this.P([c.x, c.y]), rm = 12 * u; at = [P[0], P[1] - rm - 20 * u]; mark = [P[0], P[1] - rm];
       lab = `${ph.id} ?${ppl}`; sub = `cannot choose between ${vis.length} spots`; op = c.op;
     } else if (ring && ring.op > 0.3) {
       let la = ring.arcs[0];
       for (const a of ring.arcs) if (a[1] - a[0] > la[1] - la[0]) la = a;
       const mid = (la[0] + la[1]) / 2 * D2R, rr = ring.r + (ring.kind === "ble" ? ring.sg : 0) + 16 * u;
       const P = this.P([ring.cx + rr * Math.cos(mid), ring.cy + rr * Math.sin(mid)]); at = [P[0], P[1]];
+      mark = this.P([ring.cx + ring.r * Math.cos(mid), ring.cy + ring.r * Math.sin(mid)]);
       const rg = p.ring || ph.lastRing || {};
       lab = `${ph.id}${ppl}`; sub = ring.kind === "ble" ? `Bluetooth band · about ${num(rg.r_m)} m from ${rg.puck}` : `range only · ${num(rg.r_m)} m from ${rg.puck}`; op = ring.op;
     } else if (p.geometry === "zone" && this.zoneEls) {
       const z = this.zoneEls.find((q) => q.id === ph.id);
-      if (z) { const P = this.P(z.c); at = [P[0], P[1] - z.i * 34 * u]; lab = `${ph.id}${ppl}`; sub = `probably here · ${z.words}`; op = 1; }
+      if (z) { const P = this.P(z.c); at = [P[0], P[1] - z.i * 34 * u]; mark = P; lab = `${ph.id}${ppl}`; sub = `probably here · ${z.words}`; op = 1; }
     }
-    ph.labAt = at; ph.labOp = op; ph.labRank = f && f.op > 0.45 ? 0 : bestC ? 1 : ring && ring.op > 0.3 ? 2 : 3;
+    ph.labAt = at; ph.labOp = op; ph.labMark = mark; ph.labRank = f && f.op > 0.45 ? 0 : bestC ? 1 : ring && ring.op > 0.3 ? 2 : 3;
     const as = (p.assumptions || [])[0];
     ph.assume.textContent = as ? this.assumptionTag(as) : "";
     if (at) { ph.lab.textContent = lab; ph.sub.textContent = sub; ph.lab.style.opacity = op; ph.sub.style.opacity = op; ph.assume.style.opacity = op; }
     else { ph.lab.style.opacity = 0; ph.sub.style.opacity = 0; ph.assume.style.opacity = 0; }
-    ph.title.textContent = p.text || ph.id;
+    // the ± numbers are the locator's model: say so on hover (and that they are simulated, when they are)
+    const sim = !(this.data && this.data.simulated === false);
+    ph.title.textContent = (p.text || ph.id) + (f && f.op > 0.45 ? `\n±${num(p.sigma_m)} m: 1 sigma, from the locator's model${sim ? "; simulated" : ""}` : "");
   }
 
   _placeLabels() {
@@ -751,6 +754,7 @@ export class Plan {
     for (const b of this.presEls || []) {
       const bb = bboxOf(b.room.polygon), pad = 7 * u, m = 0.25;
       b.t1.setAttribute("x", 0); b.t1.setAttribute("y", 0); b.t2.setAttribute("x", 0); b.t2.setAttribute("y", 0);
+      b.t1.textContent = b.long; b.t2.style.display = "";       // measure the full badge every frame, then decide (no flip-flop)
       const w = Math.max(b.t1.getComputedTextLength(), b.t2.getComputedTextLength()) + 2 * pad, h = 37 * u;
       const compact = w > (bb[2] - bb[0]) * 0.75;
       b.t2.style.display = compact ? "none" : "";

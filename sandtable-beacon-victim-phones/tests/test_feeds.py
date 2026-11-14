@@ -121,18 +121,24 @@ def test_cot_items(sample):
             r = p["ring"]
             pk = pucks[r["puck"]]
             assert abs(float(ev.find("point").attrib["ce"]) - (r["r_m"] + 2 * r["sigma_m"])) < 0.01
-            # the point is the puck's position, not a phone position
+            # the point is the puck's position, not a phone position, and nothing about it says "a person here"
             assert abs(float(ev.find("point").attrib["lat"]) - pk["geo"]["lat"]) < 1e-6
-            assert "range only" in ev.find("detail/remarks").text.lower()
+            assert ev.attrib["type"] == "b-m-p-s-m"
+            assert ev.find("detail/contact").attrib["callsign"] == f"{p['id']} RANGE ONLY"
+            assert ev.find("detail/remarks").text.startswith(f"RANGE ONLY: within ")
+            assert f"of puck {r['puck']}, no position" in ev.find("detail/remarks").text
         elif p["geometry"] == "candidates":
             n = len(p["candidates"])
             for i in range(1, n + 1):
                 ev = evs[f"{uid}.c{i}"]
-                assert ev.attrib["type"] == "a-u-G"
-                assert f"candidate {i} of {n}" in ev.find("detail/remarks").text.lower()
+                assert ev.attrib["type"] == "b-m-p-s-m"
+                assert ev.find("detail/contact").attrib["callsign"] == f"{p['id']} CANDIDATE {i} OF {n}"
+                assert ev.find("detail/remarks").text.startswith(f"CANDIDATE {i} OF {n}: ")
             assert uid not in evs
         elif p["geometry"] == "zone":
             assert evs[uid].attrib["type"] == "b-m-p-s-m"
+            assert evs[uid].find("detail/contact").attrib["callsign"] == f"{p['id']} ROOM ONLY"
+            assert evs[uid].find("detail/remarks").text.startswith("ROOM ONLY: ")
         else:
             assert uid not in evs
     for pk in sample["pucks"]:
@@ -165,3 +171,24 @@ def test_empty_beacons():
     assert fc["features"] == []
     xml = feeds.beacons_to_cot({"simulated": True}, time.time())
     assert ET.fromstring(xml.split("\n", 1)[1]).tag == "events"
+
+
+def test_stale_phone_is_never_a_dot(sample):
+    """Even if an upstream marked a stale phone `fix` with coordinates, the feeds publish only its last room."""
+    b = copy.deepcopy(sample)
+    fixp = next(p for p in b["phones"] if p["geometry"] == "fix")
+    fixp["stale"] = True
+    fixp["sigma_m"] = 45.0
+    fixp["track"]["last_seen_s"] = 41.0
+    fixp["last_known"] = {"geometry": "fix", "room": fixp["room"], "room_label": fixp["room_label"], "age_s": 41.0}
+    fc = feeds.beacons_to_geojson(b)
+    mine = [f for f in fc["features"] if f["properties"]["id"] == fixp["id"]]
+    assert [f["properties"]["kind"] for f in mine] == ["phone-last-known"]
+    assert mine[0]["geometry"]["type"] == "Polygon" and mine[0]["properties"]["stale"] is True
+    evs = {e.attrib["uid"]: e for e in ET.fromstring(feeds.beacons_to_cot(b, time.time()).split("\n", 1)[1]).findall("event")}
+    ev = evs[f"sandtable.beacon.{fixp['id']}"]
+    assert ev.attrib["type"] == "b-m-p-s-m"
+    assert ev.find("detail/contact").attrib["callsign"] == f"{fixp['id']} LAST KNOWN"
+    rem = ev.find("detail/remarks").text
+    assert rem.startswith("LAST KNOWN: not heard for 41 s; last located in Suite 310")
+    assert "45" not in ev.find("point").attrib["ce"]

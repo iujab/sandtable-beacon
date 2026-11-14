@@ -8,6 +8,11 @@ const S = { mode: params.get("sample") ? "sample" : "ws", hello: null, beacons: 
 const MAX_PUCKS = 5;
 let plan = null;
 
+// the ± after a fix is the locator's model, not a measurement of error: say so on hover
+const sigmaNote = () => `1 sigma, from the locator's model${simulated() ? "; simulated" : ""}`;
+// set innerHTML only when it changed, so hover, focus and running animations survive the 4-per-second updates
+function setHTML(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; return true; } return false; }
+const liveFix = (p) => p.geometry === "fix" && !p.stale && !(p.report && p.report.safe_outside);
 function toast(text) { const t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 4200); }
 const isSample = () => S.mode === "sample" || !!(S.beacons && S.beacons.sample) || !!(S.hello && S.hello.sample) || (S.beacons && S.beacons.source === "fake") || (S.hello && S.hello.source === "fake");
 const simulated = () => (S.beacons ? S.beacons.simulated !== false : S.hello ? S.hello.simulated !== false : true);
@@ -104,7 +109,7 @@ function pickSubject(phones) {
     changed.sort((a, c) => (GEO_RANK[a.geometry] ?? 5) - (GEO_RANK[c.geometry] ?? 5) || (SEV[a.report?.status] ?? 3) - (SEV[c.report?.status] ?? 3));
     S.subject = changed[0].id;
   }
-  const live = phones.filter((p) => !(p.report && p.report.safe_outside) && p.geometry !== "none");
+  const live = phones.filter((p) => !(p.report && p.report.safe_outside) && p.geometry !== "none" && !p.stale);
   if (S.selected && live.some((p) => p.id === S.selected)) return live.find((p) => p.id === S.selected);
   return live.find((p) => p.id === S.subject) || live[0] || null;
 }
@@ -132,6 +137,7 @@ function renderCaption(phones) {
   const before = cap.offsetHeight;
   if ((p.assumptions || []).length) x += ` <span style="color:#ffcf8a">Assumption: ${esc(plan.assumptionTag(p.assumptions[0]))}.</span>`;
   if (p.conflict) x += ` <span style="color:#ffb4ae">${esc(typeof p.conflict === "string" ? p.conflict : p.conflict.text || "")}</span>`;
+  cap.title = g === "fix" ? `±${num(p.sigma_m)} m: ${sigmaNote()}` : "";
   cap.innerHTML = `<div class="t"><span style="color:var(--phone-soft)">${esc(p.id)}</span><span style="color:${st.color}">${esc(st.word.toUpperCase())}</span><span style="font-family:var(--sans);font-weight:500;letter-spacing:0;font-size:14px">${esc(peopleWords(p.report))}</span></div><div class="x">${x}</div>`;
   cap.hidden = false;
   if (was || Math.abs(cap.offsetHeight - before) > 12) plan.setFocusMode(plan.focusMode);
@@ -177,43 +183,73 @@ function renderTray(b) {
 // ---------------------------------------------------------------- phone cards
 const SEV = { trapped: 0, injured: 1, sheltering: 2, unknown: 3, ok: 4 };
 const GEO_RANK = { fix: 0, candidates: 1, ring: 2, zone: 3, none: 4 };
+function cardHtml(p) {
+  const r = p.report || {};
+  const bat = isNum(r.battery_pct) ? `<span class="pc-bat" title="Battery"><span class="bat${r.battery_pct <= 15 ? " low" : ""}"><i style="width:${Math.max(0, Math.min(100, r.battery_pct)) * 0.18}px"></i></span>${Math.round(r.battery_pct)}%</span>` : "";
+  const top = `<div class="pc-top"><span class="pc-id">${esc(p.id)}</span><span class="pc-st">${esc(statusOf(r).word)}</span><span class="pc-ppl">${esc(peopleWords(r))}</span>${bat}</div>`;
+  if (p.stale) {
+    // not heard: no position is claimed; say where it was last located and how long ago
+    const lk = p.last_known || (p.geometry && p.geometry !== "none" ? { geometry: p.geometry, room_label: p.room_label || (p.zone && p.zone.room_label) } : {});
+    const age = isNum(lk.age_s) ? lk.age_s : p.track && p.track.last_seen_s;
+    const where = lk.room_label ? `last located in ${lk.room_label}${lk.geometry && lk.geometry !== "fix" ? ` (${lk.geometry === "candidates" ? "two possible spots" : lk.geometry === "ring" ? "range only" : lk.geometry})` : ""}` : "no position before it went quiet";
+    return top + `<div class="pc-stale">Not heard for ${num(age, 0)} s; ${esc(where)}</div>` + (r.text ? `<div class="pc-quote">“${esc(r.text)}”</div>` : "");
+  }
+  const lastHeard = isNum(p.track?.last_seen_s) ? (p.track.last_seen_s < 1.5 ? "heard just now" : `heard ${Math.round(p.track.last_seen_s)} s ago`) : null;
+  const meta = [floorWords(p), stillWords(r), chipWords(r), p.method && p.method.startsWith("uwb") || r.chip ? bearingWords(p) : null,
+    r.home_suite ? `says: suite ${r.home_suite}` : null, lastHeard].filter(Boolean);
+  const chip = (q) => `<span class="rg ${q.kind}" title="${q.kind === "uwb" ? "UWB two-way ranging" : "Bluetooth signal strength"} to ${esc(q.puck)}: ${num(q.d_m, 2)} m, model 1σ ${num(q.sigma_m, 2)} m${simulated() ? " (simulated)" : ""}${isNum(q.rssi) ? `, ${q.rssi} dBm` : ""}${isNum(q.los) ? `, line of sight ${num(q.los)}` : ""}">${esc(q.puck)} ${num(q.d_m)} m <i>±${num(q.sigma_m, q.kind === "uwb" ? 2 : 1)}</i></span>`;
+  const byPuck = (a, c) => String(a.puck).localeCompare(String(c.puck));
+  const rU = (p.ranges || []).filter((q) => q.kind === "uwb").sort(byPuck), rB = (p.ranges || []).filter((q) => q.kind !== "uwb").sort(byPuck);
+  const ranges = (rU.length ? `<span class="rk">UWB</span>${rU.map(chip).join("")}` : "") + (rB.length ? `<span class="rk">Bluetooth</span>${rB.map(chip).join("")}` : "");
+  const stated = (q) => q.by === "occupant-statement" || q.by === "search-room";
+  const prunedList = [...(p.pruned || [])].sort((a, c) => (stated(c) - stated(a)) || (a.x - c.x) || (a.y - c.y));
+  const pruned = prunedList.map((q) => stated(q) ? `<div class="pc-dismissed">Dismissed on a statement: ${esc(q.reason || "")}</div>` : `<div class="pc-pruned">Ruled out by the twin: ${esc(q.reason || "removed by the twin")}</div>`).join("");
+  const choose = p.geometry === "candidates" ? `<div class="pc-choose">${esc(p.text || `Two possible spots: cannot choose between them yet`)}</div>` : "";
+  const assume = (p.assumptions || []).map((a) => `<div class="pc-assume" title="${esc(a.text || "")}"><b>Assumption</b>${esc(a.text || plan.assumptionTag(a))}</div>`).join("");
+  const conflict = p.conflict ? `<div class="pc-conflict">${esc(typeof p.conflict === "string" ? p.conflict : p.conflict.text || JSON.stringify(p.conflict))}</div>` : "";
+  const geoTitle = p.geometry === "fix" ? ` title="±${num(p.sigma_m)} m: ${esc(sigmaNote())}"` : "";
+  return top +
+    `<div class="pc-geo"${geoTitle}>${esc(geometryWords(p))} <span class="how">· ${esc(methodWords(p.method))} · ${esc(GEOMETRY_SHORT[p.geometry] || p.geometry)}</span></div>` +
+    choose + assume + conflict +
+    (r.text ? `<div class="pc-quote">“${esc(r.text)}”</div>` : "") +
+    `<div class="pc-meta">${meta.map((m) => `<span>${esc(m)}</span>`).join("")}</div>` +
+    (ranges ? `<div class="pc-ranges">${ranges}</div>` : "") + pruned +
+    (p.text && S.selected === p.id && p.geometry !== "candidates" ? `<div class="pc-line">${esc(p.text)}</div>` : "");
+}
 function renderPhones(b) {
-  const all = (b && b.phones) || [];
+  const all = (b && b.phones) || [], box = $("phones");
   const inside = all.filter((p) => !(p.report && p.report.safe_outside));
   const out = all.filter((p) => p.report && p.report.safe_outside);
-  inside.sort((a, c) => (SEV[a.report?.status] ?? 3) - (SEV[c.report?.status] ?? 3) || (GEO_RANK[a.geometry] ?? 5) - (GEO_RANK[c.geometry] ?? 5) || String(a.id).localeCompare(String(c.id)));
-  const ppl = inside.reduce((s, p) => s + (isNum(p.report?.people) ? p.report.people : 0), 0);
-  $("phones-par").textContent = inside.length ? `${inside.length} inside · ${ppl} people reported` : "";
+  // a stable order: heard phones before stale ones, then the reported status, then the id; never the geometry, which changes
+  inside.sort((a, c) => (!!a.stale - !!c.stale) || (SEV[a.report?.status] ?? 3) - (SEV[c.report?.status] ?? 3) || String(a.id).localeCompare(String(c.id), undefined, { numeric: true }));
+  const heard = inside.filter((p) => !p.stale), ppl = heard.reduce((s, q) => s + (isNum(q.report?.people) ? q.report.people : 0), 0);
+  $("phones-par").textContent = inside.length ? `${heard.length} heard · ${ppl} people reported${inside.length > heard.length ? ` · ${inside.length - heard.length} not heard` : ""}` : "";
   if (!all.length) {
-    $("phones").innerHTML = `<div class="empty"><b>No opt-in phone heard</b>A phone appears here only when its owner runs the occupant app and sends an SOS beacon. Phones without the app are counted on the plan as devices, never listed.</div>`;
+    setHTML(box, `<div class="empty"><b>No opt-in phone heard</b>A phone appears here only when its owner runs the occupant app and sends an SOS beacon. Phones without the app are counted on the plan as devices, never listed.</div>`);
     return;
   }
-  const html = inside.map((p) => {
-    const r = p.report || {}, st = statusOf(r);
-    const bat = isNum(r.battery_pct) ? `<span class="pc-bat" title="Battery"><span class="bat${r.battery_pct <= 15 ? " low" : ""}"><i style="width:${Math.max(0, Math.min(100, r.battery_pct)) * 0.18}px"></i></span>${Math.round(r.battery_pct)}%</span>` : "";
-    const meta = [floorWords(p), stillWords(r), chipWords(r), p.method && p.method.startsWith("uwb") || r.chip ? bearingWords(p) : null,
-      r.home_suite ? `home suite ${r.home_suite}` : null,
-      p.stale ? `not heard for ${num(p.track?.last_seen_s, 0)} s` : isNum(p.track?.last_seen_s) ? `heard ${num(p.track.last_seen_s)} s ago` : null].filter(Boolean);
-    const chip = (q) => `<span class="rg ${q.kind}" title="${q.kind === "uwb" ? "UWB two-way ranging" : "Bluetooth signal strength"} to ${esc(q.puck)}: ${num(q.d_m, 2)} m, model 1σ ${num(q.sigma_m, 2)} m${isNum(q.rssi) ? `, ${q.rssi} dBm` : ""}${isNum(q.los) ? `, line of sight ${num(q.los)}` : ""}${isNum(q.age_s) ? `, ${num(q.age_s)} s ago` : ""}">${esc(q.puck)} ${num(q.d_m)} m <i>±${num(q.sigma_m, q.kind === "uwb" ? 2 : 1)}</i></span>`;
-    const rU = (p.ranges || []).filter((q) => q.kind === "uwb"), rB = (p.ranges || []).filter((q) => q.kind !== "uwb");
-    const ranges = (rU.length ? `<span class="rk">UWB</span>${rU.map(chip).join("")}` : "") + (rB.length ? `<span class="rk">Bluetooth</span>${rB.map(chip).join("")}` : "");
-    const stated = (q) => q.by === "occupant-statement" || q.by === "search-room";
-    const pruned = (p.pruned || []).map((q) => stated(q) ? `<div class="pc-dismissed">Dismissed on a statement: ${esc(q.reason || "")}</div>` : `<div class="pc-pruned">Ruled out by the twin: ${esc(q.reason || "removed by the twin")}</div>`).join("");
-    const choose = p.geometry === "candidates" ? `<div class="pc-choose">${esc(p.text || `Two possible spots: cannot choose between them yet`)}</div>` : "";
-    const assume = (p.assumptions || []).map((a) => `<div class="pc-assume" title="${esc(a.text || "")}"><b>Assumption</b>${esc(a.text || plan.assumptionTag(a))}</div>`).join("");
-    const conflict = p.conflict ? `<div class="pc-conflict">${esc(typeof p.conflict === "string" ? p.conflict : p.conflict.text || JSON.stringify(p.conflict))}</div>` : "";
-    return `<div class="pcard${p.stale ? " stale" : ""}${S.selected === p.id ? " sel" : ""}" data-id="${esc(p.id)}" style="--st:${st.color}">` +
-      `<div class="pc-top"><span class="pc-id">${esc(p.id)}</span><span class="pc-st">${esc(st.word)}</span><span class="pc-ppl">${esc(peopleWords(r))}</span>${bat}</div>` +
-      `<div class="pc-geo">${esc(geometryWords(p))} <span class="how">· ${esc(methodWords(p.method))} · ${esc(GEOMETRY_SHORT[p.geometry] || p.geometry)}</span></div>` +
-      choose + assume + conflict +
-      (r.text ? `<div class="pc-quote">“${esc(r.text)}”</div>` : "") +
-      `<div class="pc-meta">${meta.map((m) => `<span>${esc(m)}</span>`).join("")}</div>` +
-      (ranges ? `<div class="pc-ranges">${ranges}</div>` : "") + pruned +
-      (p.text && S.selected === p.id && p.geometry !== "candidates" ? `<div class="pc-line">${esc(p.text)}</div>` : "") + `</div>`;
-  }).join("");
-  const outHtml = out.length ? `<div class="out-list"><b>Safe outside:</b> ${out.map((p) => `${esc(p.id)}${isNum(p.report?.people) ? ` (${p.report.people})` : ""}${p.report?.home_suite ? `, suite ${esc(p.report.home_suite)}` : ""}`).join("; ")} <small>pressed “I am out”: accounted for</small></div>` : "";
-  $("phones").innerHTML = html + outHtml;
-  for (const c of $("phones").querySelectorAll(".pcard")) c.onclick = () => { selectPhone(c.dataset.id === S.selected ? null : c.dataset.id); renderPhones(S.beacons); };
+  if (box.querySelector(":scope > .empty")) { box.innerHTML = ""; box._html = null; }
+  box._html = null;
+  const existing = new Map([...box.querySelectorAll(":scope > .pcard")].map((e) => [e.dataset.id, e]));
+  let prev = null;
+  for (const p of inside) {
+    let e = existing.get(p.id);
+    if (!e) { e = document.createElement("div"); e.dataset.id = p.id; e.onclick = () => { selectPhone(p.id === S.selected ? null : p.id); renderPhones(S.beacons); }; }
+    existing.delete(p.id);
+    setHTML(e, cardHtml(p));
+    e.classList.add("pcard"); e.classList.toggle("stale", !!p.stale); e.classList.toggle("sel", S.selected === p.id);
+    e.style.setProperty("--st", p.stale ? "#5d6875" : statusOf(p.report).color);
+    const next = prev ? prev.nextSibling : box.firstChild;
+    if (next !== e) box.insertBefore(e, next);
+    prev = e;
+  }
+  for (const e of existing.values()) e.remove();
+  let outEl = box.querySelector(":scope > .out-list");
+  if (out.length) {
+    if (!outEl) { outEl = document.createElement("div"); outEl.className = "out-list"; }
+    setHTML(outEl, `<b>Safe outside:</b> ${out.map((p) => `${esc(p.id)}${isNum(p.report?.people) ? ` (${p.report.people})` : ""}${p.report?.home_suite ? `, suite ${esc(p.report.home_suite)}` : ""}`).join("; ")} <small>pressed “I am out”: accounted for</small>`);
+    box.appendChild(outEl);
+  } else if (outEl) outEl.remove();
 }
 function selectPhone(id, scroll) {
   S.selected = id;
@@ -228,14 +264,17 @@ function renderAccountability(b) {
   const a = b && b.accountability, body = $("acct-body");
   if (!a) {
     plan.setNextPuck(null);
-    body.innerHTML = `<div class="empty"><b>No accountability yet</b>When the server compares the building record's tenant roster with the phones the pucks hear, each suite appears here: how many people the record suggests, how many reported, how many are still unaccounted for.</div>`;
+    setHTML(body, `<div class="empty"><b>No accountability yet</b>When the server compares the building record's tenant roster with the phones the pucks hear, each suite appears here: how many people the record suggests, how many reported, how many are still unaccounted for.</div>`);
     $("acct-floor").textContent = "";
     return;
   }
   const fl = S.bundle.twin.floors.find((f) => f.id === a.floor);
   $("acct-floor").textContent = fl ? `floor ${fl.label}` : "";
   const t = a.totals || {};
-  const tot = [["Expected", t.expected_people, "", "People the building record suggests on this floor: an estimate (hover the rows for each basis)"], ["Reported", t.people_reported, "ppl", "People reported by opt-in phones"], ["Located", t.located, "ppl", "Opt-in phones with a fix"], ["Devices", t.cold_devices, "dev", "Bluetooth devices heard with no app: devices, not people"], ["Unscanned", t.suites_unscanned, "", "Suites with no puck in range"]];
+  // "located" counts phones with a fix now: a stale phone is not located, whatever it was before
+  const fixes = (b.phones || []).filter(liveFix);
+  const locatedIn = (s) => fixes.filter((p) => p.room && (p.room === s.room || (s.rooms || []).includes(p.room))).length;
+  const tot = [["Expected", t.expected_people, "", "People the building record suggests on this floor: an estimate (hover the rows for each basis)"], ["Reported", t.people_reported, "ppl", "People reported by opt-in phones"], ["Located", fixes.length, "ppl", "Opt-in phones with a fix now (phones not heard recently are not counted)"], ["Devices", t.cold_devices, "dev", "Bluetooth devices heard with no app: devices, not people"], ["Unscanned", t.suites_unscanned, "", "Suites with no puck in range"]];
   const pr = (a.priorities || []).slice(0, 3).map((q) => `<div class="pr" title="${esc(q.text || "")}"><span class="rk">${esc(q.rank)}</span><span>${esc(q.text || `Suite ${q.suite}`)}${q.target ? `<span class="tg">${esc(q.target)}</span>` : ""}</span></div>`).join("");
   const suites = [...(a.suites || [])].sort((x, y) => (x.priority ?? 999) - (y.priority ?? 999) || String(x.suite).localeCompare(String(y.suite)));
   const rows = suites.map((s) => {
@@ -244,7 +283,8 @@ function renderAccountability(b) {
     const ten = s.vacant ? "vacant on record" : esc(s.tenant || s.industry || "tenant not on record");
     const app = s.app_registered ? ` · <span title="Occupants who registered this suite in the app; how many pressed I am out">${s.app_registered} app user${s.app_registered === 1 ? "" : "s"}${s.safe_outside ? `, <span style="color:var(--ok)">${s.safe_outside} safe outside</span>` : ""}</span>` : "";
     const line2 = `<span class="ten">${ten}</span>${app}${s.life_hazard ? ` · <span style="color:#ffb4ae">${esc(s.life_hazard)}</span>` : ""}${s.why ? ` — ${esc(s.why)}` : ""}`;
-    const inside = (s.people_reported || s.phones_opt_in) ? `<span class="ppl">${esc(s.people_reported ?? 0)}</span><br><small>${esc(s.phones_opt_in ?? 0)} ph${isNum(s.located) && s.located ? ` · ${s.located} fix` : ""}</small>` : `<small>—</small>`;
+    const loc = locatedIn(s);
+    const inside = (s.people_reported || s.phones_opt_in) ? `<span class="ppl">${esc(s.people_reported ?? 0)}</span><br><small>${esc(s.phones_opt_in ?? 0)} ph${loc ? ` · ${loc} fix` : ""}</small>` : `<small>—</small>`;
     return `<tr class="r1${fire ? " fire" : ""}" data-room="${esc(s.room || "")}">` +
       `<td class="ste">${isNum(s.priority) ? `<span class="rk">${esc(s.priority)}</span>` : ""}${esc(s.suite)}</td>` +
       `<td class="num"><span class="basis" title="${esc(e.basis ? `Estimate. ${e.basis}` : "Estimate")}">${isNum(e.people) ? "~" + e.people : "?"}</span>${isNum(e.low) ? `<br><small>${e.low}–${e.high}</small>` : ""}</td>` +
@@ -254,15 +294,16 @@ function renderAccountability(b) {
       `<td class="l"><span class="pill ${esc(s.state)}">${esc(String(s.state || "").replace(/-/g, " "))}</span></td></tr>` +
       `<tr class="r2${fire ? " fire" : ""}" data-room="${esc(s.room || "")}"><td colspan="6">${line2}</td></tr>`;
   }).join("");
-  body.innerHTML = `<div class="totals">${tot.map(([k, v, c, tt], i) => `<div class="tot" title="${esc(tt)}"><div class="k">${esc(k)}</div><div class="v ${c}">${isNum(v) ? (i === 0 ? "~" + v : v) : "—"}</div></div>`).join("")}</div>` +
+  const changed = setHTML(body, `<div class="totals">${tot.map(([k, v, c, tt], i) => `<div class="tot" title="${esc(tt)}"><div class="k">${esc(k)}</div><div class="v ${c}">${isNum(v) ? (i === 0 ? "~" + v : v) : "—"}</div></div>`).join("")}</div>` +
     (pr ? `<div class="prio"><div class="k">Search priorities</div>${pr}</div>` : "") +
     `<div class="tbl"><table class="acct"><thead><tr><th>Suite</th><th title="Expected people from the building record: an estimate, hover for its basis">Expected</th><th title="People reported inside">Inside</th><th title="Devices heard with no app">Devices</th><th title="Unaccounted for">Unacc.</th><th class="l">State</th></tr></thead><tbody>${rows}</tbody></table></div>` +
     checksHtml(a) +
-    assumptionsHtml(a.assumptions);
+    assumptionsHtml(a.assumptions));
   const src = a.source || {};
   $("acct-sub").textContent = src.real_sponsor_data ? "building record: CoStar (live)" : "building record: fixture, not CoStar";
   $("acct-sub").title = src.text || "";
   plan.setNextPuck(a.next_puck || null);
+  if (!changed) return;
   for (const tr of body.querySelectorAll("tr[data-room]")) {
     tr.onmouseenter = () => { plan.highlightRoom(tr.dataset.room, true); for (const q of body.querySelectorAll(`tr[data-room="${CSS.escape(tr.dataset.room)}"]`)) q.classList.add("hl"); };
     tr.onmouseleave = () => { plan.highlightRoom(tr.dataset.room, false); for (const q of body.querySelectorAll("tr.hl")) q.classList.remove("hl"); };
@@ -326,10 +367,18 @@ async function pollFeeds() {
   try {
     const r = await fetch("/feed/cot.xml", { cache: "no-store" });
     if (!r.ok) throw Object.assign(new Error(), { status: r.status });
-    const xml = await r.text();
-    const first = (xml.match(/<event[\s\S]*?<\/event>/) || [xml.slice(0, 400)])[0];
-    const n = (xml.match(/<event[\s>]/g) || []).length;
-    $("feed-cot-pre").textContent = `${n} event${n === 1 ? "" : "s"}. First:\n` + first.replace(/>\s*</g, ">\n<").slice(0, 600);
+    const doc = new DOMParser().parseFromString(await r.text(), "application/xml");
+    const evs = [...doc.getElementsByTagName("event")];
+    const lines = evs.slice(0, 8).map((ev) => {
+      const uid = (ev.getAttribute("uid") || "").replace(/^sandtable\.beacon\./, ""), type = ev.getAttribute("type") || "";
+      const pt = ev.getElementsByTagName("point")[0], ce = pt ? Number(pt.getAttribute("ce")) : NaN;
+      const cs = (ev.getElementsByTagName("contact")[0] || { getAttribute: () => "" }).getAttribute("callsign") || "";
+      const rm = (ev.getElementsByTagName("remarks")[0] || {}).textContent || "";
+      // a ring is sent as the puck's position with a circle that contains it: not a position of the phone
+      const rangeOnly = /range only/i.test(cs) || /range only/i.test(rm);
+      return `${uid.padEnd(10)} ${type.padEnd(10)} ${isNum(ce) ? `ce ${ce.toFixed(1)} m` : ""}${rangeOnly ? "  RANGE ONLY" : ""}${cs && !/range only/i.test(cs) ? `  ${cs}` : ""}`;
+    });
+    $("feed-cot-pre").textContent = `${evs.length} event${evs.length === 1 ? "" : "s"}${evs.length > 8 ? " (first 8)" : ""}:\n` + lines.join("\n");
   } catch (e) { $("feed-cot-pre").textContent = `not served by this source (${e.status ? "HTTP " + e.status : "offline"})`; }
 }
 
@@ -343,10 +392,14 @@ function renderAgent() {
   const busy = !!A.busy;
   $("btn-agent").disabled = busy || S.mode === "sample";
   $("btn-agent").textContent = busy ? "Thinking…" : "Ask the command agent";
-  $("agent-state").textContent = busy ? "· thinking…" : A.backend ? `· ${backendWords(A.backend)}` : "";
+  const meta = S.agentMeta || {}, asOf = meta.as_of_t ?? (A.plan && (A.plan.as_of_t ?? A.plan.t));
+  const stale = !!meta.stale && !!A.plan && !busy;
+  $("agent-state").textContent = busy ? "· thinking…" : [A.plan && isNum(asOf) ? `plan from ${clockOf(asOf)}` : null, A.backend ? backendWords(A.backend) : null].filter(Boolean).map((x) => "· " + x).join(" ");
+  $("btn-agent").classList.toggle("primary", stale);
   const p = A.plan, parts = [];
+  if (stale) parts.push(`<div class="agent-stale">The situation has changed since this plan${isNum(asOf) ? ` (${clockOf(asOf)})` : ""}: ask again.</div>`);
   if (p) {
-    parts.push(`<div class="plan-card"><div class="run-head"><span>Plan</span><span class="bk ${esc(p.backend)}" title="${esc(backendWords(p.backend))}">${esc(p.backend || "")}</span></div>` +
+    parts.push(`<div class="plan-card${stale ? " old" : ""}"><div class="run-head"><span>Plan${isNum(asOf) ? ` <small>from ${clockOf(asOf)}</small>` : ""}</span><span class="bk ${esc(p.backend)}" title="${esc(backendWords(p.backend))}">${esc(p.backend || "")}</span></div>` +
       (p.summary ? `<div class="sum">${esc(p.summary)}</div>` : "") +
       ((p.orders || []).length ? `<div class="k">Radio orders</div>${p.orders.map((o) => `<div class="rx ${esc(o.priority)}"><span class="to">→ ${esc(o.to)}</span>${esc(o.text)}${o.target ? ` <span class="tg" style="font:400 11px var(--mono);color:var(--phone-soft)">${esc(o.target)}</span>` : ""}</div>`).join("")}` : "") +
       (p.next_puck ? `<div class="k">Next puck</div><div class="nextp"><b>${esc(p.next_puck.suite ? "Suite " + p.next_puck.suite : p.next_puck.room || "")}</b>${p.next_puck.why ? ` — ${esc(p.next_puck.why)}` : ""}</div>` : "") +
@@ -364,7 +417,7 @@ function renderAgent() {
     }).join("");
     parts.push(`<div class="run"><div class="run-head"><span>${esc(run.split("#")[0] === "phones" ? "Phones situation" : run)}</span><span class="bk ${esc(bk)}" title="${esc(backendWords(bk))}">${esc(bk || "")}</span></div>${rows}</div>`);
   }
-  $("agent-log").innerHTML = parts.join("") || `<div class="empty">Ask the command agent: it reads the phones and the building record, then writes search priorities and radio orders.</div>`;
+  setHTML($("agent-log"), parts.join("") || `<div class="empty">Ask the command agent: it reads the phones and the building record, then writes search priorities and radio orders.</div>`);
 }
 function onAgentMessage(m) {
   if (!S.agent) S.agent = { busy: false, backend: null, plan: null, log: [] };   // a run arrived: the agent exists
@@ -379,9 +432,12 @@ function onAgentMessage(m) {
   if (S.beacons && S.beacons.accountability) renderAccountability(S.beacons);
   const box = $("agent-log"); box.scrollTop = m.type === "agent_plan" ? 0 : box.scrollHeight;
 }
-async function loadAgent() {
-  try { const a = await getJSON("/api/agent"); S.agent = a.available === false ? null : { busy: !!a.busy, backend: a.backend || null, plan: a.plan || null, log: a.log || [] }; }
-  catch { S.agent = null; }
+async function loadAgent(keep) {
+  try {
+    const a = await getJSON("/api/agent");
+    if (a.available === false && !keep) S.agent = null;
+    else S.agent = { busy: !!a.busy, backend: a.backend || (S.agent && S.agent.backend) || null, plan: a.plan || (S.agent && S.agent.plan) || null, log: (a.log && a.log.length ? a.log : (S.agent && S.agent.log)) || [] };
+  } catch { if (!keep) S.agent = null; }
   renderAgent();
 }
 function askAgent() {
@@ -394,7 +450,11 @@ function render() {
   const b = S.beacons;
   renderTop();
   if (b) {
-    if (b.agent && S.agent) { S.agent.busy = !!b.agent.busy; if (b.agent.backend) S.agent.backend = b.agent.backend; renderAgent(); }
+    if (b.agent) {
+      S.agentMeta = b.agent;
+      if (!S.agent) { S.agent = { busy: !!b.agent.busy, backend: b.agent.backend || null, plan: null, log: [] }; loadAgent(true); }
+      S.agent.busy = !!b.agent.busy; if (b.agent.backend) S.agent.backend = b.agent.backend; renderAgent();
+    }
     plan.update(b);
     renderCaption(b.phones || []);
     renderPhones(b);

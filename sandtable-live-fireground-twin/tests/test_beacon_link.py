@@ -262,3 +262,26 @@ def _slow_agent(monkeypatch, delay_s):
         await asyncio.sleep(delay_s)
         return await real(self, situation)
     monkeypatch.setattr(agent_mod.CommandAgent, "handle", handle)
+
+
+def test_the_fallback_policy_finishes_the_beacon_script_when_the_first_phone_has_two_candidates(monkeypatch, tmp_path):
+    """No stuck exercise: empty recording cache (every agent turn is the labelled fallback policy) and the priority phone is the one
+    with two candidates (the live-twin case that once hung at "reached: the agent plans the way out")."""
+    import sandtable.beacon_link as bl
+    story = json.loads(bl.STORY.read_text())
+    swap = {"B1": "B2", "B2": "B1"}
+    for f in story["frames"]:
+        for p in f["beacons"].get("phones") or []:
+            p["id"] = swap.get(p["id"], p["id"])
+        f["beacons"]["phones"] = sorted(f["beacons"].get("phones") or [], key=lambda p: p["id"])
+    path = tmp_path / "story_swapped.json"
+    path.write_text(json.dumps(story))
+    monkeypatch.setattr(bl, "STORY", path)
+    s, events, step, seen = _beacon_run(monkeypatch, tmp_path / "cache")
+    inc = s.incident
+    assert step == "done" and inc.phase == "terminated", s.director.steps
+    assert all(v["status"] == "out" for v in inc.phones.values())
+    agent = [e for e in events if e.get("type") == "agent" and e["kind"] != "start"]
+    assert agent and all(e["backend"] == "reflex-fallback" for e in agent)       # every turn labelled as the fallback policy
+    assert any(e["kind"] == "fallback" for e in inc.timeline)
+    assert any(e["kind"] == "search" and "phone B1" in e["text"] for e in inc.timeline)          # the priority phone needed the search

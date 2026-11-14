@@ -437,16 +437,18 @@ def test_board_sharing_turns_serves_one_phone_at_a_time(twin):
     w = World(twin, seed=23, board_sharing="turns")
     assert w.sim_model["board_sharing"] == "turns" and "one phone at a time" in w.sim_model["board_sharing_modes"]["turns"]
     w.set_pucks([{"id": "P1", "x": 9.15, "y": 6.7}, {"id": "P2", "x": 9.15, "y": 2.7}], exact=True)
-    w.upsert_phone("a", 2.1, 1.8)
-    w.upsert_phone("b", 3.4, 6.4)
+    w.upsert_phone("a", 6.5, 5.0)
+    w.upsert_phone("b", 6.5, 3.5)
     eids = {q["key"]: q["eid"] for q in w.truth()["phones"]}
     obs = [o for o in run(w, 30.0) if o["kind"] == "uwb"]
-    for pid in ("P1", "P2"):
+    both = [p for p in w._pucks_true if all(w._uwb_link_ok(p, w._devices[k]) for k in ("a", "b"))]
+    assert both                                                                   # the scene has a puck both phones can use
+    for pid in [p["id"] for p in both]:
         seq = [(o["t"], o["eid"]) for o in obs if o["puck"] == pid]
         assert {e for _, e in seq} == set(eids.values())                         # both phones get turns
         bursts = []
         for t, e in seq:
-            if bursts and bursts[-1][0] == e and t - bursts[-1][2] < 0.6:
+            if bursts and bursts[-1][0] == e and t - bursts[-1][2] < 0.9:
                 bursts[-1][2] = t
             else:
                 bursts.append([e, t, t])

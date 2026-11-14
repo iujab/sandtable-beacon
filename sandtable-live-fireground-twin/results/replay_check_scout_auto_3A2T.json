@@ -1,0 +1,33 @@
+{
+ "script": "scout",
+ "mode": "auto",
+ "profile": "3A2T",
+ "simulated": true,
+ "llm_backend": "replay",
+ "final_step": "done",
+ "phase": "terminated",
+ "wall_s": 71.1,
+ "runs": {
+  "preplan": [
+   "replay"
+  ],
+  "scan#1": [
+   "replay"
+  ],
+  "victim_reached#2": [
+   "replay"
+  ],
+  "aar": [
+   "replay"
+  ]
+ },
+ "radio_messages": 6,
+ "fallback_runs": [],
+ "preplan_backend": "replay",
+ "aar_backend": "replay",
+ "metrics_simulated": {
+  "replans": 0,
+  "hazards": 0
+ },
+ "at": "2026-11-14T13:35:43-0600"
+}

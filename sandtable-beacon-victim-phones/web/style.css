@@ -136,6 +136,7 @@ a { color: #cfd6de; }
 .ph-lab { font: 700 calc(var(--u) * 15px) var(--cond); fill: #fff; text-anchor: middle; paint-order: stroke; stroke: var(--phone-deep); stroke-width: calc(var(--u) * 4px); letter-spacing: .02em; pointer-events: none; }
 .ph-sub { font: 500 calc(var(--u) * 11.5px) var(--sans); fill: var(--phone-soft); text-anchor: middle; paint-order: stroke; stroke: #0b0e12; stroke-width: calc(var(--u) * 3px); pointer-events: none; }
 .phone-g.stale { opacity: .45; }
+.ph-leader { stroke: var(--phone-soft); stroke-width: calc(var(--u) * 1px); opacity: 0; pointer-events: none; }
 .phone-g.sel .ph-lab { stroke: #8a1a55; }
 /* plan overlays */
 .caption { position: absolute; left: 10px; top: 10px; max-width: min(78%, 520px); background: rgba(12, 15, 20, .88); border: 1px solid var(--line-2); border-left: 3px solid var(--phone); border-radius: 6px; padding: 7px 11px 8px; z-index: 4; pointer-events: none; }
@@ -410,3 +411,13 @@ table.acct tr.fire td:first-child { box-shadow: inset 2px 0 0 var(--e1); }
   .tool-btn { padding: 4px 7px; font-size: 11.5px; }
 }
 @media (max-width: 1100px) { .links { flex-wrap: wrap; } .layout-why { width: min(70%, 300px); } }
+
+/* round 2: stale phones, the agent's age, stable cards */
+.pc-stale { margin-top: 5px; font-size: 13px; color: var(--muted); font-style: italic; }
+.pcard.stale { opacity: .55; box-shadow: inset 3px 0 0 #3a4553; }
+.pcard.stale .pc-id, .pcard.stale .pc-st { color: var(--muted); }
+.agent-stale { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: #3a2a12; border: 1px solid var(--e1); color: #ffe2a6; font-size: 13px; font-weight: 600; }
+.plan-card.old { opacity: .55; }
+.run-head small { font: 400 11px var(--mono); letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: 4px; }
+#btn-agent.primary { color: #1a1405; }
+.feed pre { max-height: 110px; }

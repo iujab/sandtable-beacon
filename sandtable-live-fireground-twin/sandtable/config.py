@@ -25,17 +25,25 @@ TAGS_OVERLAY_JSON = DATA_DIR / "twin_tags_overlay.json"      # tags written back
 CORRECTIONS_JSON = DATA_DIR / "record_corrections.json"      # record corrections filed in fixture mode
 
 
-def _load_env_files() -> None:
+# Switches decide WHAT a process does (which data, which model backend). They come from the command's environment or from the
+# project's own .env, never from the bench drop zone: that directory holds credentials and ids for several machines (one of its
+# files is the .env prepared for the laptop), and a switch found there must not silently turn every process on this machine live.
+SWITCHES = frozenset({"SANDTABLE_DATA_MODE", "COSTAR_MODE", "MATTERPORT_MODE", "VEXCEL_MODE", "LLM_BACKEND"})
+
+
+def _load_env_files(project_env: Path | None = None, drop_zone: Path | None = None, environ=None) -> None:
     """Load KEY=VALUE files into os.environ without overriding what is already set.
 
     Looked up in this order: <project>/.env, then every *.env in a `.secrets/`
-    directory beside the project (the bench drop zone). Values are never logged.
+    directory beside the project (the bench drop zone), from which the SWITCHES
+    and empty values are not taken. Values are never logged.
     """
-    candidates: list[Path] = [ROOT / ".env"]
-    secrets = ROOT.parent / ".secrets"
+    environ = os.environ if environ is None else environ
+    candidates: list[tuple[Path, bool]] = [(project_env or ROOT / ".env", True)]
+    secrets = drop_zone or ROOT.parent / ".secrets"
     if secrets.is_dir():
-        candidates += sorted(secrets.glob("*.env"))
-    for path in candidates:
+        candidates += [(p, False) for p in sorted(secrets.glob("*.env"))]
+    for path, own in candidates:
         if not path.is_file():
             continue
         try:
@@ -46,8 +54,10 @@ def _load_env_files() -> None:
                 key, _, value = line.partition("=")
                 key = key.strip().removeprefix("export ").strip()
                 value = value.strip().strip('"').strip("'")
-                if key and key not in os.environ:
-                    os.environ[key] = value
+                if not own and (key in SWITCHES or not value):
+                    continue
+                if key and key not in environ:
+                    environ[key] = value
         except OSError:
             continue
 

@@ -24,7 +24,7 @@ How the code enforces it, so that nobody has to remember:
 
 ## Laptop setup: Windows or Mac (about 15 minutes)
 
-Three things travel by hand, never through the repository: the private `.env` (keys, the property id, the model id), the CoStar kit zip, and the laptop bundle `sandtable-live-bundle.zip`. The bundle comes from `python scripts/pack_live_bundle.py pack` on the machine that ran live, and holds everything that live run used: the chosen building, its public context, the CoStar index of the building, the Matterport and Vexcel caches, the private agent recordings and the Beacon copy. It contains sponsor data and no key values. Never commit it, upload it or attach it.
+Three things travel by hand, never through the repository: the private `.env` (keys, the property id, the model id), the CoStar kit zip, and the laptop bundle `sandtable-live-bundle.zip`. The bundle comes from `python scripts/pack_live_bundle.py pack` on the machine that ran live (it writes `data/live/bundle/sandtable-live-bundle.zip`, a git-ignored path), and holds everything that live run used: the chosen building, its public context, the CoStar index of the building, the Matterport and Vexcel caches, the private agent recordings and the Beacon copy. It contains sponsor data and no key values. Never commit it, upload it or attach it.
 
 **Windows (PowerShell).** Python 3.12 or 3.13 from python.org; `py` is the launcher.
 
@@ -73,7 +73,7 @@ SANDTABLE_DATA_MODE=live LLM_BACKEND=anthropic .venv/bin/python -m sandtable.dem
 | `COSTAR_KIT_DIR` | without the bundle | With the bundle, the building's record is read from the private index `data/live/costar/_index/`, and the kit is needed only for another building. |
 | `COSTAR_PROPERTY_ID` | if `data/live/demo_building.json` is absent | `COSTAR_PROPERTY_ADDRESS` also works. |
 | `COSTAR_KIT_ZIP_PASSWORD` | only for `costar_extract unzip` | |
-| `MATTERPORT_TOKEN_ID`, `MATTERPORT_TOKEN_SECRET`, `MATTERPORT_MODEL_ID` | yes | The Matterport adapter needs the model id in the environment even when `demo_building.json` names it. |
+| `MATTERPORT_TOKEN_ID`, `MATTERPORT_TOKEN_SECRET`, `MATTERPORT_MODEL_ID` | the two token variables always; the model id only without the bundle | When `MATTERPORT_MODEL_ID` is not set, the adapter takes the model id, storey and suite from `data/live/demo_building.json`; an explicit value wins. |
 | `MATTERPORT_SDK_KEY` | for the real-scan view | Works on `localhost` only. |
 | `MATTERPORT_STOREY`, `MATTERPORT_SUITE` | if `demo_building.json` is absent | They place the scanned space in the building and join it to its tenant. |
 | `MATTERPORT_EXERCISE_FLOOR`, `MATTERPORT_REFRESH`, `MATTERPORT_WRITE_TAGS` | optional | |

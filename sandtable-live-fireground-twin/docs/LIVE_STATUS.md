@@ -28,7 +28,7 @@ This page holds no sponsor data. It says which layers have been read live, on wh
 - **The CoStar adapter written before the event assumed an HTTP API.** CoStar delivered a data extract (JSON Lines, integer enums, a model-id CSV), so the adapter was rewritten to read files through one mapping table, with fuzzy column matching for other extract layouts.
 - **The first building candidate had no current tenants in CoStar.** Every tenancy had a move-out date. The demo building was changed to one with current tenants.
 - **The first building denylist blocked the public sync.** A single-word tenant name was also an ordinary brand word. Names now need two words or ten letters, matching is on whole words, and dropped terms are listed privately with the reason.
-- **Matterport live needs `MATTERPORT_MODEL_ID` in the environment.** `check --live` fails for Matterport until it is set: the adapter does not read it from `data/live/demo_building.json`.
+- **Matterport's model id.** When `MATTERPORT_MODEL_ID` is not set, the adapter takes the model id, storey and suite from `data/live/demo_building.json` (which only exists on a machine that has the private bundle). With neither, `check --live` fails for Matterport and names both.
 - **The Showcase SDK key works only on `localhost`.** The real-scan page must be opened at `http://localhost:<port>`. For the phone, use `adb reverse`.
 
 ## Privacy writers not yet switched (requests to their owners)

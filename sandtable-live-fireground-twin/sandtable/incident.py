@@ -749,6 +749,10 @@ class Incident:
             self._log("assign", f"{u['label']}: {task}", unit_id)
             return {"ok": True, "route": None}
         victim = self.victim_target(target)
+        if victim is not None and task in RESCUE_TASKS and victim["status"] in ("reached", "evacuating", "out", "handed_over") and victim.get("rescuer") != unit_id:
+            why = {"out": "is already out", "handed_over": "was handed over"}.get(victim["status"], f"is already with {victim.get('rescuer')}")
+            self._log("assign", f"{u['label']}: no {task} order for {victim['id']}: {victim['id']} {why}", unit_id)
+            return {"ok": False, "reason": f"{victim['id']} {why}"}
         if target in self.units:
             other = self.units[target]
             dst = self._unit_node(other) or [other["x"], other["y"]]

@@ -223,7 +223,17 @@ class Director:
                 inc.phase = "terminated"
                 inc._log("par", "All crews are out of the floor. Accountability complete.")
                 inc._situation("all_out", None, {})
-        await self._wait(lambda: inc.phase == "terminated", (config.AGENT_FALLBACK_AFTER_S + 180) * slow * human, "all crews out")
+        loop = asyncio.get_running_loop()                  # until all out: a crew sent back in meanwhile (by anyone) is withdrawn again
+        end = loop.time() + (config.AGENT_FALLBACK_AFTER_S + 180) * slow * human
+        while inc.phase != "terminated" and loop.time() < end:
+            if not s.agent_busy():
+                for u in inc.units.values():
+                    if u["_was_interior"] and u["status"] == "interior" and (u["assignment"] or {}).get("task") != "exit":
+                        self._script_fallback(f"{u['label']} withdraws with the others")
+                        inc.assign(u["id"], "exit", "exit", source="script-fallback")
+            await asyncio.sleep(0.5)
+        if inc.phase != "terminated":
+            log.warning("storyboard: timed out waiting for all crews out")
 
     async def _e1_to_door(self, room: str, human: float) -> None:
         from .scout.session import door_outside_node

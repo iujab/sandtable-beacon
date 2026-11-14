@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Private laptop bundle: everything a second machine needs to reproduce this live run without re-deriving it.
 
-    python scripts/pack_live_bundle.py pack [--out data/sandtable-live-bundle.zip]
+    python scripts/pack_live_bundle.py pack [--out data/live/bundle/sandtable-live-bundle.zip]
     python scripts/pack_live_bundle.py unpack <archive> [--into data/live]
     python scripts/pack_live_bundle.py show <archive>                 the manifest's parts and sizes, nothing else
 
@@ -34,7 +34,7 @@ from sandtable import config  # noqa: E402  (loads .env and the bench drop zone 
 SCHEMA = "sandtable.live_bundle/1"
 WARNING = ("This archive contains sponsor data (CoStar, Matterport, Vexcel) and data derived from it. Never commit it, upload it, attach it "
            "or share it. Unpack it only into data/live/ of a Sandtable checkout. It holds no key values.")
-DEFAULT_OUT = ROOT / "data" / "sandtable-live-bundle.zip"
+DEFAULT_OUT = config.LIVE_DIR / "bundle" / "sandtable-live-bundle.zip"   # under a `live` directory, like everything private; no PARTS pattern matches bundle/
 
 # What goes in: (part name, glob patterns relative to the live root, what it is, how the laptop could rebuild it instead)
 PARTS = [

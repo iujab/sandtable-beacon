@@ -23,7 +23,7 @@ Commands are Windows PowerShell. On Linux or the UNO Q, use `.venv/bin/python` i
    $env:BEACON_URL = "http://127.0.0.1:1885"        # the UNO Q instead: http://<uno-q address>:1885
    .venv\Scripts\python -m sandtable.demo            # add --host 0.0.0.0 to reach it from other devices
    ```
-   On Linux: `BEACON_URL=http://127.0.0.1:1885 .venv/bin/python -m sandtable.demo`. `BEACON_URL` is the variable the lead's integration defines. When this file was written, nothing in `sandtable/` read it yet. Confirm with `python -m sandtable.demo --help` or the README.
+   On Linux: `BEACON_URL=http://127.0.0.1:1885 .venv/bin/python -m sandtable.demo`. The board reads `BEACON_URL` (`sandtable/beacon_link.py`); `python -m sandtable.demo --beacon-url http://127.0.0.1:1885` sets the same thing. With neither, the launcher uses a Beacon server already answering on the port, or starts the vendored copy in `vendor/beacon/`.
    **Works when** <http://localhost:1810/> opens. The UWB layers then show the orange `SIM` badge, because Scout and Crews stay simulated.
 4. The phone crew page. Over USB: `adb reverse tcp:1810 tcp:1810`, then open `http://localhost:1810/crew.html?unit=RIT` in Chrome. Over Wi-Fi: start with `--host 0.0.0.0` and open `http://<laptop-ip>:1810/crew.html?unit=RIT`. Allow Python through the Windows firewall on private networks when asked. Speech works without a secure context; vibration may not.
 5. The UNO Q as the box (optional; untested on a UNO Q). It runs Debian aarch64, and every dependency is a wheel. Copy the folder, do step 1 with `.venv/bin/python`, then run step 3 with `--host 0.0.0.0`. The laptop and the phone then only need browsers.

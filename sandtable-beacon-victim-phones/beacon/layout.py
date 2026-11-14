@@ -23,6 +23,7 @@ import math
 INSET_M = 0.35          # how far inside the wall the pucks stand
 SPACING_M = 4.0         # distance between the two pucks along the wall (clamped to the wall)
 END_MARGIN_M = 0.6      # keep clear of the room's corners
+MIN_BASELINE_M = 3.0    # a door wall with less usable length than this is too short: use the long wall nearest the door
 
 
 def _edges(poly):
@@ -108,11 +109,22 @@ def recommend(twin, room_id: str, n: int = 2, strategy: str = "door-wall", spaci
                     "why": f"Both pucks {inset_m:.2f} m inside the {_wall_name(edge, c)}, {s:.1f} m apart. The mirror image of anyone in the room is outside the building, so the twin removes it."}
 
     # door-wall (default)
+    on_door_wall = True
     if door is None:
         edge, t_door = max(edges, key=lambda e: math.dist(e[0], e[1])), None
     else:
         dp = (float(door["at"][0]), float(door["at"][1]))
-        edge = min(edges, key=lambda e: _point_seg_dist(dp, e[0], e[1])[0])
+
+        def usable(e):
+            return max(0.0, math.dist(e[0], e[1]) - 2 * END_MARGIN_M)
+
+        door_edge = min(edges, key=lambda e: _point_seg_dist(dp, e[0], e[1])[0])
+        edge = door_edge
+        if usable(door_edge) < MIN_BASELINE_M:
+            # the wall the door is in is too short for a useful distance between the pucks (small rooms, real scans):
+            # take the wall near the door that gives the longest one
+            edge = max(edges, key=lambda e: min(usable(e), spacing_m) - 0.25 * _point_seg_dist(dp, e[0], e[1])[0])
+        on_door_wall = edge is door_edge
         t_door = _point_seg_dist(dp, edge[0], edge[1])[1] * math.dist(edge[0], edge[1])
     L = math.dist(edge[0], edge[1])
     s = min(spacing_m, max(1.0, L - 2 * END_MARGIN_M))
@@ -134,6 +146,12 @@ def recommend(twin, room_id: str, n: int = 2, strategy: str = "door-wall", spaci
                 beyond = "the " + (twin.room(other[0]).get("label") or "corridor").lower()
             except Exception:
                 pass
+    if not on_door_wall:
+        return {"room": room_id, "strategy": "door-wall", "pucks": [{"id": f"P{i + 1}", "x": p[0], "y": p[1]} for i, p in enumerate(pts)],
+                "wall": _wall_name(edge, c) + " (the long wall nearest the door)", "spacing_m": round(s, 2), "mirror_falls": "beyond that wall, outside the room", "certain": False,
+                "why": (f"The wall the door is in is too short to separate two pucks, so both go {inset_m:.2f} m inside the long wall nearest the door, {s:.1f} m apart. "
+                        f"The mirror image of anyone in the room falls beyond that wall, outside the room; the twin removes it when the ranges do not fit a spot behind a wall, "
+                        f"otherwise it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed.")}
     return {"room": room_id, "strategy": "door-wall", "pucks": [{"id": f"P{i + 1}", "x": p[0], "y": p[1]} for i, p in enumerate(pts)],
             "wall": _wall_name(edge, c) + " (the wall the door is in)", "spacing_m": round(s, 2), "mirror_falls": "beyond the door wall: " + beyond + " or the next suite", "certain": False,
             "why": (f"Both pucks {inset_m:.2f} m inside the wall the door is in, {s:.1f} m apart: one beside the door, one slid along the wall. "

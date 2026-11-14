@@ -252,18 +252,27 @@ def test_live_server_takes_the_app_batches(make_client, fixture):
     assert _wait(lambda: not c.get("/api/beacons").json()["phones"])
 
 
-def test_values_the_app_clamps_would_be_rejected(make_client):
-    """Why Reporter.buildBatch clamps d_m to >= 0.01 and drops RSSI outside -130..10: the server rejects the WHOLE
-    batch (report included) on one out-of-range value, and the app repeats a reading for 25 s."""
+def test_one_bad_value_does_not_silence_the_phone(make_client):
+    """The app clamps d_m to >= 0.01 and drops RSSI outside -130..10 (Reporter.buildBatch). The server is tolerant as well:
+    an observation that fails validation is dropped and reported, the rest of the batch (the status report) is used, and
+    d_m = 0 (a phone lying on a puck) is accepted. Only a batch with nothing usable in it gets a 400."""
     c = make_client("live")
     t = time.time()
-    for bad in ({"kind": "uwb", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "d_m": 0.0},
-                {"kind": "sos", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "rssi": 127}):
-        body = {"device": {"eid": "a3f19c02"},
-                "obs": [bad, {"kind": "report", "t": t, "eid": "a3f19c02", "report": {"status": "trapped"}}]}
-        r = c.post("/api/ingest", json=body)
-        assert r.status_code == 400
-        assert isinstance(r.json().get("detail"), str)     # Reporter shows this text (ServerErrorReply.detail)
+    body = {"device": {"eid": "a3f19c02"},
+            "obs": [{"kind": "sos", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "rssi": 127},
+                    {"kind": "report", "t": t, "eid": "a3f19c02", "report": {"status": "trapped"}}]}
+    r = c.post("/api/ingest", json=body)
+    assert r.status_code == 200
+    j = r.json()
+    assert j["accepted"] == 1 and j["rejected"] == 1 and isinstance(j["errors"][0], str)
+    zero = {"device": {"eid": "a3f19c02"},
+            "obs": [{"kind": "uwb", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "d_m": 0.0}]}
+    assert c.post("/api/ingest", json=zero).status_code == 200
+    only_bad = {"device": {"eid": "a3f19c02"},
+                "obs": [{"kind": "sos", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "rssi": 127}]}
+    r = c.post("/api/ingest", json=only_bad)
+    assert r.status_code == 400
+    assert isinstance(r.json().get("detail"), str)     # Reporter shows this text (ServerErrorReply.detail)
     ok = {"device": {"eid": "a3f19c02"},
           "obs": [{"kind": "uwb", "t": t, "eid": "a3f19c02", "accessory": "X#0001", "d_m": 0.01}]}
     assert c.post("/api/ingest", json=ok).status_code == 200

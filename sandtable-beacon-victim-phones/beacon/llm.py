@@ -26,7 +26,7 @@ from pathlib import Path
 from . import config
 
 BACKENDS = ("replay", "claude-cli", "anthropic")
-CACHE_DIR = config.FIXTURES / "llm_cache"
+CACHE_DIR = config.LLM_CACHE_DIR          # fixtures/llm_cache for the fixture bundle; a private directory for an external one
 CLI_MODEL = {"fast": "haiku", "main": "sonnet", "hard": "opus"}
 API_MODEL = {"fast": os.environ.get("LLM_MODEL_FAST", "claude-haiku-5-5"),
              "main": os.environ.get("LLM_MODEL_MAIN", "claude-sonnet-5-5"),

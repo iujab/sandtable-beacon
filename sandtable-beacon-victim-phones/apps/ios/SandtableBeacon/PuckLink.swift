@@ -125,6 +125,7 @@ final class PuckLink: NSObject {
     private var niSession: NISession?
     private var configuration: NINearbyAccessoryConfiguration?
     private var initAttempts = 0
+    private var pendingSubscriptions = 0
     private var lastInitSent: TimeInterval = 0
     private var stopRequested = false
     private var invalidationRetries = 0
@@ -405,6 +406,9 @@ extension PuckLink: CBPeripheralDelegate {
                 log("service invalidated; discovering again")
                 rxCharacteristic = nil
                 txCharacteristic = nil
+                pendingSubscriptions = 0
+                initAttempts = 0
+                connectedAt = nowSeconds()      // restarts the 12 s watchdog in tick()
                 peripheral.discoverServices(PuckUUIDs.services)
             }
         }
@@ -471,6 +475,7 @@ extension PuckLink: CBPeripheralDelegate {
         for characteristic in toSubscribe {
             let props = characteristic.properties
             if props.contains(.notify) || props.contains(.indicate) {
+                pendingSubscriptions += 1
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
@@ -480,14 +485,23 @@ extension PuckLink: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if pendingSubscriptions > 0 {
+            pendingSubscriptions -= 1
+        }
         if let error = error {
             log("could not subscribe: \(error.localizedDescription)")
+            // Another subscription may carry the board's answer: ask once all have answered
+            // (tick() also asks after 3 s, and gives up after 3 unanswered attempts).
+            if pendingSubscriptions == 0 && initAttempts == 0 && rxCharacteristic != nil {
+                sendInitialize(nowSeconds())
+            }
             return
         }
         if characteristic.isNotifying {
             // Differs from the sample: the sample waits for a button press before sending
-            // initialize. We send it as soon as the board can answer.
-            if initAttempts == 0 {
+            // initialize. We send it as soon as every subscription we asked for is
+            // confirmed, so the board's answer (0x01) cannot arrive before we listen.
+            if pendingSubscriptions == 0 && initAttempts == 0 {
                 sendInitialize(nowSeconds())
             }
         } else {

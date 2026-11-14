@@ -131,9 +131,12 @@ final class PuckManager: NSObject, ObservableObject {
         } else {
             startScanningIfReady()
         }
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        // .common mode: a timer in the default mode stops while a finger scrolls the screen.
+        let t = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
         let mode = settings.takeTurns ? "taking turns, one board at a time" : "at most \(settings.maxPucks) boards"
         BeaconLog.shared.add("Looking for rescue beacons (" + mode + ")")
     }

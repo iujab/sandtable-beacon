@@ -316,3 +316,24 @@ def test_crews_ordered_by_the_agent_hold_while_it_is_busy_but_the_director_does_
     busy[0] = False
     r.step(1)
     assert r.inc.units["RIT"]["_follow"]["s"] > 0
+
+
+def test_scout_script_situations_do_not_depend_on_how_long_the_agent_takes(monkeypatch, tmp_path):
+    """Recorded scout turns must replay whatever the model's latency: same situations, snapshots and after-action input with a
+    2 s delay inside every agent turn as without."""
+    from test_beacon_link import _aar_lines, _slow_agent
+    import sandtable.server as server
+    runs, aar = [], []
+    for i in range(2):
+        with monkeypatch.context() as m:
+            if i == 1:
+                _slow_agent(m, 2.0)
+            seen = []
+            real_on = server.AppState._on_situation
+            m.setattr(server.AppState, "_on_situation", lambda self, sit: (seen.append(json.loads(json.dumps(sit))), real_on(self, sit))[1])
+            s, events, step = _run_scout_script(m, "fake", tmp_path / str(i))
+            assert step == "done" and s.incident.phase == "terminated"
+            runs.append([json.dumps({k: v for k, v in x.items() if k != "seq"}, sort_keys=True) for x in seen])
+            aar.append(_aar_lines(s.incident))
+    assert [json.loads(x)["kind"] for x in runs[0]] == ["scan", "victim_reached", "all_out"]
+    assert runs[0] == runs[1] and aar[0] == aar[1]

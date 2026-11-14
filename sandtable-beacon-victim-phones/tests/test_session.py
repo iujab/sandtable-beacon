@@ -325,11 +325,15 @@ def test_live_rig_scale(twin_raw, site_raw):
         s.set_rig_scale(0)
 
 
-def test_live_batch_is_all_or_nothing(twin_raw, site_raw):
+def test_live_batch_drops_only_the_bad_observation(twin_raw, site_raw):
+    """One bad value must not silence a phone: it is dropped and reported; a batch with nothing usable raises."""
     s, _ = _session(twin_raw, site_raw, source="live")
+    out = _batch(s, T0, [("A#0001", 2.0), ("A#0001", -3.0)])
+    assert out["rejected"] == 1 and out["accepted"] >= 1 and "d_m" in out["errors"][0]
+    s2, _ = _session(twin_raw, site_raw, source="live")
     with pytest.raises(ValueError):
-        _batch(s, T0, [("A#0001", 2.0), ("A#0001", -3.0)])
-    assert not s._pending
+        s2.ingest_batch([{"kind": "uwb", "t": T0, "eid": "a3f19c02", "accessory": "A#0001", "d_m": -3.0}], now=T0)
+    assert not s2._pending
 
 
 def test_live_persisted_puck_table(twin_raw, site_raw, tmp_path):

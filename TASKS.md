@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 1:07 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 1:22 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,7 +8,7 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 75% | Live sponsor layers (private): CoStar record reads from the kit (72 current tenants on the chosen 12-storey Los Angeles office), Matterport twin of a scanned suite normalised with real walls and doorways; Vexcel imagery being fetched; server being generalised to run the board on the live twin. Fixture demo: beacon and scout agent turns recorded with a real model; replay determinism under a slow model being fixed before re-recording. |
+| Command board | `sandtable-live-fireground-twin/` | building | 80% | All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published): CoStar record from the kit (construction, sprinklers, 72 current tenants), Matterport twin of a scanned suite (real walls, doorways, sweep graph, Showcase SDK view on localhost), Vexcel imagery (3-6 cm ortho, four obliques, roof attributes; the agent vision tool counts parking stalls on it). The beacon flow ran end to end on the live twin. Now: all-three-live board run and verification, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, docs, judge. |
 | Phones and pucks | `sandtable-beacon-victim-phones/` | building | 78% | simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
@@ -68,7 +68,7 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Live sponsor layers (private): CoStar record reads from the kit (72 current tenants on the chosen 12-storey Los Angeles office), Matterport twin of a scanned suite normalised with real walls and doorways; Vexcel imagery being fetched; server being generalised to run the board on the live twin. Fixture demo: beacon and scout agent turns recorded with a real model; replay determinism under a slow model being fixed before re-recording.
+**Being worked on now:** All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published): CoStar record from the kit (construction, sprinklers, 72 current tenants), Matterport twin of a scanned suite (real walls, doorways, sweep graph, Showcase SDK view on localhost), Vexcel imagery (3-6 cm ortho, four obliques, roof attributes; the agent vision tool counts parking stalls on it). The beacon flow ran end to end on the live twin. Now: all-three-live board run and verification, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, docs, judge.
 
 **Left to build (agents):**
 

@@ -618,10 +618,16 @@ class ToolBox:
                 "to_id": r["dst_resolved"]["id"], "via": [q["label"] for q in rooms[1:-1]], "steps": [s["text"] for s in r["steps"]]}
 
     def _floor_no(self) -> int:
-        return int(self.twin.floor()["label"])
+        label = self.twin.floor()["label"]
+        try:
+            return int(label)
+        except (TypeError, ValueError):                       # a live twin may label its floor "Level 10"
+            import re
+            m = re.search(r"-?\d+", str(label or ""))
+            return int(m.group(0)) if m else None
 
     def _tenant_view(self, t: dict) -> dict:
-        return {"suite": t["suite"], "category": t["industry"], "since": t.get("registered_since"), "life_hazard": t.get("life_hazard"),
+        return {"suite": t.get("suite"), "category": t.get("industry"), "since": t.get("registered_since"), "life_hazard": t.get("life_hazard"),
                 "hazmat": t.get("hazmat"), "hazard_basis": "inferred from category" if t.get("hazard_basis") else None, "synthetic": bool(t.get("synthetic"))}
 
     # ---- record (CoStar layer)
@@ -641,8 +647,8 @@ class ToolBox:
         tenants = self.provider.costar.list_tenants(floor)
         counts: dict[str, int] = {}
         for t in tenants:
-            counts[t["suite"]] = counts.get(t["suite"], 0) + 1
-        return {"floor": floor, "tenants": [self._tenant_view(t) for t in tenants], "suites_with_several_registrations": sorted(s for s, n in counts.items() if n > 1),
+            counts[t.get("suite")] = counts.get(t.get("suite"), 0) + 1
+        return {"floor": floor, "tenants": [self._tenant_view(t) for t in tenants], "suites_with_several_registrations": sorted(s for s, n in counts.items() if n > 1 and s is not None),
                 "note": "names withheld in fixture mode; life hazards are inferred from the business category" if self.provider.modes["costar"] == "fixture" else None}
 
     def t_list_vacant_space(self, floor: int | None = None) -> dict:
@@ -689,7 +695,7 @@ class ToolBox:
                 "apparatus": [{"id": a["id"], "label": a["label"], "side": a.get("side"), "basis": a.get("source")} for a in ctx.get("apparatus_positions", [])],
                 "entrances": [{"id": e["id"], "label": e["label"], "side": e.get("side"), "leads_to": e.get("leads_to"), "basis": e.get("source")} for e in ctx.get("entrances", [])],
                 "hydrants": hydrants, "hydrant_source": (ctx.get("hydrants") or [{}])[0].get("source"),
-                "fire_stations": [{"name": s["name"], "distance_m": s["distance_m"]} for s in ctx.get("fire_stations", [])],
+                "fire_stations": [{"name": s.get("name"), "distance_m": s.get("distance_m")} for s in ctx.get("fire_stations", [])],
                 "building_height_m": structure.get("height_m"), "height_source": structure.get("source"),
                 "roof": {"material": structure.get("roof_material"), "condition": structure.get("roof_condition")}}
 
@@ -763,7 +769,7 @@ class ToolBox:
         u = self._unit(unit)
         if not u["room"]:
             return {"unit": unit, "located": False}
-        tenants = [self._tenant_view(t) for t in self.provider.costar.list_tenants(self._floor_no()) if u["suite"] and t["suite"] == u["suite"]]
+        tenants = [self._tenant_view(t) for t in self.provider.costar.list_tenants(self._floor_no()) if u["suite"] and t.get("suite") == u["suite"]]
         exits = []
         for ex in self.twin.exits():
             r = self.twin.route(u["node"], ex["id"], self._blocked())

@@ -44,7 +44,7 @@ for ef in env_files:
 deny = set()
 dl = root / "data" / "live" / "denylist_building.txt"
 if dl.is_file():
-    deny = {i: re.compile(r"(?<![a-z0-9])" + re.escape(l.strip().lower()) + r"(?![a-z0-9])")
+    deny = {i: (l.strip().lower(), re.compile(r"(?<![a-z0-9])" + re.escape(l.strip().lower()) + r"(?![a-z0-9])"))
             for i, l in enumerate(dl.read_text(encoding="utf-8", errors="ignore").splitlines(), 1) if len(l.strip()) >= 4 and not l.startswith("#")}
 models = set()
 kit = Path(os.environ.get("COSTAR_KIT_DIR") or root.parent / ".secrets" / "costar-kit")
@@ -61,7 +61,7 @@ for f in files:
         print(f"{f}  (contains a key value from an env file)")
     if deny:
         low = text.lower()
-        hits = [i for i, rx in deny.items() if rx.search(low)]
+        hits = [i for i, (term, rx) in deny.items() if term in low and rx.search(low)]
         if hits:
             print(f"{f}  (contains data/live/denylist_building.txt line(s) {', '.join(map(str, hits[:5]))}; the term is not printed)")
     if models and not models.isdisjoint(TOKEN.findall(text)):

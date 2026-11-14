@@ -19,25 +19,27 @@ from __future__ import annotations
 import copy
 
 
-def apply_statement(est: dict, room_id: str | None, room_label: str | None, basis: str, kind: str = "occupant-statement") -> dict:
+def apply_statement(est: dict, room_id, room_label: str | None, basis: str, kind: str = "occupant-statement") -> dict:
     """Return a copy of `est` in which candidates outside `room_id` are dismissed on the strength of `basis`.
 
     est:   a locator / tracker result (`geometry`, `candidates`, `pruned`, ...).
+    room_id: one room id, or a list of room ids when a suite is several rooms of the twin.
     basis: human-readable, e.g. "the occupant says they are in Suite 310".
     kind:  "occupant-statement" | "search-room".
     """
     if not room_id or est.get("geometry") != "candidates":
         return est
+    rooms = {room_id} if isinstance(room_id, str) else set(room_id)       # a suite may be several rooms of the twin
     cands = est.get("candidates") or []
-    inside = [c for c in cands if c.get("room") == room_id]
-    outside = [c for c in cands if c.get("room") != room_id]
+    inside = [c for c in cands if c.get("room") in rooms]
+    outside = [c for c in cands if c.get("room") not in rooms]
     if not outside:
         return est                                  # nothing to dismiss: both candidates are in that room
     out = copy.deepcopy(est)
     if not inside:
-        out["conflict"] = f"No candidate is in {room_label or room_id}, although {basis}: showing every candidate"
+        out["conflict"] = f"No candidate is in {room_label or 'that room'}, although {basis}: showing every candidate"
         return out
-    label = room_label or room_id
+    label = room_label or (room_id if isinstance(room_id, str) else "that suite")
     out.setdefault("pruned", [])
     for c in outside:
         where = c.get("room_label") or "outside any room"
@@ -45,7 +47,7 @@ def apply_statement(est: dict, room_id: str | None, room_label: str | None, basi
                               "reason": f"in {where}, not in {label}: {basis}", "by": kind,
                               "weight": c.get("weight")})
     geometry_share = round(sum(float(c.get("weight") or 0.0) for c in inside), 2)
-    assumption = {"kind": kind, "room": room_id,
+    assumption = {"kind": kind, "room": room_id if isinstance(room_id, str) else sorted(rooms)[0], "rooms": sorted(rooms),
                   "text": f"Mirror candidate dismissed because {basis}. On the measurements alone it was "
                           f"{int(round((1.0 - geometry_share) * 100))}% likely."}
     out.setdefault("assumptions", []).append(assumption)

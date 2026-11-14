@@ -3,7 +3,7 @@
   "name": "suite-310",
   "simulated": true,
   "title": "Suite 310 fire, two pucks on the door wall: a trapped iPhone 14 (U1), an injured iPhone 15 (U2), one occupant already out",
-  "description": "SIMULATED demo scene on the synthetic twin (fixtures/building/twin.json, floor f3), matching the owner's live demo: TWO pucks placed in the door-wall layout of Suite 310 (beacon.layout.recommend), two opt-in iPhones inside the fire room (an iPhone 14 with a U1 chip deep in the room: 2 people, trapped, cannot move; an iPhone 15 with a U2 chip behind the reception desk: 1 person, injured), an opt-in phone whose user pressed 'I am out', and devices with no app (phones, wearables, a laptop) over the room and its neighbours that only feed the cold device count. Neither iPhone sends a bearing (they report no direction to an accessory). Nothing here is a measurement.",
+  "description": "SIMULATED demo scene on the synthetic twin (fixtures/building/twin.json, floor f3), matching the owner's live demo: TWO pucks placed in the door-wall layout of Suite 310 (beacon.layout.recommend), two opt-in iPhones inside the fire room (an iPhone 14 with a U1 chip deep in the room: 2 people, trapped, cannot move; an iPhone 15 with a U2 chip behind the reception desk: 1 person, injured), an opt-in phone whose user pressed 'I am out', and devices with no app (phones, wearables, a laptop) over the room and its neighbours that only feed the cold device count. Neither iPhone sends a bearing (they report no direction to an accessory). Nothing here is a measurement. The two phones' keys are chosen so that neither phone's links are body-blocked in this scene (a scripted scene, like the positions; the evaluation uses random draws).",
   "floor": "f3",
   "room": "r310",
   "seed": 310,

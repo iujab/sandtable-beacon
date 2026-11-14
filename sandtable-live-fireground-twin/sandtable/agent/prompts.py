@@ -204,7 +204,7 @@ def describe_result(name: str, r: dict) -> str:
     if name == "assign":
         return (f"route {r['route']['length_m']} m via {', '.join(r['route']['rooms'][1:-1]) or 'direct'}" if r.get("ok") and r.get("route") else ("ok" if r.get("ok") else f"refused: {r.get('reason')}"))
     if name == "locate_unit":
-        who = "; ".join(t["category"] for t in r.get("tenants_in_record", [])) or "no tenant in the record"
+        who = "; ".join(str(t.get("category") or "tenant") for t in r.get("tenants_in_record", [])) or "no tenant in the record"   # live records can lack it
         return f"{r.get('room_label')}: {who}"
     if name == "hose_stretch":
         return f"{r['total_m']} m ({r['lengths_50ft']} lengths): inside {r['inside_m']} m, stair {r['vertical_m']} m, outside {r['outside_m']} m"

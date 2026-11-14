@@ -40,6 +40,8 @@ class CoStarLive:
         self.is_kit = cx.is_kit(self.kit_dir)
         self.address = address
         self.kit = cx.Kit(self.kit_dir) if self.is_kit else None
+        if self.kit is None and not (self.kit_dir.is_dir() and cx.discover(self.kit_dir)):
+            self.kit = cx.CachedKit()                   # no extract here: the private index carried by the laptop bundle
         self.property_id = self.kit.find_property_id(property_id, model_id, address, lat, lon) if self.kit else property_id
         if self.kit and not self.property_id:
             from . import AdapterError
@@ -56,7 +58,7 @@ class CoStarLive:
     def from_env(cls) -> "CoStarLive":
         from . import AdapterError
         kit = cx.default_kit_dir()
-        if not kit.is_dir() or not cx.discover(kit):
+        if (not kit.is_dir() or not cx.discover(kit)) and not (config.LIVE_DIR / "costar" / "_index" / "enums.json").is_file():
             raise AdapterError(f"COSTAR_MODE=live but there is no CoStar extract folder: set COSTAR_KIT_DIR to the unzipped CoStar Data Extract "
                                f"(expected {kit.name}/ with CSV, JSON or JSON Lines files; see docs/TOOLKIT_SWAP.md)")
         b = config.demo_building() or {}

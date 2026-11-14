@@ -152,7 +152,7 @@ def main(argv=None) -> int:
 
     import signal
     import uvicorn
-    print(f"[demo] Sandtable board: http://{host}:{args.port}/   (LLM backend: {os.environ.get('LLM_BACKEND', 'replay')}, data: {os.environ.get('SANDTABLE_DATA_MODE', 'fixture')})", flush=True)
+    print(f"[demo] Sandtable board: http://{host}:{args.port}/   (LLM backend: {os.environ.get('LLM_BACKEND', 'replay')}, data: {', '.join(f"{k.split('_')[0].lower()} {os.environ.get(k) or os.environ.get('SANDTABLE_DATA_MODE', 'fixture')}" for k in ('COSTAR_MODE', 'MATTERPORT_MODE', 'VEXCEL_MODE'))})", flush=True)
     # The server runs in a thread so that this main thread owns the signals and always gets to stop the hub it started.
     server = uvicorn.Server(uvicorn.Config("sandtable.server:app", host=host, port=args.port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)

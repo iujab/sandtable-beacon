@@ -385,7 +385,7 @@ class Incident:
         at = v.get("at_candidate") or {"x": v["x"], "y": v["y"]}
         v["at_candidate"] = None
         if found:
-            v["status"], v["reached_t"] = "reached", self.clock()
+            v["status"], v["reached_t"], v["found_by_search"] = "reached", self.clock(), u["label"]
             if self.phase in ("operations", "rescue"):
                 self.phase = "egress"
             self._log("phone", f"{u['label']} has reached phone {pid} in {v['room_label']}: {v['what']}", unit_id)

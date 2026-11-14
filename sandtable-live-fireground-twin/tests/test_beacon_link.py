@@ -196,36 +196,41 @@ def _beacon_run(monkeypatch, tmp_path, beacon_env="sample"):
 def test_beacon_script_replays_the_recorded_two_puck_run_identically(monkeypatch, tmp_path):
     """The hands-free beacon exercise: two pucks placed by hand, phone 1 a fix (its mirror pruned outside the building), phone 2 two
     candidates; the agent's situations must be byte-identical across runs so recorded model turns replay."""
-    runs = []
-    for i in range(2):
-        s, events, step, seen = _beacon_run(monkeypatch, tmp_path / str(i))
-        inc = s.incident
-        assert step == "done" and inc.phase == "terminated", s.director.steps
-        assert inc.phones["B1"]["status"] == "out" and inc.phones["B1"]["geometry"] == "fix"
-        assert inc.phones["B2"]["status"] == "out" and inc.phones["B2"]["geometry"] == "fix" and inc.phones["B2"]["searched"][0]["by"] == "Engine 1"
-        assert inc.phones["B1"]["rescuer"] == "RIT" and inc.phones["B2"]["rescuer"] == "E1"
-        assert any(e["kind"] == "search" and "nobody there" in e["text"] for e in inc.timeline)
-        b2 = next(p for e in events if e.get("type") == "beacons" for p in e.get("phones") or [] if p["id"] == "B2" and p["geometry"] == "fix")
-        assert any(q["reason"] == "searched by Engine 1: nobody there" for q in b2["pruned"]) and b2["annotated"]
-        rep = s.report()
-        how = {p["id"]: p["how_found"] for p in rep["people"]}
-        assert "outside the building" in how["B1"] and "searched by Engine 1" in how["B2"] and all(p["out_t_rel"] for p in rep["people"])
-        relayed = [e for e in events if e.get("type") == "beacons" and e.get("phones")]
-        assert relayed and all(e["link"]["source"] == "replay" and e["replay"] is True and e["sample"] is False for e in relayed)
-        assert all(p.get("placed") == "by hand" for p in relayed[-1]["pucks"]) and len(relayed[-1]["pucks"]) == 2
-        b1 = next(p for p in relayed[0]["phones"] if p["id"] == "B1")
-        assert b1["pruned"] and "outside the building" in b1["pruned"][0]["reason"]
-        par = next(e["text"] for e in inc.timeline if e["kind"] == "par")
-        assert "B1" in par and "B2" in par and "Accountability complete" in par
-        runs.append([x for x in seen if x["kind"] in ("phone", "phone_reached", "all_out")])
+    runs, aar = [], []
+    for i in range(2):                      # the second run has a slow agent (2 s inside every turn, like a live model): same situations
+        with monkeypatch.context() as m:
+            if i == 1:
+                _slow_agent(m, 2.0)
+            s, events, step, seen = _beacon_run(m, tmp_path / str(i))
+            inc = s.incident
+            assert step == "done" and inc.phase == "terminated", s.director.steps
+            assert inc.phones["B1"]["status"] == "out" and inc.phones["B1"]["geometry"] == "fix"
+            assert inc.phones["B2"]["status"] == "out" and inc.phones["B2"]["geometry"] == "fix" and inc.phones["B2"]["searched"][0]["by"] == "Engine 1"
+            assert inc.phones["B1"]["rescuer"] == "RIT" and inc.phones["B2"]["rescuer"] == "E1"
+            assert any(e["kind"] == "search" and "nobody there" in e["text"] for e in inc.timeline)
+            b2 = next(p for e in events if e.get("type") == "beacons" for p in e.get("phones") or [] if p["id"] == "B2" and p["geometry"] == "fix")
+            assert any(q["reason"] == "searched by Engine 1: nobody there" for q in b2["pruned"]) and b2["annotated"]
+            rep = s.report()
+            how = {p["id"]: p["how_found"] for p in rep["people"]}
+            assert "outside the building" in how["B1"] and "searched by Engine 1" in how["B2"] and all(p["out_t_rel"] for p in rep["people"])
+            relayed = [e for e in events if e.get("type") == "beacons" and e.get("phones")]
+            assert relayed and all(e["link"]["source"] == "replay" and e["replay"] is True and e["sample"] is False for e in relayed)
+            assert all(p.get("placed") == "by hand" for p in relayed[-1]["pucks"]) and len(relayed[-1]["pucks"]) == 2
+            b1 = next(p for p in relayed[0]["phones"] if p["id"] == "B1")
+            assert b1["pruned"] and "outside the building" in b1["pruned"][0]["reason"]
+            par = next(e["text"] for e in inc.timeline if e["kind"] == "par")
+            assert "B1" in par and "B2" in par and "Accountability complete" in par
+            runs.append([x for x in seen if x["kind"] in ("phone", "phone_reached", "all_out")])
+            aar.append(_aar_lines(inc))
     kinds = [x["kind"] for x in runs[0]]
     assert kinds.count("phone") >= 3 and kinds.count("phone_reached") == 2 and kinds[-1] == "all_out"
     assert any(x["kind"] == "phone" and x["data"]["why"] == {"B2": "fix"} for x in runs[0])
+    assert len(runs[0]) == len(runs[1])
     for a, b in zip(runs[0], runs[1]):
         a, b = dict(a), dict(b)
         a.pop("seq"), b.pop("seq")
         assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
-    assert len(runs[0]) == len(runs[1])
+    assert aar[0] == aar[1]
 
 
 def test_an_assigned_rescue_follows_the_phone_when_its_geometry_improves():
@@ -241,3 +246,18 @@ def test_an_assigned_rescue_follows_the_phone_when_its_geometry_improves():
     e = r.inc.phones[b4["id"]]
     assert e["match"] == "point" and r.inc.units["RIT"]["route"]["polyline"][-1] == pytest.approx([2.0, 6.5]) and first != [2.0, 6.5]
     assert r.situations[n]["kind"] == "phone" and r.situations[n]["data"]["why"] == {b4["id"]: "fix"}
+
+
+def _aar_lines(inc):
+    return [f"{e['kind']}: {e['text']}" for e in inc.timeline if e["kind"] not in ("radio", "unit", "system", "correction", "twin")]
+
+
+def _slow_agent(monkeypatch, delay_s):
+    """Test hook: every agent turn takes `delay_s` longer (inside the turn, while the agent is busy), like a live model."""
+    import sandtable.agent as agent_mod
+    real = agent_mod.CommandAgent.handle
+
+    async def handle(self, situation):
+        await asyncio.sleep(delay_s)
+        return await real(self, situation)
+    monkeypatch.setattr(agent_mod.CommandAgent, "handle", handle)

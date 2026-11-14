@@ -5,7 +5,8 @@ import pytest
 
 from sandtable import config
 from sandtable.adapters import AdapterError, build_provider
-from sandtable.adapters.costar_live import COSTAR_FIELD_MAP, CoStarLive
+from sandtable.adapters import costar_extract as cx
+from sandtable.adapters.costar_live import CoStarLive
 from sandtable.adapters.matterport_live import MatterportLive, normalize_model
 from sandtable.adapters.vexcel_live import VexcelLive
 
@@ -86,10 +87,11 @@ def test_fixture_writes_go_to_local_files_with_deterministic_ids(p):
     assert not any(str(t["id"]).startswith("obs-") for t in p.matterport.list_tags())
 
 
-def test_live_mode_without_keys_fails_loudly(monkeypatch):
-    for k in ("VEXCEL_API_KEY", "MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "COSTAR_API_KEY", "COSTAR_BASE_URL", "COSTAR_PROPERTY_ID"):
+def test_live_mode_without_keys_fails_loudly(monkeypatch, tmp_path):
+    for k in ("VEXCEL_API_KEY", "MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "COSTAR_PROPERTY_ID", "COSTAR_PROPERTY_ADDRESS"):
         monkeypatch.delenv(k, raising=False)
-    for kwargs, name in (({"vexcel_mode": "live"}, "VEXCEL_API_KEY"), ({"matterport_mode": "live"}, "MATTERPORT_TOKEN_ID"), ({"costar_mode": "live"}, "COSTAR_API_KEY")):
+    monkeypatch.setenv("COSTAR_KIT_DIR", str(tmp_path / "no-extract-here"))          # never the real extract in a test
+    for kwargs, name in (({"vexcel_mode": "live"}, "VEXCEL_API_KEY"), ({"matterport_mode": "live"}, "MATTERPORT_TOKEN_ID"), ({"costar_mode": "live"}, "COSTAR_KIT_DIR")):
         with pytest.raises(AdapterError) as err:
             build_provider(**kwargs)
         assert name in str(err.value)
@@ -437,27 +439,123 @@ def test_matterport_live_from_env_never_writes_tags_by_default(monkeypatch):
     assert MatterportLive.from_env().dry_run is True
 
 
-def test_costar_live_maps_toolkit_fields_through_one_table(p):
-    raw = {"propertyId": "P-1", "propertyName": "Test Tower", "address": {"street": "1 Main St", "city": "Houston", "state": "TX", "postalCode": "77002"},
-           "location": {"latitude": 29.76, "longitude": -95.36}, "numberOfStories": 12, "rentableBuildingArea": 250000, "yearBuilt": 1982,
-           "constructionMaterial": "Steel", "sprinklers": "Wet", "propertyManager": {"name": "PM Co", "phone": "000"}}
-    posted = []
+def test_matterport_from_env_falls_back_to_the_building_pick(monkeypatch):
+    from sandtable.adapters import matterport_live
+    for k, val in (("MATTERPORT_TOKEN_ID", "x"), ("MATTERPORT_TOKEN_SECRET", "y")):
+        monkeypatch.setenv(k, val)
+    for k in ("MATTERPORT_MODEL_ID", "MATTERPORT_STOREY", "MATTERPORT_SUITE"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(matterport_live.config, "demo_building", lambda: {"model_id": "invented-pick", "floor": 4, "suite": "410"})
+    m = MatterportLive.from_env()
+    assert (m.model_id, m.storey, m.suite) == ("invented-pick", 4, "410")
+    monkeypatch.setenv("MATTERPORT_MODEL_ID", "invented-other")                        # an explicit variable wins
+    m = MatterportLive.from_env()
+    assert (m.model_id, m.storey, m.suite) == ("invented-other", None, None)          # the pick's storey belongs to the pick's model
+    monkeypatch.delenv("MATTERPORT_MODEL_ID")
+    monkeypatch.setattr(matterport_live.config, "demo_building", lambda: None)
+    with pytest.raises(AdapterError) as err:
+        MatterportLive.from_env()
+    assert "MATTERPORT_MODEL_ID" in str(err.value) and "demo_building.json" in str(err.value)
 
-    def transport(method, path, body=None):
-        if method == "POST":
-            posted.append((path, body))
-            return {"id": "RR-9"}
-        if path.endswith("/tenants"):
-            return {"items": [{"tenantId": "T1", "tenantName": "Acme", "suite": "300", "floor": 3, "squareFeetOccupied": 4000, "industry": "Law"}]}
-        if path.endswith("/available-spaces"):
-            return [{"suite": "310", "floor": 3, "squareFeetAvailable": 2000, "spaceStatus": "Vacant"}]
-        return raw
 
-    c = CoStarLive("key", "https://example.invalid/api", "P-1", transport=transport, open_bundle=p.site())
+# --- CoStar live adapter, against an invented extract folder ---
+# Every value below is made up (ids, names, addresses, model ids). The real extract never enters the repository.
+
+def _jsonl(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def made_up_kit(root, lat, lon):
+    """A tiny folder in the CoStar data kit layout: JSON Lines datasets, integer enums, the model-id CSV."""
+    enums = {"PropertyType": {"0": "Unknown", "5": "Office"}, "BuildingClass": {"0": "Unknown", "2": "B"}, "SprinklerType": {"0": "Unknown", "1": "Wet"},
+             "BuildingConstructionMaterialType": {"0": "Unknown", "4": "Steel"}, "ConstructionEventType": {"2": "ConstructionComplete", "4": "RenovationFinished"},
+             "FloorName": {"23": "Ground", "25": "SecondFloor", "27": "ThirdFloor"}, "IndustryType": {"0": "Unknown", "15": "HealthCareAndSocialAssistance", "16": "LawFirms"},
+             "ContactRole": {"4": "PropertyManager", "7": "TrueOwner"}, "ElevatorType": {"1": "Passenger"}, "ListingStatus": {"1": "Active"},
+             "AvailabilityType": {"1": "Direct"}, "SalePriceStatus": {"3": "Confirmed"}}
+    (root / "schemas").mkdir(parents=True)
+    (root / "schemas" / "enums.json").write_text(json.dumps(enums))
+    floors = [{"propertyFloorId": 901, "floorName": 23}, {"propertyFloorId": 902, "floorName": 25}, {"propertyFloorId": 903, "floorName": 27}]
+    prop = {"id": 4242, "buildingName": "Invented Plaza", "propertyType": 5, "buildingClass": 2, "numStoriesAboveGrade": 3, "rentableBuildingAreaSquareFeet": 40000,
+            "grossTypicalFloorSquareFeet": 13000, "buildingConstructionMaterial": 4, "hasSprinklers": True, "sprinklerType": 1, "buildingHeightInFeet": 45,
+            "constructionEvents": [{"eventType": 2, "year": 1988}], "parking": [{"parkingType": 1, "totalSpaces": 120}], "floors": floors,
+            "primaryAddress": {"streetNumber": "100", "streetName": "Example", "streetType": "Ave", "city": "Testville", "state": "CA", "postcode": "90000",
+                               "latitude": lat, "longitude": lon},
+            "propertyOffice": {"structural": {"elevators": [{"elevatorType": 1, "numElevators": 2, "elevatorState": 1}]}},
+            "contacts": [{"contactRole": 4, "locationId": 77, "contactPhoneNumber": "(555) 000-0000"}],
+            "attachments": [{"videoExternalReferenceType": 36, "videoKey": "madeUpModel1"}]}
+    other = {"id": 5151, "propertyType": 5, "primaryAddress": {"streetNumber": "9", "streetName": "Elsewhere", "latitude": lat + 1, "longitude": lon}}
+    _jsonl(root / "data" / "commercial-property.jsonl", [other, prop])
+    _jsonl(root / "data" / "location-occupancy.jsonl", [
+        {"id": 1, "propertyId": 4242, "tenantLocationId": 11, "industryType": 15, "fromDate": "2019-01-01", "toDate": None,
+         "spaces": [{"suite": "300", "propertyFloorId": 903, "squareFeetOccupied": 4000}], "leaseDeal": {"id": 5, "expirationDate": "2029-06-30T00:00:00", "leaseTerm": 60}},
+        {"id": 2, "propertyId": 4242, "tenantLocationId": 12, "industryType": 16, "fromDate": "2010-01-01", "toDate": "2015-01-01", "spaces": [{"suite": "200", "propertyFloorId": 902}]},
+        {"id": 3, "propertyId": 5151, "tenantLocationId": 13, "industryType": 16, "fromDate": "2010-01-01", "spaces": [{"suite": "100"}]}])
+    _jsonl(root / "data" / "company-detail.jsonl", [{"id": 11, "name": "Made Up Dental Group", "numEmployees": 14, "suite": "300"},
+                                                     {"id": 12, "name": "Former Tenant LLP"}, {"id": 13, "name": "Unrelated Co"}, {"id": 77, "name": "Invented Management"}])
+    _jsonl(root / "data" / "commercial-listing-summary.jsonl", [{"id": 8, "propertyId": 4242, "listingStatus": 1,
+                                                                  "forLeaseSummary": {"spaces": [{"propertyId": 4242, "suite": "210", "propertyFloorId": 902, "squareFeetMax": 2500, "availabilityType": 1}]}}])
+    _jsonl(root / "data" / "commercial-sale-comp.jsonl", [{"id": 9, "soldDate": "2021-03-04", "soldForPrice": 12000000, "salePriceStatus": 3,
+                                                            "entities": [{"propertyId": 4242, "totalSquarefeet": 40000}]}])
+    (root / "commercial-properties.csv").write_text("PropertyId,MatterportModelId,Address,City,State\n4242,madeUpModel1,100 Example Ave,Testville,CA\n"
+                                                    "4242,madeUpModel2,100 Example Ave,Testville,CA\n5151,,9 Elsewhere,Testville,CA\n")
+    return root
+
+
+def test_costar_live_reads_the_kit_layout_through_one_mapping_table(p, tmp_path):
+    fx = p.site()["property"]
+    kit = made_up_kit(tmp_path / "kit", fx["lat"], fx["lon"])
+    c = CoStarLive(kit, model_id="madeUpModel2", open_bundle=p.site())                 # found through commercial-properties.csv
+    assert c.property_id == "4242"
     site = c.site()
-    assert site["property"]["stories"] == 12 and site["property"]["sprinklers"] == "Wet" and site["property"]["address"] == "1 Main St"
-    assert set(COSTAR_FIELD_MAP) <= set(site["property"]) and site["field_sources"]["sprinklers"] == {"source": "CoStar", "synthetic": False}
-    assert c.list_tenants(3)[0]["name"] == "Acme" and c.list_available_space()[0]["suite"] == "310"
-    assert site["context"]["hydrants"] and site["footprint"]["type"] == "Polygon"                 # public context is kept from the open bundle
-    out = c.file_correction("stories", 12, 13, {"why": "test"})
-    assert out["id"] == "RR-9" and posted[0][0].endswith("/research-requests") and out["status"].startswith("sent to CoStar")
+    prop = site["property"]
+    assert prop["address"] == "100 Example Ave" and prop["stories"] == 3 and prop["construction"] == "Steel" and prop["sprinklers"] == "Yes (Wet)"
+    assert prop["building_class"] == "B" and prop["year_built"] == 1988 and prop["parking_spaces"] == 120 and prop["elevators"] == "2 passenger"
+    assert prop["height_m"] == 13.7 and prop["matterport_model_ids"] == ["madeUpModel1", "madeUpModel2"]
+    assert prop["property_manager"]["name"] == "Invented Management" and "fake" in prop["property_manager"]["note"]
+    assert site["field_sources"]["stories"]["source"].startswith("CoStar") and site["field_sources"]["percent_leased"]["source"] == "not in the CoStar record"
+    assert set(cx.MAPPING["property"]) <= set(prop)
+    [t] = c.list_tenants()                                                               # the former tenant is not current
+    assert (t["name"], t["suite"], t["floor"], t["sf"], t["employees"], t["lease_expiration"]) == ("Made Up Dental Group", "300", 3, 4000, 14, "2029-06-30")
+    assert t["industry"] == "HealthCareAndSocialAssistance" and t["life_hazard"] and "inferred" in t["hazard_basis"]
+    assert c.list_available_space(2)[0]["suite"] == "210" and c.list_available_space(2)[0]["sf"] == 2500
+    assert site["comparables"]["sales"][0]["price"] == 12000000 and site["comparables"]["leases"][0]["term_months"] == 60
+    assert site["context"]["hydrants"] and site["footprint"]["type"] == "Polygon"      # public context of the same place is merged
+    assert (config.LIVE_DIR / "costar" / "_index" / "property_4242.json").is_file()      # indexed once, privately
+    alone = CoStarLive(tmp_path / "no-kit-here", property_id="4242", open_bundle=p.site())   # the laptop bundle without the kit
+    assert isinstance(alone.kit, cx.CachedKit) and alone.site()["tenants"] == site["tenants"] and alone.site()["property"] == prop
+    out = c.file_correction("stories", 3, 4, {"why": "test"})
+    assert out["id"] == "corr-1" and "not sent" in out["status"]
+    config.CORRECTIONS_JSON.unlink()
+
+
+def test_costar_live_finds_by_address_and_refuses_context_of_another_place(p, tmp_path):
+    kit = made_up_kit(tmp_path / "kit", 29.76, -95.37)                                   # far from the fixture building
+    c = CoStarLive(kit, address="100 Example Avenue, Suite 300, Testville", open_bundle=p.site())
+    assert c.property_id == "4242"
+    site = c.site()
+    assert site["footprint"] is None and site["context"]["hydrants"] == [] and "build_site.py" in site["unavailable"][0]
+
+
+def test_costar_extract_maps_unseen_flat_files_fuzzily_and_inspect_prints_no_values(tmp_path, capsys):
+    root = tmp_path / "extract"
+    root.mkdir()
+    (root / "Property Export.csv").write_text("PropertyID,Property Address,City,Number of Stories,Year Built,Sprinkler Type,RBA,Secret Column\n"
+                                              "77,1 Sample Rd,Nowhere,7,1990,Wet,90000,zz\n78,2 Other Rd,Nowhere,2,1970,,10000,zz\n")
+    (root / "tenants.csv").write_text("PropertyID;Tenant Name;Suite;Floor;SF Occupied;Industry;Lease Expiration\n"
+                                      "77;Invented Clinic;710;7th;3000;Physician offices;2030-01-31\n78;Not Ours;100;1;100;Retail;\n")
+    rec, report = cx.flat_record(root, property_id="77")
+    assert rec["property"]["stories"] == 7 and rec["property"]["address"] == "1 Sample Rd" and rec["property"]["rba_sf"] == 90000
+    [t] = rec["tenants"]
+    assert (t["name"], t["suite"], t["floor"], t["sf"]) == ("Invented Clinic", "710", 7, 3000) and t["life_hazard"]
+    assert "percent_leased" in report["unmapped_fields"]["property"]
+    assert cx.main(["inspect", str(root)]) == 0
+    out = capsys.readouterr().out
+    assert "Number of Stories" in out and "NOT mapped" in out
+    for value in ("1 Sample Rd", "Invented Clinic", "90000", "zz"):
+        assert value not in out
+
+
+def test_costar_floor_names_and_addresses_normalise():
+    assert [cx.floor_number(x) for x in ("ThirdFloor", "TwentyFirstFloor", "Ground", "7th", "Floor 12", "Basement", "Penthouse")] == [3, 21, 1, 7, 12, -1, None]
+    assert cx.address_key("100 North Example Avenue, Suite 5") == cx.address_key("100 N. Example Ave")

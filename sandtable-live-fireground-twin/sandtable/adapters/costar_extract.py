@@ -20,7 +20,7 @@ row values; `find` writes its matches to a file under data/live/ and prints the 
     python -m sandtable.adapters.costar_extract inspect [DIR]
     python -m sandtable.adapters.costar_extract find [--city la|houston] [--type office] [--has-model] [--min-stories N]
     python -m sandtable.adapters.costar_extract record [--property-id ID]     counts only; the record stays in memory
-    python -m sandtable.adapters.costar_extract unzip ZIP [--out data/live/costar]   password from COSTAR_KIT_ZIP_PASSWORD
+    python -m sandtable.adapters.costar_extract unzip ZIP [--out FOLDER]   outside the repo, or data/live/costar; password from COSTAR_KIT_ZIP_PASSWORD
     python -m sandtable.adapters.costar_extract denylist [PROPERTY_ID]   writes data/live/denylist_building.txt for the publish check
 """
 from __future__ import annotations
@@ -318,8 +318,8 @@ def map_record(section: str, record: dict, ctx: Context, flat_columns: dict[str,
         if flat_columns is not None:                         # a flat file: the column was matched once per table
             col = flat_columns.get(field)
             if col is not None:
-                conv = next((c.split("|", 1)[1] for c in cands if "|" in c and norm(c.split("|", 1)[0]) == norm(col)), "")
-                conv = conv if conv and not conv.startswith(("enum:", "year:", "contact:")) and conv not in ("street", "sprinklers", "elevators", "parking_total", "matterport_models") else ""
+                # a flat column holds plain text: apply the field's plain type (int, float, date) if it has one
+                conv = next((c.split("|", 1)[1] for c in cands if c.endswith(("|int", "|float", "|date"))), "")
                 out[field], where[field] = convert(conv, record.get(col), record, ctx), col
                 if field == "floor":
                     out[field] = floor_number(record.get(col))
@@ -537,6 +537,10 @@ class Kit:
     def raw(self, property_id: str) -> dict:
         """The property's records from every dataset, cached per property under data/live/costar/_index/."""
         pid = int(property_id)
+        enums = _cache_dir() / "enums.json"                # the private index then works without the kit (a laptop with the bundle)
+        if not enums.is_file() and (self.root / KIT["enums"]).is_file():
+            config.guard_write(enums)
+            enums.write_text((self.root / KIT["enums"]).read_text(encoding="utf-8"), encoding="utf-8")
         cache = _cache_dir() / f"property_{pid}.json"
         if cache.is_file() and cache.stat().st_mtime >= (self.root / KIT["property"]).stat().st_mtime:
             return json.loads(cache.read_text(encoding="utf-8"))
@@ -558,6 +562,34 @@ class Kit:
         config.guard_write(cache)
         cache.write_text(json.dumps(raw), encoding="utf-8")
         return raw
+
+
+class CachedKit(Kit):
+    """The private index alone (data/live/costar/_index/: per-property records and the enums), when the kit is not on this machine."""
+
+    def __init__(self, index_dir: Path | None = None):
+        self.root = Path(index_dir or config.LIVE_DIR / "costar" / "_index")
+        if not (self.root / "enums.json").is_file() or not list(self.root.glob("property_*.json")):
+            raise FileNotFoundError("no private CoStar index (data/live/costar/_index/ with enums.json and a property record)")
+        self.enums = Enums(self.root / "enums.json")
+        self._models = None
+
+    def models(self) -> dict[str, list[str]]:
+        if self._models is None:
+            self._models = {}
+            for f in self.root.glob("property_*.json"):
+                raw = json.loads(f.read_text(encoding="utf-8"))
+                self._models[str(raw["property"]["id"])] = list(raw.get("models") or [])
+        return self._models
+
+    def index(self) -> list[dict]:
+        return [{"id": int(pid), "street": None, "lat": None, "lon": None} for pid in self.models()]
+
+    def raw(self, property_id: str) -> dict:
+        path = self.root / f"property_{int(property_id)}.json"
+        if not path.is_file():
+            raise KeyError(f"property id {property_id} is not in the private index and the kit is not on this machine")
+        return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _dist2(r: dict, lat: float, lon: float) -> float:
@@ -812,9 +844,10 @@ def _cmd_unzip(args: list[str]) -> int:
     ap.add_argument("zip")
     ap.add_argument("--out", default=str(config.LIVE_DIR / "costar"))
     a = ap.parse_args(args)
-    out = Path(a.out).resolve()
-    if not config.is_private(out / "x"):
-        print("refusing: the extract must be unpacked under a directory named 'live' (e.g. data/live/costar)")
+    out = Path(a.out).expanduser().resolve()
+    if out.is_relative_to(config.ROOT.resolve()) and not config.is_private(out / "x"):
+        print("refusing: inside the repository the extract may only go under a directory named 'live' (e.g. data/live/costar); "
+              "outside the repository any folder is fine")
         return 2
     pwd = os.environ.get("COSTAR_KIT_ZIP_PASSWORD", "").encode() or None
     try:

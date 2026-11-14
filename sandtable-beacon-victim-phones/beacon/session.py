@@ -591,7 +591,7 @@ class BeaconSession:
             if obs.get("version") is not None:
                 o["version"] = str(obs["version"])[:16]
         elif kind in ("uwb", "uwb_puck"):
-            o["d_m"] = _finite(obs.get("d_m"), "d_m", 0.0, 150.0, open_lo=True)
+            o["d_m"] = max(_finite(obs.get("d_m"), "d_m", 0.0, 150.0), 0.01)        # a phone lying on a puck reads 0.00 m
             if o["d_m"] >= 150.0:
                 raise ValueError("d_m out of range")
             for k, lo, hi in (("rssi", -150.0, 20.0), ("fp", -150.0, 20.0), ("los", 0.0, 1.0)):
@@ -680,6 +680,7 @@ class BeaconSession:
                 dev_info[k] = str(device[k])[:40]
         clean = []
         skipped = 0
+        rejected: list[str] = []
         seen = self.__dict__.setdefault("_seen_readings", {})
         for i, item in enumerate(items):
             if not isinstance(item, dict):
@@ -693,7 +694,9 @@ class BeaconSession:
             try:
                 o = self.validate(it, now)
             except ValueError as exc:
-                raise ValueError(f"obs[{i}]: {exc}")
+                # one bad value must not silence a phone: the observation is dropped and reported, the rest are used
+                rejected.append(f"obs[{i}]: {exc}")
+                continue
             # The iOS app re-sends each board's latest reading (with its original time) in every batch for up to 25 s,
             # because boards are shared by taking turns: the same reading must count once.
             mapped = o.get("puck") is not None or o.get("accessory") in self._accessories
@@ -710,6 +713,8 @@ class BeaconSession:
             if dev_info and o["kind"] == "report":
                 o["report"] = {**dev_info, **o["report"]}
             clean.append(o)
+        if rejected and not clean and not skipped:
+            raise ValueError("; ".join(rejected[:3]))            # nothing usable in the batch: 400 with the reasons
         unknown = []
         for o in clean:
             acc = o.get("accessory")
@@ -720,7 +725,11 @@ class BeaconSession:
             self._pending.append(({"kind": "_device", "eid": dev_eid.lower(), "t": now, "device": dev_info}, origin))
         eid = (dev_eid or next((o.get("eid") for o in clean if o.get("eid")), None))
         phone = self.phone_by_eid(eid.lower()) if eid else None
-        return {"ok": True, "accepted": len(clean), "skipped": skipped, "unknown_accessories": unknown, "ack": self.ack(phone)}
+        out = {"ok": True, "accepted": len(clean), "skipped": skipped, "unknown_accessories": unknown, "ack": self.ack(phone)}
+        if rejected:
+            out["rejected"] = len(rejected)
+            out["errors"] = rejected[:3]
+        return out
 
     # ---- lookups
     def phone_by_eid(self, eid: str | None) -> dict | None:
@@ -961,8 +970,10 @@ class BeaconSession:
                     spatial = None
             if spatial is None:
                 spatial = _none_spatial()
-            st = self._statement(rep)
-            if st is not None and spatial.get("geometry") == "candidates":
+            # stated evidence, strongest first: the occupant's own suite, then command's search room
+            for st in self._statements(rep):
+                if spatial.get("geometry") != "candidates":
+                    break
                 try:
                     from . import prune
                     spatial = prune.apply_statement(spatial, st[0], st[1], st[2], st[3])
@@ -1016,13 +1027,30 @@ class BeaconSession:
                 return r
         return None
 
+    def _statements(self, rep: dict) -> list[tuple]:
+        """Every piece of stated evidence that may dismiss a candidate (beacon.prune), strongest first: the occupant's
+        stated suite, then command's search room."""
+        out = []
+        first = self._statement(rep)
+        if first is not None:
+            out.append(first)
+        if self.search_room and (first is None or first[3] != "search-room"):
+            label = self.twin.room(self.search_room)["label"]
+            out.append((self.search_room, label, f"command is searching {label} and the crew holds the corridor", "search-room"))
+        return out
+
     def _statement(self, rep: dict) -> tuple[str, str, str, str] | None:
         """(room, label, basis, kind) of the stated evidence that may dismiss a candidate (beacon.prune), or None."""
         suite = rep.get("home_suite")
         if suite is not None and not rep.get("safe_outside"):
-            r = self._suite_room(str(suite))
-            if r is not None:
+            floor = self.floor or self.twin.exercise_floor
+            rooms = [r for r in self.twin.rooms("suite") if str(r.get("suite")) == str(suite) and r.get("floor") == floor]
+            if len(rooms) == 1:
+                r = rooms[0]
                 return r["id"], r["label"], f"the occupant says they are in {r['label']}", "occupant-statement"
+            if len(rooms) > 1:          # a suite of several rooms (a scan of one suite): any of its rooms agrees with the statement
+                label = f"Suite {suite}"
+                return [r["id"] for r in rooms], label, f"the occupant says they are in {label}", "occupant-statement"
         if self.search_room:
             label = self.twin.room(self.search_room)["label"]
             return self.search_room, label, f"command is searching {label} and the crew holds the corridor", "search-room"

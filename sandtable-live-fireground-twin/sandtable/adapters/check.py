@@ -16,8 +16,9 @@ from .. import config
 
 VARS = {
     "costar": ["COSTAR_KIT_DIR", "COSTAR_PROPERTY_ID", "COSTAR_PROPERTY_ADDRESS", "COSTAR_KIT_ZIP_PASSWORD"],
-    "matterport": ["MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "MATTERPORT_SDK_KEY"],
-    "vexcel": ["VEXCEL_API_KEY"],
+    "matterport": ["MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "MATTERPORT_SDK_KEY", "MATTERPORT_STOREY", "MATTERPORT_SUITE",
+                   "MATTERPORT_WRITE_TAGS"],
+    "vexcel": ["VEXCEL_API_KEY", "VEXCEL_OFFLINE"],
     "llm": ["LLM_BACKEND", "ANTHROPIC_API_KEY"],
 }
 TODO = {
@@ -83,11 +84,16 @@ def check_layer(layer: str, mode: str) -> bool:
     modes = {"costar_mode": "fixture", "matterport_mode": "fixture", "vexcel_mode": "fixture", f"{layer}_mode": mode}
     print(f"\n[{layer}] mode={mode}")
     print(f"  variables: {_vars(layer)}")
+    if mode == "live":
+        config.enter_live([layer])            # what build_provider does first: the paths below are the live ones
     if layer == "costar":
         from .costar_extract import default_kit_dir, discover
         kit = default_kit_dir()
         n = len(discover(kit)) if kit.is_dir() else 0
-        print(f"  extract folder: {'found' if kit.is_dir() else 'absent'} ({n} table files)")
+        idx = config.LIVE_DIR / "costar" / "_index"
+        print(f"  extract folder: {'found' if kit.is_dir() else 'absent'} ({n} table files)"
+              + (f"; private index: {len(list(idx.glob('property_*.json')))} building record(s){' (used, since there is no extract)' if not n else ''}"
+                 if (idx / "enums.json").is_file() else ""))
         b = config.demo_building()
         print(f"  data/live/demo_building.json: {'present, keys ' + ', '.join(sorted(b)) if b else 'absent'}")
         ctx = _rel(config.site_context_json())

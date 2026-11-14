@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { Scout3D } from "./scout3d.js";
 import { Beacon3D } from "./beacon3d.js";
+import { labelPoint } from "./plan2d.js";
 
 const ROOM_COLOR = { suite: 0x1d2631, corridor: 0x2a3644, stair: 0x1b4631, lobby: 0x2c2e47, elevator: 0x1c2027, restroom: 0x222a3a, mechanical: 0x35291f };
 const WALL_H = 1.3, WALL_T = 0.16, SMOKE_COLOR = 0x7f8489, PHYS = 2;
@@ -42,6 +43,7 @@ export class Twin3D {
     this.scene.fog = new THREE.FogExp2(SMOKE_COLOR, 0);          // density 0 for the main view; the inset raises it
     this.camera = new THREE.PerspectiveCamera(36, 1, 0.3, 600);
     const D = this.D = Math.max(this.fx, this.fy);
+    this.k = Math.max(0.35, Math.min(1, D / 40));            // crew markers in metres: smaller on a small floor (fixture: 1)
     this.home = { pos: new THREE.Vector3(-0.32 * D, 1.02 * D, 0.98 * D), target: new THREE.Vector3(0, 0, 1.5) };
     this.camera.position.copy(this.home.pos);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -73,14 +75,17 @@ export class Twin3D {
     const slab = phys(new THREE.Mesh(new THREE.BoxGeometry(this.fx + 0.8, 0.5, this.fy + 0.8), new THREE.MeshStandardMaterial({ color: 0x141a21, roughness: 1 })));
     slab.position.y = -0.27; this.scene.add(slab);
     const floorNo = Number(this.floor.label);
+    const suiteRooms = {};
+    for (const r of t.rooms.filter((q) => q.floor === fid && q.suite)) (suiteRooms[r.suite] ||= []).push(r);
     for (const r of t.rooms.filter((q) => q.floor === fid)) {
       const mat = new THREE.MeshStandardMaterial({ color: ROOM_COLOR[r.kind] ?? 0x202833, roughness: 0.95 });
       const m = phys(this._poly(r.polygon, 0.01, mat)); m.userData.base = mat.color.getHex();
       this.scene.add(m); this.rooms[r.id] = m;
-      const c = [r.polygon.reduce((s, p) => s + p[0], 0) / r.polygon.length, r.polygon.reduce((s, p) => s + p[1], 0) / r.polygon.length];
+      const c = labelPoint(r.polygon);
       if (r.kind === "suite") {
         const hz = this.site.tenants.some((q) => q.floor === floorNo && q.suite === r.suite && q.life_hazard);
-        const s = label(r.suite, hz ? "#ffb4ae" : "#b9c4d0", 60, null, true); s.scale.multiplyScalar(0.034 / s.scale.y); s.position.copy(this.V(c[0], c[1], 0.9)); this.scene.add(s);
+        const shared = (suiteRooms[r.suite] || []).length > 1;      // a scanned suite: rooms are named by their label
+        const s = label(shared ? r.label : r.suite, hz ? "#ffb4ae" : "#b9c4d0", 60, null, true); s.scale.multiplyScalar(0.034 / s.scale.y); s.position.copy(this.V(c[0], c[1], 0.9)); this.scene.add(s);
         s.userData.room = r.id; (this.roomLabels ||= []).push(s);
       } else if (r.kind === "stair") {
         const s = label(r.label.toUpperCase(), "#7fe3b4", 46, null, true); s.scale.multiplyScalar(0.026 / s.scale.y); s.position.copy(this.V(c[0], c[1], 1.9)); this.scene.add(s);
@@ -155,8 +160,7 @@ export class Twin3D {
     if (obs) { const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.9), new THREE.MeshBasicMaterial({ color: 0xffffff })); stem.position.copy(this.V(tg.position[0], tg.position[1], 0.95)); this.obs.add(stem); }
   }
   highlightSuite(suite, on) {
-    const r = this.twin.rooms.find((q) => q.suite === suite), m = r && this.rooms[r.id];
-    if (m) m.material.color.setHex(on ? 0x3d5068 : (m.userData.tint ?? m.userData.base));
+    for (const r of this.twin.rooms.filter((q) => q.suite === suite)) { const m = this.rooms[r.id]; if (m) m.material.color.setHex(on ? 0x3d5068 : (m.userData.tint ?? m.userData.base)); }
   }
   setPreplan(pp) {
     this.pre.clear();
@@ -164,9 +168,18 @@ export class Twin3D {
     if (!pp) { this.obs.clear(); return; }
     const t = pp.tactical || {};
     for (const h of t.life_hazards || []) { const m = this.rooms[h.room]; if (m) { m.userData.tint = 0x3a2229; m.material.color.setHex(0x3a2229); } }
+    const seen = {};
     for (const [key, color, word] of [["attack_stair", 0xffc247, "ATTACK"], ["evac_stair", 0x3fcf8e, "EVAC"]]) {
       const st = this.twin.stairs.find((s) => s.id === t[key]); if (!st) continue;
-      const r = this.twin.rooms.find((q) => q.id === st.room);
+      const r = this.twin.rooms.find((q) => q.id === st.room), door = this.twin.doors.find((d) => d.id === st.door);
+      if (r?.kind !== "stair" && door) {
+        // the scan has no stair: the way in and out is the suite entrance, marked at its door, not by painting a room
+        const n = seen[st.id] = (seen[st.id] || 0) + 1;
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.copy(this.V(door.at[0], door.at[1], 0.08)); ring.renderOrder = 16; this.pre.add(ring);
+        const s = label(`${word}: ${st.label}`, "#0b0e12", 44, "#" + color.toString(16).padStart(6, "0"), true); s.scale.multiplyScalar(0.024 / s.scale.y); s.position.copy(this.V(door.at[0], door.at[1], 1.2 + 0.7 * n)); this.pre.add(s);
+        continue;
+      }
       this.pre.add(this._poly(r.polygon, 0.04, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28 })));
       const c = [r.polygon.reduce((s, p) => s + p[0], 0) / r.polygon.length, r.polygon.reduce((s, p) => s + p[1], 0) / r.polygon.length];
       const s = label(word, "#0b0e12", 44, "#" + color.toString(16).padStart(6, "0"), true); s.scale.multiplyScalar(0.026 / s.scale.y); s.position.copy(this.V(c[0], c[1], 3.6)); this.pre.add(s);
@@ -179,13 +192,14 @@ export class Twin3D {
   _unit(u) {
     const color = new THREE.Color(this.colors[u.id] || "#ffffff");
     const g = new THREE.Group();
-    g.ball = new THREE.Mesh(new THREE.SphereGeometry(0.75, 24, 16), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.85, fog: false }));
-    g.ball.position.y = 1.1;
-    g.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 6), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, fog: false }));
-    g.beam.position.y = 3;
+    const k = this.k;
+    g.ball = new THREE.Mesh(new THREE.SphereGeometry(0.75 * k, 24, 16), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.85, fog: false }));
+    g.ball.position.y = 1.1 * Math.max(k, 0.6);
+    g.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * k, 0.07 * k, 6 * k), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, fog: false }));
+    g.beam.position.y = 3 * k;
     g.disc = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, depthWrite: false, fog: false }));
     g.disc.rotation.x = -Math.PI / 2; g.disc.position.y = 0.06;
-    g.tag = label(u.id, this.colors[u.id] || "#fff", 64, null, true); g.tag.position.y = 6.4; g.tag.scale.multiplyScalar(0.05 / g.tag.scale.y);
+    g.tag = label(u.id, this.colors[u.id] || "#fff", 64, null, true); g.tag.position.y = 6.4 * k; g.tag.scale.multiplyScalar(0.05 / g.tag.scale.y);
     for (const o of [g.ball, g.beam, g.disc]) o.renderOrder = 18;
     g.add(g.ball, g.beam, g.disc, g.tag);
     g.target = null; g.visible = false;
@@ -217,7 +231,7 @@ export class Twin3D {
       const p = this.V(u.x, u.y, 0);
       if (!g.visible) { g.position.copy(p); g.visible = true; }
       g.target = p;
-      g.disc.scale.setScalar(Math.max(1.1, u.sigma_m || 0));
+      g.disc.scale.setScalar(Math.max(1.1 * this.k, u.sigma_m || 0));
       g.mayday = u.status === "mayday";
       this._route(u);
     }

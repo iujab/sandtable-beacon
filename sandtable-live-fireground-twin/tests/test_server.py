@@ -209,3 +209,35 @@ def test_autopilot_is_refused_on_real_boards_but_guided_mode_is_allowed():
         client.post("/api/storyboard", json={"action": "stop"})
         r = client.get("/api/vision/ortho.png")
         assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
+
+
+def _recorded(marker: str) -> bool:
+    """True when the replay cache holds a recorded turn for this kind of situation (the script has been recorded)."""
+    return any(marker in p.read_text(encoding="utf-8") for p in config.LLM_CACHE_DIR.glob("*.json"))
+
+
+def test_beacon_script_replays_the_recorded_model_run(monkeypatch):
+    """The hands-free beacon exercise (two pucks, two phones, the search): every agent turn must hit the recording."""
+    if not _recorded('\\"kind\\": \\"phone_reached\\"'):
+        pytest.skip("the beacon script has not been recorded yet (scripts/record_all.sh)")
+    from test_beacon_link import _beacon_run
+    s, events, step, seen = _beacon_run(monkeypatch, config.LLM_CACHE_DIR)
+    assert step == "done" and s.incident.phase == "terminated"
+    agent = [e for e in events if e.get("type") == "agent"]
+    missed = sorted({e["run"] for e in agent if e["backend"] == "reflex-fallback"})
+    assert agent and not missed, f"turns missed the recording: {missed} (re-record with scripts/record_all.sh)"
+    assert s.preplan["backend"] == "replay" and s.aar["backend"] == "replay"
+
+
+def test_scout_script_replays_the_recorded_model_run(monkeypatch):
+    """The hands-free scout exercise on the radar engine and the build-time demo seed: every agent turn must hit the recording."""
+    if not _recorded('\\"kind\\": \\"victim_reached\\"'):
+        pytest.skip("the scout script has not been recorded yet (scripts/record_all.sh)")
+    from test_scout_session import _engine_imports, _run_scout_script
+    if not _engine_imports():
+        pytest.skip("radar engine does not import")
+    s, events, step = _run_scout_script(monkeypatch, "sim", config.LLM_CACHE_DIR)
+    assert step == "done" and s.incident.phase == "terminated" and s.scout.engine == "sim"
+    agent = [e for e in events if e.get("type") == "agent"]
+    missed = sorted({e["run"] for e in agent if e["backend"] == "reflex-fallback"})
+    assert agent and not missed, f"turns missed the recording: {missed} (re-record with scripts/record_all.sh)"

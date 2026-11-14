@@ -91,21 +91,25 @@ class MatterportLive:
 
     @classmethod
     def from_env(cls) -> "MatterportLive":
-        missing = [k for k in ("MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID") if not os.environ.get(k)]
+        """Keys from the environment. The model: MATTERPORT_MODEL_ID when set (it wins), else the building pick in
+        data/live/demo_building.json (config.demo_building()). Storey and suite: MATTERPORT_STOREY / MATTERPORT_SUITE,
+        else the pick's `floor` / `suite` when the pick is the same model."""
+        from . import AdapterError
+        missing = [k for k in ("MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET") if not os.environ.get(k)]
+        try:
+            pick = config.demo_building() or {}             # the building pick (data/live/, never published)
+        except (OSError, ValueError):
+            pick = {}
+        model_id = os.environ.get("MATTERPORT_MODEL_ID") or pick.get("model_id")
+        if not model_id:
+            missing.append("MATTERPORT_MODEL_ID (or a model_id in data/live/demo_building.json)")
         if missing:
-            from . import AdapterError
             raise AdapterError("MATTERPORT_MODE=live but these are not set: " + ", ".join(missing))
-        model_id = os.environ["MATTERPORT_MODEL_ID"]
         storey, suite = os.environ.get("MATTERPORT_STOREY"), os.environ.get("MATTERPORT_SUITE")
-        if storey is None or suite is None:
-            try:
-                d = config.demo_building() or {}            # the building pick (data/live/, never published)
-                if d.get("model_id") == model_id:
-                    storey = storey if storey is not None else d.get("floor")
-                    suite = suite if suite is not None else d.get("suite")
-            except (OSError, ValueError):
-                pass
-        return cls(os.environ["MATTERPORT_TOKEN_ID"], os.environ["MATTERPORT_TOKEN_SECRET"], model_id,
+        if pick.get("model_id") == model_id:
+            storey = storey if storey not in (None, "") else pick.get("floor")
+            suite = suite if suite not in (None, "") else pick.get("suite")
+        return cls(os.environ["MATTERPORT_TOKEN_ID"], os.environ["MATTERPORT_TOKEN_SECRET"], str(model_id),
                    refresh=os.environ.get("MATTERPORT_REFRESH") == "1", dry_run=os.environ.get("MATTERPORT_WRITE_TAGS") != "1",
                    exercise_floor=os.environ.get("MATTERPORT_EXERCISE_FLOOR") or None,
                    storey=int(storey) if storey not in (None, "") else None, suite=str(suite) if suite else None)

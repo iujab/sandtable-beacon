@@ -11,8 +11,7 @@ One sentence a judge can retell: **"Two pucks heard two phones; for one phone th
 3. Stage it before the judge arrives. Suite 310 is the south-west corner of the floor, so its west and south walls are the building's outside walls. Stand the two pucks upright, 15 cm or more off the table, 2 to 3 m apart in a line parallel to one outside wall at the demo's scale. A phone's mirror candidate is its reflection across that line: put **phone 1 farther from the line than the line is from the wall** (its mirror lands outside the building, so the twin deletes it) and **phone 2 close to the line** (both candidates stay inside the room). Tape-measure the pucks, click **Place pucks**, click the plan where each one stands (or type the measurements), **Send 2 to Beacon**.
 4. Reset, sound on, 3D twin view. Phones on the table, app open, not yet pressed.
 
-**B. Hands-free on the simulator (fallback, and the video).** `bash run_demo.sh --storyboard` (Windows: `.venv\Scripts\python -m sandtable.demo --storyboard`). The exercise plays by itself in about a minute: pre-plan, Engine 1 to the fire room, pucks thrown, lane L16's simulator plays its scripted phones (pucks land one by one; a phone appears as a ring or a room-level zone and collapses to a point as more pucks hear it), the agent routes the rescue, all out, the report. The `SIMULATED` badges are on screen; say "this run is the simulator" once.
-TODO(lead): if the beacon script now plays two pucks (one phone pruned to a point, one left as two candidates), replace the sentence in brackets above with that.
+**B. Hands-free on the simulator (fallback, and the video).** `bash run_demo.sh --storyboard` (Windows: `.venv\Scripts\python -m sandtable.demo --storyboard`). The exercise plays by itself in about a minute: pre-plan, Engine 1 to the fire room, pucks thrown, lane L16's simulator plays its scripted phones (Engine 1 places two pucks by hand; each phone then has two possible positions, mirror images across the line between the pucks; one phone's mirror falls outside the building, so the twin deletes it and that phone becomes a point; the other phone's two positions are both inside the room, and the board says it cannot choose), the agent routes the rescue, all out, the report. The `SIMULATED` badges are on screen; say "this run is the simulator" once.
 
 ## The script (live version; the times assume the replayed pre-plan)
 
@@ -66,7 +65,7 @@ On the hands-free simulator the same beats play by themselves; the ah-ha there i
 **"Why not cameras, or thermal imagers?"** Smoke scatters visible light and LiDAR. Thermal imagers do see through smoke and stay the better tool for fire and hot surfaces, but they need line of sight and fail in heat, steam and water spray. A phone answers from behind a door or under a desk and says who it is and what state they are in. This complements the imager; it does not replace it.
 
 **"What is real tonight?"** The board, the reflex layer, the agent's tools and its replayed real runs, the report and the feeds; real public data for the building. Simulated: the phones on the hands-free run, the radar, the crews. Fixtures: all three sponsor layers.
-TODO(lead): after the first live run, add one sentence here on what ran on the owner's pucks and iPhones.
+Not yet run on the owner's pucks and iPhones: say so if asked, and say which run the judge is watching.
 
 **"Who would switch it on on Monday?"** The incident commander and the command post, for any building whose occupants have the app; a fire-prevention bureau, for a pre-plan draft with a verify-on-site list for any commercial address; and a building owner, who has a reason to give tenants the app.
 

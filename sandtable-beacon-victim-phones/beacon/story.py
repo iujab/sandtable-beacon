@@ -48,8 +48,18 @@ class Story:
     def _load(self) -> dict:
         from . import layout
         from .sim import load_scenario_file
+        tw0 = self.state.twin
         try:
-            sc = load_scenario_file(self.script)
+            if self.script == "auto":
+                from . import autoscene
+                sc = autoscene.build(tw0)
+            else:
+                sc = load_scenario_file(self.script)
+                named_room = sc.get("room") or (((sc.get("pucks") or {}).get("throw") or {}).get("room") if isinstance(sc.get("pucks"), dict) else None)
+                if named_room and named_room not in {r["id"] for r in tw0.data.get("rooms", [])}:
+                    # a fixture scene on another twin (BEACON_TWIN_JSON): build the scene for the twin that is loaded
+                    from . import autoscene
+                    sc = autoscene.build(tw0)
         except Exception as exc:
             raise ValueError(f"unknown walk-through script {self.script!r}: {exc}")
         pk = sc.get("pucks")
@@ -150,7 +160,8 @@ class Story:
         self.log.append({"step": step, "t_s": round(t - (self.t0 or t), 1), "title": title})
         self.state.emit({"type": "beacon_event", "t": round(t, 3), "name": "story", "id": None, "text": f"SIMULATED walk-through: {text}",
                          "step": step, "simulated": True})
-        log.info("story step %d: %s", step, text)
+        # with an external bundle the text may name rooms or tenants of a private building: keep it out of logs
+        log.info("story step %d%s", step, "" if config.EXTERNAL_BUNDLE else ": " + str(text))
 
     def _phone(self, key: str) -> dict | None:
         _truth, eid = self.state.sim_phone_key_eid(key)
@@ -222,6 +233,10 @@ class Story:
             s = st.session
             tw = st.twin
             label = tw.room(self.room)["label"]
+            try:
+                s.set_search_room(None)
+            except Exception:
+                pass
             self._say(0, "reset", f"fire on floor {tw.floor(self.floor).get('label', self.floor)}, {label}. Two pucks, no puck down yet.")
             await asyncio.sleep(1.5)
 
@@ -243,6 +258,13 @@ class Story:
             self._say(4, "puck 2, door wall", f"the crew slides P2 along the door wall ({self.layout['wall']}): the mirror spot now "
                                               f"falls outside the room and is dismissed: one fix")
             await self._wait(lambda: self._geom(tk) == "fix", 4.0, 9.0)
+            if self._geom(tk) == "candidates":
+                # The mirror spot is somewhere the twin allows (for example the next room of the same suite), and the
+                # occupant's stated suite covers both spots: command decides, and the board shows it as an assumption.
+                s.set_search_room(self.room)
+                self._say(4, "search room", f"the mirror spot is in a place the twin allows, so command declares {label} the search room: "
+                                            f"the spot outside it is dismissed, and shown as dismissed")
+                await self._wait(lambda: self._geom(tk) == "fix", 3.0, 6.0)
 
             if self.neighbour is not None:
                 nk = self.neighbour["key"]

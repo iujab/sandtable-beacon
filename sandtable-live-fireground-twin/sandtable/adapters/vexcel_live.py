@@ -442,7 +442,7 @@ class VexcelLive:
         if x1 - x0 < 16 or y1 - y0 < 16:
             return None
         img = Image.open(config.ROOT / ortho["hd_path"]).crop((x0, y0, x1, y1))
-        scale = min(1.0, 2000 / max(img.size))
+        scale = min(1.0, VISION_MAX_PX / max(img.size))        # the annotated PNG must stay under the API's 5 MB image limit
         if scale < 1.0:
             img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
         img.convert("RGB").save(dest, quality=94)

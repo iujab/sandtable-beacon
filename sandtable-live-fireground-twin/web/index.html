@@ -74,6 +74,7 @@
         <img id="aerial-img" alt="Aerial image of the building">
         <svg id="aerial-svg" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
+      <div class="sides" id="aerial-sides" hidden></div>
     </div>
     <div class="panel record-panel">
       <div class="panel-head tabs" role="tablist">
@@ -85,7 +86,7 @@
       <div class="tabpane acc-pane" id="tab-acc"></div>
       <div class="tabpane" id="tab-record" hidden>
         <div class="record" id="record"></div>
-        <div class="tenants-head">Floor <span id="floor-no"></span> tenants <small>(hover to find the suite)</small></div>
+        <div class="tenants-head">Floor <span id="floor-no"></span> tenants <small id="tenants-note">(hover to find the suite)</small></div>
         <div class="tenants" id="tenants"></div>
       </div>
       <div class="tabpane scout-card" id="tab-scout" hidden></div>
@@ -106,6 +107,7 @@
           <div class="seg" id="view-seg">
             <button data-view="3d" class="on">3D twin</button>
             <button data-view="2d">Plan</button>
+            <button data-view="scan" id="btn-scan" hidden title="The Matterport scan itself (Showcase SDK)">Scan</button>
           </div>
         </div>
       </div>
@@ -114,6 +116,7 @@
       <div class="twin-wrap">
         <div id="twin3d"></div>
         <svg id="plan" xmlns="http://www.w3.org/2000/svg" hidden></svg>
+        <div id="scanview" hidden></div>
         <div class="smoke-claim" id="smoke-claim" hidden>Illustration, not a sensor model. Smoke particles are about the size of light and LiDAR wavelengths (under 2 µm) and scatter them; the pucks' 6.5 GHz radio, with a 4.6 cm wavelength, passes. The radio layer is drawn on top.</div>
         <div class="smoke-inset" id="smoke-inset" hidden><span>What a camera or LiDAR sees (illustration)</span></div>
         <div class="devbar" id="devbar" hidden></div>

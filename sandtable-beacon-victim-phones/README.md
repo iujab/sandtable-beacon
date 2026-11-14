@@ -156,6 +156,7 @@ Open <http://localhost:1885/>. `/phone.html` is a simulated victim's phone you c
 | `--lan` | bind 0.0.0.0 and print the address for the iPhone app | off |
 | `--port` / `PORT` | | 1885 |
 | `LLM_BACKEND` | `replay` (recorded real model output, offline), `claude-cli`, `anthropic` (needs `ANTHROPIC_API_KEY`) | `replay` |
+| `BEACON_BUNDLE_DIR`, or `BEACON_TWIN_JSON` and `BEACON_SITE_JSON` | another building's twin and record, kept outside the repository (`docs/BEACON_FEED.md` section A10); everything the server then writes goes under a private `live` directory | the fixtures |
 
 Tests (offline): `bash run_tests.sh`. Evaluation: `python scripts/eval_beacon.py` (about 70 s; writes `results/` and `figures/eval_*.png`), then `python scripts/fill_numbers.py` writes the numbers into the documents.
 

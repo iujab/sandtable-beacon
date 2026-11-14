@@ -1,10 +1,11 @@
 // Sandtable command board. Static ES modules, no build step, no network beyond this origin.
-import { Plan } from "./plan2d.js";
+import { Plan, prettyIndustry } from "./plan2d.js";
 import { Aerial } from "./aerial.js";
 import { BeaconModel, PHONE_COLOR, STATUS_WORD, STATE_WORD, MODES, geomWords, reportWords, ago } from "./beacon.js";
 import { ScoutModel, PHASES, PHASE_WORD, RUNG_WORD, METHOD_WORD, VICTIM_COLOR, victimState, sigmaEllipse, wallDistances, regQuality, meshSvg } from "./scout.js";
 
 const $ = (id) => document.getElementById(id);
+const indOf = (t) => prettyIndustry(t?.industry) || "tenant (industry not on record)";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const UNIT_COLOR = { E1: "#ffc247", RIT: "#4fd1ff" };
 const LAYER_OF_TOOL = {
@@ -31,11 +32,17 @@ const mmss = (s) => { s = Math.max(0, Math.round(s || 0)); return `${String(Math
 // ---------------------------------------------------------------- static panels
 function renderRecord() {
   const { site, twin, labels } = S.bundle;
-  const p = site.property, fs = site.field_sources || {};
+  const p = site.property, fs = site.field_sources || {}, live = labels.costar.mode === "live";
   $("address").textContent = `${p.address}, ${p.city}, ${p.state} · ${p.name || ""}`;
-  $("record-src").textContent = labels.costar.mode === "live" ? "CoStar (live)" : "fixture: public open data, not CoStar";
+  $("record-src").textContent = live ? "CoStar (live)" : "fixture: public open data, not CoStar";
   const fmt = (v) => (typeof v === "number" ? v.toLocaleString("en-US") : v);
-  const rows = [
+  const sub = p.property_subtype ? String(p.property_subtype).split("_").pop().replace(/([a-z])([A-Z])/g, "$1 $2") : "";
+  const rows = live ? [
+    ["Type", [p.property_type, sub && sub !== p.property_type ? sub.toLowerCase() : ""].filter(Boolean).join(", "), "property_type", true], ["Construction", p.construction, "construction", true],
+    ["Class", p.building_class, "building_class"], ["Floors", p.stories, "stories"], ["Year built", p.year_built && `${p.year_built}${p.year_renovated ? `, renovated ${p.year_renovated}` : ""}`, "year_built"],
+    ["Area", p.rba_sf && `${fmt(p.rba_sf)} sq ft`, "rba_sf"], ["Height", p.height_m && `${p.height_m} m`, "height_m"], ["Sprinklers", p.sprinklers, "sprinklers"],
+    ["Elevators", p.elevators, "elevators"], ["Parking", p.parking_spaces, "parking_spaces"], ["Key holder", p.property_manager && (p.property_manager.name || null), "property_manager"],
+  ] : [
     ["Type", p.property_type, "property_type", true], ["Construction", p.construction, "construction", true],
     ["Floors", p.stories, "stories"], ["Year built", p.year_built, "year_built"],
     ["Area", p.rba_sf && `${fmt(p.rba_sf)} sq ft`, "rba_sf"], ["Height", p.height_m && `${p.height_m} m`, "height_m"],
@@ -46,31 +53,38 @@ function renderRecord() {
     const src = fs[f] || {};
     const layer = /LARIAC|footprint|aerial|Vexcel/i.test(src.source || "") ? "vexcel" : "costar";
     const empty = v === null || v === undefined || v === "";
-    const title = empty ? "Only the CoStar record has this field: empty in fixture mode" : (src.source || "");
+    const title = empty ? (live ? "Not in this building's CoStar record" : "Only the CoStar record has this field: empty in fixture mode") : (src.source || "");
     return `<div class="fact${wide ? " wide" : ""}" title="${esc(title)}"><div class="k"><span class="dot ${layer}"></span>${k}${src.synthetic ? " · synthetic" : ""}</div>` +
-      `<div class="v${empty ? " null" : ""}" title="${esc(empty ? title : v)}">${empty ? "CoStar field" : esc(v)}</div></div>`;
+      `<div class="v${empty ? " null" : ""}" title="${esc(empty ? title : v)}">${empty ? (live ? "not in record" : "CoStar field") : esc(v)}</div></div>`;
   }).join("");
   const floorNo = Number(twin.floors.find((f) => f.id === twin.exercise_floor).label);
   $("floor-no").textContent = floorNo;
   const tenants = site.tenants.filter((t) => t.floor === floorNo);
   S.tenantsBySuite = {};
   for (const t of tenants) (S.tenantsBySuite[t.suite] ||= []).push(t);
-  $("tenants").innerHTML = tenants.map((t) =>
-    `<div class="tenant" data-suite="${esc(t.suite)}"><div class="suite">${esc(t.suite)}</div><div><div class="cat">${esc(t.industry)}</div>` +
-    (t.life_hazard ? `<div class="hz">Life hazard: ${esc(t.life_hazard)}</div>` : "") + (t.hazmat ? `<div class="hm">Hazmat: ${esc(t.hazmat)}</div>` : "") + `</div></div>`).join("") ||
-    `<div class="empty">No tenants in the record for this floor.</div>`;
+  const row = (t) => `<div class="tenant" data-suite="${esc(t.suite)}"><div class="suite">${esc(t.suite)}</div><div><div class="cat">${live && t.name ? `<b>${esc(t.name)}</b> · ` : ""}${esc(indOf(t))}</div>` +
+    (live && (t.employees != null || t.sf) ? `<div class="emp">${t.employees != null ? `${fmt(t.employees)} employees` : "employees not on record"}${t.sf ? ` · ${fmt(Math.round(t.sf))} sq ft` : ""}</div>` : "") +
+    (t.life_hazard ? `<div class="hz">Life hazard: ${esc(t.life_hazard)}</div>` : "") + (t.hazmat ? `<div class="hm">Hazmat: ${esc(t.hazmat)}</div>` : "") + `</div></div>`;
+  const others = live ? site.tenants.filter((t) => t.floor !== floorNo) : [];
+  const byFloor = {};
+  for (const t of others) (byFloor[t.floor] ||= []).push(t);
+  $("tenants").innerHTML = (tenants.map(row).join("") || `<div class="empty">No tenants in the record for this floor.</div>`) +
+    (others.length ? `<details class="others"><summary>The rest of the building: ${others.length} tenancies on ${Object.keys(byFloor).length} other floors</summary>` +
+      Object.keys(byFloor).map(Number).sort((a, b) => b - a).map((f) => `<div class="of-h">Floor ${f}: ${byFloor[f].reduce((n, t) => n + (t.employees || 0), 0)} employees on record</div>${byFloor[f].map(row).join("")}`).join("") + `</details>` : "");
   for (const el of $("tenants").querySelectorAll(".tenant")) {
     el.addEventListener("mouseenter", () => highlightSuite(el.dataset.suite, true));
     el.addEventListener("mouseleave", () => highlightSuite(el.dataset.suite, false));
   }
-  $("twin-src").textContent = twin.source.synthetic ? `floor ${floorNo} · synthetic twin fitted to the real footprint (not a Matterport scan)` : `floor ${floorNo} · Matterport twin`;
+  if (live) { const emp = tenants.reduce((n, t) => n + (t.employees || 0), 0); $("tenants-note").textContent = `${tenants.length} tenancies, ${emp} employees on record (hover to find the suite)`; }
+  $("twin-src").textContent = twin.source.synthetic ? `floor ${floorNo} · synthetic twin fitted to the real footprint (not a Matterport scan)` : `floor ${floorNo} · Matterport twin${twin.source.kind === "matterport-live" ? " (live scan)" : ""}`;
   const fx = (k, live, fixture) => (labels[k].mode === "live" ? live : fixture);
   const sources = (labels.open_data || []).map((o) => o.name).join("; ");
   $("foot").innerHTML = `<b>What is real here.</b> ` + [
     fx("costar", "Record: CoStar (live)", "Record: real public open data (assessor parcel, city business registrations; tenant names withheld), CoStar-only fields empty. Not CoStar data"),
-    fx("matterport", "Twin: Matterport (live)", "Twin: synthetic interior fitted to the real footprint. Not a Matterport scan"),
-    fx("vexcel", "Aerial: Vexcel (live)", "Aerial: real USDA NAIP imagery. Not Vexcel"),
-  ].map(esc).join(`<span class="sep">|</span>`) + `<span class="sep">|</span><span title="${esc(sources)}">Open sources: ${esc(sources)}</span>`;
+    fx("matterport", "Twin: Matterport scan (live)", "Twin: synthetic interior fitted to the real footprint. Not a Matterport scan"),
+    fx("vexcel", "Aerial: Vexcel imagery (live)", "Aerial: real USDA NAIP imagery. Not Vexcel"),
+  ].map(esc).join(`<span class="sep">|</span>`) + (sources ? `<span class="sep">|</span><span title="${esc(sources)}">Open sources: ${esc(sources)}</span>` : "") +
+    (["costar", "matterport", "vexcel"].some((k) => labels[k].mode === "live") ? `<span class="sep">|</span>Crews, pucks and phones: simulated unless a badge says live` : "");
 }
 function highlightSuite(suite, on) {
   plan.highlightSuite(suite, on);
@@ -172,13 +186,14 @@ function renderHereVictim(v) {
   const side = nearestSide(v);
   const geo = v.geo || (() => { const g = aerial.geo(v.x, v.y); return { lat: g[0], lon: g[1] }; })();
   const rec = tenants.length
-    ? tenants.map((t) => `<div>${esc(t.industry)}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "")).join("")
+    ? tenants.map((t) => `<div>${esc(indOf(t))}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "")).join("")
     : (room?.suite ? "no active tenant in the record for this suite" : "common area, no tenant");
-  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${VICTIM_COLOR}"></span>${esc(v.id)}: a person, not tagged</div><div class="where">${esc(room?.label || s.room_label || "—")}</div><div class="sub">${esc(victimState(v))}</div></div>` +
+  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${VICTIM_COLOR}"></span>${esc(v.id)}: a person, not tagged</div><div class="where">${esc(room?.label || s.room_label || "—")}</div><div class="sub">${esc(victimState(v))}</div>${lookBtn(v.x, v.y)}</div>` +
     `<div><div class="k"><span class="dot matterport"></span>Twin: where in the room</div><div>${esc(room ? wallDistances(twin, room, v.x, v.y) : "")}</div>${exits.map((e) => `<div>${esc(e.label)}: ${e.m == null ? "<b class='hzline'>cut off</b>" : e.m + " m"}</div>`).join("")}</div>` +
     `<div><div class="k"><span class="dot costar"></span>Record: who is usually in there</div>${rec}</div>` +
     `<div><div class="k"><span class="dot vexcel"></span>Aerial: where outside</div><div>${side ? `behind side ${side}` : ""}</div><div>${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)}</div></div>` +
     `<div><div class="k"><span class="dot scan"></span>Radar: how sure${s.simulated ? " (simulated)" : ""}</div><div>±${(v.sigma_m ?? sigmaEllipse(v).a).toFixed(1)} m, ${v.n_links ?? "?"} links agree</div><div>confidence ${Math.round((v.confidence ?? 0) * 100)}%${v.breathing_conf != null ? `, breath ${Math.round(v.breathing_conf * 100)}%` : ""}</div><div class="faintline">coarse: still and not breathing would look like furniture</div></div>`;
+  wireLook();
 }
 function renderHere() {
   const st = S.state, el = $("here");
@@ -192,14 +207,15 @@ function renderHere() {
   const exits = plan.exitDistances(u.node, st.hazards);
   const side = nearestSide(u);
   const rec = tenants.length
-    ? tenants.map((t) => `<div>${esc(t.industry)}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "") + (t.hazmat ? `<div class="hzline">Hazmat: ${esc(t.hazmat)}</div>` : "")).join("")
+    ? tenants.map((t) => `<div>${esc(indOf(t))}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "") + (t.hazmat ? `<div class="hzline">Hazmat: ${esc(t.hazmat)}</div>` : "")).join("")
     : (u.suite ? "no active tenant in the record for this suite" : "common area, no tenant");
-  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${UNIT_COLOR[u.id]}"></span>${esc(u.label)} is here${u.physical ? "" : " (virtual)"}</div><div class="where">${esc(u.room_label || "—")}</div></div>` +
+  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${UNIT_COLOR[u.id]}"></span>${esc(u.label)} is here${u.physical ? "" : " (virtual)"}</div><div class="where">${esc(u.room_label || "—")}</div>${lookBtn(u.x, u.y)}</div>` +
     `<div><div class="k"><span class="dot matterport"></span>Twin: way out</div>${exits.map((e) => `<div>${esc(e.label)}: ${e.m == null ? "<b class='hzline'>cut off</b>" : e.m + " m"}</div>`).join("")}</div>` +
     `<div><div class="k"><span class="dot costar"></span>Record: who is in there</div>${rec}</div>` +
     `<div><div class="k"><span class="dot vexcel"></span>Aerial: where outside</div><div>${side ? `behind side ${side}` : ""}</div><div>${u.geo ? `${u.geo.lat.toFixed(5)}, ${u.geo.lon.toFixed(5)}` : ""}</div></div>` +
     `<div><div class="k"><span class="dot uwb"></span>UWB: the fix</div>${u.physical ? `<div>tag ${esc(u.tag)}${u.sigma_m != null ? ` · ±${u.sigma_m.toFixed(1)} m in the building` : ""}</div><div>${u.still_s >= 3 ? `still for ${Math.round(u.still_s)} s` : "moving"}</div>` : "<div>no tag: moved by the server</div>"}</div>`;
   for (const t of $("tenants").querySelectorAll(".tenant")) t.classList.toggle("at", !!u.suite && t.dataset.suite === u.suite);
+  wireLook();
 }
 
 // ---------------------------------------------------------------- agent log, radio
@@ -505,7 +521,7 @@ function phoneRows() {
     const withThem = ["reached", "evacuating", "out"].includes(inc.status);
     return `<div class="unit-row phone ${p.id === S.selected ? "sel" : ""}${p.stale ? " stale" : ""}" data-unit="${esc(p.id)}">` +
       `<div class="cs" style="color:${PHONE_COLOR}">${esc(p.id)}</div>` +
-      `<div style="min-width:0"><div class="loc">${esc(out ? "outside the building" : p.room_label || p.zone?.room_label || (p.geometry === "ring" ? `near puck ${p.ring.puck}` : p.geometry === "candidates" ? [...new Set(p.candidates.map((c) => c.room_label || "?"))].join(" or ") : "where unknown"))}<span class="pill st-${esc(r.status || "unknown")}">${esc(STATUS_WORD[r.status] || "no status")}</span></div>` +
+      `<div style="min-width:0"><div class="loc">${beacon.foreign ? "on another building's plan" : esc(out ? "outside the building" : p.room_label || p.zone?.room_label || (p.geometry === "ring" ? `near puck ${p.ring.puck}` : p.geometry === "candidates" ? [...new Set(p.candidates.map((c) => c.room_label || "?"))].join(" or ") : "where unknown"))}${beacon.foreign ? "" : ""}<span class="pill st-${esc(r.status || "unknown")}">${esc(STATUS_WORD[r.status] || "no status")}</span></div>` +
       `<div class="asg">${esc(reportWords(r))}${asg ? ` · ${esc(asg.label)} ${withThem ? (inc.status === "out" ? "brought them out" : "is with them") : "sent"}` : ""}</div></div>` +
       `<div class="nums">${esc(short)}<br>${r.battery_pct != null ? `${r.battery_pct}% · ` : ""}${esc(ago(p.track?.last_seen_s ?? r.age_s))}</div></div>`;
   }).join("");
@@ -521,12 +537,13 @@ function renderHerePhone(p) {
   const side = pt ? nearestSide({ x: pt[0], y: pt[1] }) : null;
   const geo = p.geometry === "fix" ? (p.geo || (() => { const g = aerial.geo(p.x, p.y); return { lat: g[0], lon: g[1] }; })()) : null;
   const where = p.geometry === "fix" && room ? wallDistances(twin, room, p.x, p.y) + ((p.pruned || []).length ? `; the mirror place is ruled out (${p.pruned[0].reason})` : "") : p.geometry === "ring" ? `search the arc ${p.ring.r_m.toFixed(1)} m from puck ${p.ring.puck}` : p.geometry === "candidates" ? `two mirror places; the twin cannot choose: check both, ${Math.round(p.candidates[0].weight * 100)}% first` : p.geometry === "zone" ? "search the room" : "";
-  const rec = tenants.length ? tenants.map((t) => `<div>${esc(t.industry)}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "")).join("") : (room?.suite ? "no active tenant in the record for this suite" : "—");
-  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${PHONE_COLOR}"></span>${esc(p.id)}: phone${r.people != null ? `, ${r.people} ${r.people === 1 ? "person" : "people"}` : ""}</div><div class="where">${esc(r.safe_outside ? "Outside" : room?.label || "—")}</div><div class="sub st-${esc(r.status || "unknown")}">${esc(reportWords(r))}</div></div>` +
+  const rec = tenants.length ? tenants.map((t) => `<div>${esc(indOf(t))}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "")).join("") : (room?.suite ? "no active tenant in the record for this suite" : "—");
+  el.innerHTML = `<div><div class="who"><span class="dot" style="background:${PHONE_COLOR}"></span>${esc(p.id)}: phone${r.people != null ? `, ${r.people} ${r.people === 1 ? "person" : "people"}` : ""}</div><div class="where">${esc(r.safe_outside ? "Outside" : room?.label || "—")}</div><div class="sub st-${esc(r.status || "unknown")}">${esc(reportWords(r))}</div>${pt && !r.safe_outside ? lookBtn(pt[0], pt[1]) : ""}</div>` +
     `<div><div class="k"><span class="dot matterport"></span>Twin: where</div><div>${esc(geomWords(p))}</div><div>${esc(where)}</div>${exits.map((e) => `<div>${esc(e.label)}: ${e.m == null ? "<b class='hzline'>cut off</b>" : e.m + " m"}</div>`).join("")}</div>` +
     `<div><div class="k"><span class="dot costar"></span>Record: who is usually in there</div>${rec}</div>` +
     `<div><div class="k"><span class="dot vexcel"></span>Aerial: where outside</div><div>${side ? `behind side ${side}` : ""}</div><div>${geo ? `${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)}` : "no point: not a fix"}</div></div>` +
     `<div><div class="k"><span class="dot scan"></span>Phone: what it says${p.simulated ? " (simulated)" : ""}</div>${r.text ? `<div>“${esc(r.text)}”</div>` : ""}<div>${r.battery_pct != null ? `battery ${r.battery_pct}%, ` : ""}heard ${esc(ago(p.track?.last_seen_s ?? r.age_s))}</div><div class="faintline">${esc(p.method)}, confidence ${Math.round((p.confidence ?? 0) * 100)}%${p.stale ? ", not heard recently" : ""}</div></div>`;
+  wireLook();
 }
 function renderBeaconHead() {
   const el = $("beacon-head");
@@ -539,6 +556,7 @@ function renderBeaconHead() {
     return;
   }
   el.className = "scan-head beacon-head";
+  if (b && beacon.foreign) { el.className = "scan-head beacon-head off"; el.innerHTML = `<div class="st1"><span class="sh-phase failed">Other building</span><b>The Beacon module is set up for another building</b><span class="sh-text">Its phones and suites (floor ${esc(b.floor)}) are not in this twin, so none are drawn here. Restart the Beacon module with this building's bundle.</span></div>`; return; }
   if (!b) { el.innerHTML = `<div class="st1"><span class="sh-phase">Waiting</span><b>Beacon module connected</b><span class="sh-text">No pucks in a room yet: Throw pucks, or run the beacon drill.</span></div>`; return; }
   const ph = b.phones || [], ppl = ph.reduce((s, p) => s + (p.report?.safe_outside ? 0 : p.report?.people || 0), 0), dev = (b.presence || []).reduce((s, c) => s + (c.count || 0), 0);
   const marks = [b.simulated ? `<span class="badge sim" title="Simulated phones and pucks (${esc(b.source)})">Simulated</span>` : `<span class="badge live">Real pucks</span>`];
@@ -552,9 +570,9 @@ function renderBeaconHead() {
     (lim.length ? `<div class="st2" title="${esc(lim.join("; "))}"><b>Cannot tell:</b> ${lim.map(esc).join("; ")}</div>` : "");
 }
 function renderAcc() {
-  const el = $("tab-acc"), rows = beacon.rows(), tot = beacon.totals();
+  const el = $("tab-acc"), rows = beacon.rows(), tot = beacon.foreign || (beacon.acc?.rows && rows.length !== beacon.acc.rows.length) ? null : beacon.totals();
   if (!rows.length) {
-    el.innerHTML = `<div class="sc-empty"><p>The building record's suites against the phones heard: who the record expects, who reported in, who is still unaccounted for.</p><p>${beacon.connected ? "No pucks in a room yet." : "<b>Beacon module not connected.</b> No phone data; the record is in the Record tab."}</p></div>`;
+    el.innerHTML = `<div class="sc-empty"><p>The building record's suites against the phones heard: who the record expects, who reported in, who is still unaccounted for.</p><p>${beacon.foreign ? "<b>The Beacon module is set up for another building</b>: its suites are not in this twin." : beacon.connected ? "No pucks in a room yet." : "<b>Beacon module not connected.</b> No phone data; the record is in the Record tab."}</p></div>`;
     return;
   }
   const rungs = beacon.b?.rungs || {};
@@ -639,10 +657,53 @@ function beaconBox() {
 function setView(v) {
   S.view = v;
   if (v === "3d" && !twin3d) v = S.view = "2d";
-  $("twin3d").hidden = v !== "3d"; $("plan").toggleAttribute("hidden", v !== "2d");
+  if (v === "scan" && !S.scan) v = S.view = twin3d ? "3d" : "2d";
+  $("twin3d").hidden = v !== "3d"; $("plan").toggleAttribute("hidden", v !== "2d"); $("scanview").hidden = v !== "scan";
+  $("twin3d").parentElement.classList.toggle("scanmode", v === "scan");
+  if (v === "scan" && !$("scanview").firstChild) {
+    const f = document.createElement("iframe");
+    f.src = "/mp.html"; f.title = "Matterport scan of the suite (Showcase SDK)"; f.allow = "fullscreen; xr-spatial-tracking";
+    $("scanview").appendChild(f); S.scan.frame = f;
+  }
   for (const b of $("view-seg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.view === v);
   if (v === "3d") twin3d.resize();
   if (scout) applySmoke();
+}
+// ---------------------------------------------------------------- the Matterport scan (live only): look here in the scan
+async function initScan() {
+  if (S.bundle.labels.matterport?.mode !== "live") return;      // fixture mode never asks for the live config
+  try {
+    const r = await fetch("/api/live/config", { cache: "no-store" });
+    if (!r.ok) return;
+    const c = await r.json();
+    if (!(c && (c.matterport?.live || (c.sdk_key && c.model_id) || c.matterport?.model_id))) return;
+  } catch { return; }
+  S.scan = { frame: null, ready: false, queue: [] };
+  $("btn-scan").hidden = false;
+  addEventListener("message", (ev) => {
+    const m = ev.data || {};
+    if (!S.scan || !String(m.type || "").startsWith("mp.")) return;
+    if (m.type === "mp.ready") { S.scan.ready = true; for (const q of S.scan.queue.splice(0)) S.scan.frame?.contentWindow?.postMessage(q, "*"); }
+    else if (m.type === "mp.moved") toast(m.ok ? `Scan: moved to the nearest scan position (${m.dist_m != null ? m.dist_m.toFixed(1) + " m away" : "nearest"})` : `Scan: ${m.error || "could not move"}`);
+    else if (m.type === "mp.error") toast(`Scan: ${m.text}`);
+  });
+  if (S.state) renderHere();
+}
+function lookInScan(x, y) {
+  if (!S.scan) return;
+  setView("scan");
+  const msg = { type: "mp.goto", x, y, floor: S.bundle.twin.exercise_floor };
+  if (S.scan.ready) S.scan.frame?.contentWindow?.postMessage(msg, "*"); else S.scan.queue = [msg];
+}
+const lookBtn = (x, y) => (S.scan && x != null ? `<button class="mini lookscan" data-look="${x.toFixed(2)},${y.toFixed(2)}" title="Open the Matterport scan at the nearest scan position">Look here in the scan</button>` : "");
+function wireLook() { for (const b of $("here").querySelectorAll("[data-look]")) b.onclick = () => { const [x, y] = b.dataset.look.split(",").map(Number); lookInScan(x, y); }; }
+function showOblique(im, letter) {
+  const s = (S.bundle.site.sides || {})[letter] || {};
+  $("doc-title").textContent = `Side ${letter}`;
+  $("doc-body").innerHTML = `<img class="oblique-big" src="${esc(im.url || "/" + im.path)}" alt="Oblique view of side ${esc(letter)}">` +
+    `<div class="qa">The ${esc(im.shows_face || "")} face of the building${s.street ? `, on ${esc(s.street)}` : ""}: camera looking ${esc(im.look || "")}${im.capture_date ? `, captured ${esc(im.capture_date)}` : ""}${im.gsd_m ? `, about ${im.gsd_m} m per pixel` : ""}.</div>` +
+    `<div class="qa"><small>${esc(im.source || "")}. An oblique has no map projection here, so nothing is drawn on it; the side letter comes from the face it shows and the building's sides.</small></div>`;
+  $("doc").hidden = false;
 }
 function setInject(on) {
   S.inject = on; $("inject-hint").hidden = !on; $("btn-inject").classList.toggle("on", on);
@@ -693,7 +754,7 @@ async function main() {
     onSelect: (unit) => { S.selected = unit; S._pinned = true; renderHere(); },
     canDrag: () => !!S.hello?.drivable,
   });
-  aerial = new Aerial($("aerial-img"), $("aerial-svg"), $("aerial-seg"), $("aerial-src"), S.bundle, UNIT_COLOR);
+  aerial = new Aerial($("aerial-img"), $("aerial-svg"), $("aerial-seg"), $("aerial-src"), S.bundle, UNIT_COLOR, { sidesEl: $("aerial-sides"), onOblique: showOblique });
   renderRecord();
   scout = new ScoutModel(S.bundle, onScoutChange);
   beacon = new BeaconModel(S.bundle, onBeaconChange);
@@ -706,6 +767,7 @@ async function main() {
   } catch (err) { console.warn("3D view unavailable, using the plan:", err); twin3d = null; }
   setView(twin3d ? "3d" : "2d");
   for (const b of $("view-seg").querySelectorAll("button")) b.onclick = () => setView(b.dataset.view);
+  initScan();
   $("btn-alarm").onclick = () => api("/api/alarm", {});
   $("btn-story").onclick = (e) => api("/api/storyboard", S.state?.storyboard?.running ? { action: "stop" } : { action: "start", script: S.script, mode: (!S.hello?.drivable || S.guided || e.shiftKey) ? "assist" : "auto" }).catch(() => {});
   wireScoutControls();

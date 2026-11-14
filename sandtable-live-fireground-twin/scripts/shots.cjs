@@ -11,8 +11,10 @@ const path = require("path");
 const BASE = process.argv[2] || "http://127.0.0.1:1810";
 const EX = { ui: "beacon", beacon: "beacon", scout: "scout", mayday: "mayday" }[process.argv[3] || "beacon"] || "beacon";
 const MODE = { beacon: "beacon", scout: "scout", mayday: "crews" }[EX];
-const OUT = path.join(__dirname, "..", "figures");
-const RESULTS = path.join(__dirname, "..", "results", "ui_walk.json");
+// Sponsor data never reaches the public tree: when any layer of the server's bundle is live, screenshots and the
+// walk's results go to data/live/ (git-ignored) instead of figures/ and results/.
+let OUT = path.join(__dirname, "..", "figures");
+let RESULTS = path.join(__dirname, "..", "results", "ui_walk.json");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const get = async (p) => (await fetch(BASE + p)).json();
 const post = (p, b = {}) => fetch(BASE + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json().catch(() => ({})));
@@ -32,6 +34,13 @@ async function waitFor(cond, what, timeout = 180000) {
 const missed = [];
 
 (async () => {
+  const bundle = await get("/api/bundle");
+  const live = ["costar", "matterport", "vexcel"].filter((k) => bundle.labels?.[k]?.mode === "live");
+  if (live.length) {
+    OUT = path.join(__dirname, "..", "data", "live", "figures");
+    RESULTS = path.join(__dirname, "..", "data", "live", "ui_walk.json");
+    console.log(`live sponsor layers (${live.join(", ")}): writing to data/live/ only`);
+  }
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
@@ -144,7 +153,7 @@ const missed = [];
   console.log(issues.length ? "console issues:\n  " + issues.join("\n  ") : "no console errors");
   let all = {};
   try { all = JSON.parse(fs.readFileSync(RESULTS, "utf8")); } catch { /* first run */ }
-  const run = { exercise: EX, base: "localhost", storyboard_wall_s: wall, console_issues: issues, waits_timed_out: missed, figures: saved, at: new Date().toISOString() };
+  const run = { exercise: EX, base: "localhost", sponsor_layers_live: live, storyboard_wall_s: wall, console_issues: issues, waits_timed_out: missed, figures: saved, at: new Date().toISOString() };
   all = { ...run, runs: { ...(all.runs || {}), [EX]: run } };
   fs.writeFileSync(RESULTS, JSON.stringify(all, null, 1));
   await browser.close();

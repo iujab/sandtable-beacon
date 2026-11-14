@@ -84,9 +84,12 @@ final class Reporter: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = true
         sensors.start(heading: settings.cameraAssist)
         pucks.start()
-        timer = Timer.scheduledTimer(withTimeInterval: Reporter.batchInterval, repeats: true) { [weak self] _ in
+        // .common mode: a timer in the default mode stops while a finger scrolls the screen.
+        let t = Timer(timeInterval: Reporter.batchInterval, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
         tick()
     }
 

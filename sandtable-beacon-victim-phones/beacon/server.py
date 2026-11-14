@@ -305,6 +305,11 @@ class AppState:
                 pass
         if typ == "beacons":
             self._cot_tick(msg)
+        try:                                   # the incident report's recorder (beacon/report.py) keeps the timeline
+            from . import report
+            report.RECORDER.feed(msg)
+        except Exception:
+            pass
 
     def _cot_tick(self, b: dict) -> None:
         if not self.cot_clients:
@@ -494,10 +499,10 @@ class AppState:
         if room:
             return room
         try:
-            r = self.twin.room(config.DEFAULT_ROOM)
+            r = self.twin.room(config.default_room(self.twin))
             if r.get("kind") == "suite":
                 return r["id"]
-        except ValueError:
+        except (ValueError, TypeError):
             pass
         floor = self.twin.exercise_floor
         idx = next((i for i, f in enumerate(self.twin.data["floors"]) if f["id"] == floor), 0)
@@ -554,13 +559,21 @@ class AppState:
 
     def load_scenario(self, name: str) -> dict:
         world = self.require_sim()
-        path = (config.SCENARIOS_DIR / f"{name}.json").resolve()
-        if config.SCENARIOS_DIR.resolve() not in path.parents or not path.is_file():
-            raise ValueError(f"unknown scenario {name!r}")
+        data = None
+        if name != "auto":
+            path = (config.SCENARIOS_DIR / f"{name}.json").resolve()
+            if config.SCENARIOS_DIR.resolve() not in path.parents or not path.is_file():
+                raise ValueError(f"unknown scenario {name!r}")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            named_room = data.get("room")
+            if named_room and named_room not in {r["id"] for r in self.twin.data.get("rooms", [])}:
+                data = None                 # a fixture scene on another twin: build one for the twin that is loaded
+        if data is None:
+            from . import autoscene
+            data = autoscene.build(self.twin)
         if self.story is not None:
             self.story.stop()
         self.session.reset()
-        data = json.loads(path.read_text(encoding="utf-8"))
         with self._lock:
             world.clear()
             world.load_scenario(data)
@@ -672,7 +685,7 @@ async def api_bundle():
     s = await get_state()
     return {"twin": s.twin_raw, "site": s.site_raw, "labels": s.labels,
             "config": {"source": s.source, "engine": s.engine, "simulated": s.simulated, "sample": s.engine == "fake",
-                       "notice": s.notice, "room": config.DEFAULT_ROOM, "floor": s.twin.exercise_floor,
+                       "notice": s.notice, "room": config.default_room(s.twin), "floor": s.twin.exercise_floor,
                        "stale_s": config.STALE_S, "retention_s": config.RETENTION_S, "step_hz": config.STEP_HZ,
                        "sim_hz": config.SIM_HZ, "rig": {"scale": s.session.rig_scale if s.session else 1.0},
                        "scenarios": sorted(p.stem for p in config.SCENARIOS_DIR.glob("*.json")) if config.SCENARIOS_DIR.is_dir() else []}}
@@ -737,8 +750,8 @@ async def api_pucks(request: Request):
             strategy = body.get("strategy")
             if strategy is not None and strategy not in ("door-wall", "exterior-wall", "careless"):
                 raise ValueError("strategy must be door-wall, exterior-wall or careless")
-            pucks = s.throw_pucks(room or s.session_room() or config.DEFAULT_ROOM, n, int(seed) if seed is not None else None, strategy)
-            return {"ok": True, "pucks": s.session.pucks, "thrown": len(pucks), "room": room or s.session_room() or config.DEFAULT_ROOM,
+            pucks = s.throw_pucks(room or s.session_room() or config.default_room(s.twin), n, int(seed) if seed is not None else None, strategy)
+            return {"ok": True, "pucks": s.session.pucks, "thrown": len(pucks), "room": room or s.session_room() or config.default_room(s.twin),
                     "strategy": strategy or ("door-wall" if n == 2 else "throw")}
     except ValueError as exc:
         raise HTTPException(400, str(exc))

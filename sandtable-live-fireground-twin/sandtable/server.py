@@ -205,6 +205,7 @@ class AppState:
             reasons = [q.get("reason") or "" for q in gd.get("pruned") or []]
             searched = [r for r in reasons if r.startswith("searched by")]
             how = (f"two candidates; a crew's search removed one ({searched[0]})" if searched else
+                   f"two candidates; {e['found_by_search']} searched the first and found the person there" if e.get("found_by_search") else
                    f"two candidates; the twin removed one ({reasons[0]})" if reasons and e.get("geometry") == "fix" else
                    {"fix": f"fix ({e.get('method')})", "candidates": "two candidates, not resolved", "ring": "range only (a ring)",
                     "zone": "Bluetooth zone only"}.get(e.get("geometry"), str(e.get("geometry"))))

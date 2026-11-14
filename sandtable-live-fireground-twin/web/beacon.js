@@ -76,13 +76,21 @@ export class BeaconModel {
     this.link = { ...(this.link || {}), ...sb };
     return JSON.stringify(this.link) !== was;
   }
+  // the Beacon module may run on a different building than this board's twin (its own copy of another bundle):
+  // then its phones and suites are not drawn here, and the board says so
+  get foreign() {
+    const b = this.b; if (!b || this.dev) return false;
+    const rooms = new Set(this.twin.rooms.map((r) => r.id));
+    return (!!b.floor && !this.twin.floors.some((f) => f.id === b.floor)) || (!!b.room && !rooms.has(b.room));
+  }
   rows() {
-    if (this.acc?.rows) return this.acc.rows;
-    return this.b?.accountability?.suites || [];
+    const rooms = new Set(this.twin.rooms.map((r) => r.id));
+    const all = this.acc?.rows || this.b?.accountability?.suites || [];
+    return all.filter((r) => !r.room || rooms.has(r.room));
   }
   totals() { return this.acc?.totals || this.b?.accountability?.totals || null; }
   view() {
-    if (!this.b) return null;
+    if (!this.b || this.foreign) return null;
     const key = `${this.b.seq ?? ""}|${this.b.t ?? ""}|${(this.b.phones || []).length}|${JSON.stringify((this.b.phones || []).map((p) => [p.geometry, p.x, p.ring?.r_m, p.candidates?.length, p.stale]))}|${JSON.stringify(this.b.pucks || [])}|${JSON.stringify(this.b.presence || [])}`;
     const hand = new Set((this.b.pucks || []).filter((pk) => pk.source === "hand" || (this.hand[pk.id] && Math.hypot(this.hand[pk.id][0] - pk.x, this.hand[pk.id][1] - pk.y) < 0.15)).map((pk) => pk.id));
     return { key: key + [...hand].join(","), b: this.b, collapses: this.collapses, sample: this.sample, hand };
@@ -173,7 +181,7 @@ function devStory(twin, site) {
       const ppl = inRoom.reduce((s, p) => s + (p.report?.people || 0), 0);
       const cold = pres.filter((c) => c.room === r.id).reduce((s, c) => s + c.count, 0);
       const state = !ten.length ? "vacant-on-record" : ppl ? "people-reported" : cold ? "devices-heard" : np && r.id === fire ? "silent" : "unscanned";
-      return { suite: r.suite, room: r.id, room_label: r.label, tenant: ten.length ? `${ten[0].industry.replace(/\s*\(.*?\)/g, "")} (name withheld)` : null, industry: ten[0]?.industry || null, vacant: !ten.length,
+      return { suite: r.suite, room: r.id, room_label: r.label, tenant: ten.length ? `${(ten[0].industry || "tenant").replace(/\s*\(.*?\)/g, "")} (name withheld)` : null, industry: ten[0]?.industry || null, vacant: !ten.length,
         life_hazard: ten.find((t) => t.life_hazard)?.life_hazard || null,
         expected: ten.length ? { people: exp, low: Math.round(exp * 0.45), high: Math.round(exp * 1.6), basis: `${Math.round(r.area_m2 * 10.764)} sf at 100 sf per person (outpatient load factor), open hours` } : { people: 0, low: 0, high: 2, basis: "no tenant on record" },
         app_registered: 0, safe_outside: 0, phones_opt_in: inRoom.length, people_reported: ppl, located: inRoom.filter((p) => p.geometry === "fix").length,

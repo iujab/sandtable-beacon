@@ -9,14 +9,33 @@ const el = (name, attrs = {}, text) => {
 };
 
 export class Aerial {
-  constructor(img, svg, seg, srcLabel, bundle, colors) {
-    this.img = img; this.svg = svg; this.bundle = bundle; this.colors = colors; this.srcLabel = srcLabel;
-    this.images = bundle.aerial.images.filter((i) => i.kind === "ortho");
+  constructor(img, svg, seg, srcLabel, bundle, colors, opts = {}) {
+    this.img = img; this.svg = svg; this.bundle = bundle; this.colors = colors; this.srcLabel = srcLabel; this.opts = opts;
+    // map-projected images only (orthos and an ortho detail such as the roof); obliques go to the sides strip
+    this.images = bundle.aerial.images.filter((i) => (i.kind === "ortho" || i.kind === "detail") && i.bbox);
     this.units = {};
-    seg.innerHTML = this.images.map((i, k) => `<button data-i="${k}" class="${k === 0 ? "on" : ""}">${i.id === "ortho" ? "Site" : "Approach"}</button>`).join("");
+    seg.innerHTML = this.images.map((i, k) => `<button data-i="${k}" class="${k === 0 ? "on" : ""}">${i.id === "ortho" ? "Site" : i.kind === "detail" ? "Roof" : "Approach"}</button>`).join("");
     for (const b of seg.querySelectorAll("button")) b.onclick = () => { for (const q of seg.querySelectorAll("button")) q.classList.toggle("on", q === b); this.show(Number(b.dataset.i)); };
     if (this.images.length < 2) seg.hidden = true;
     this.show(0);
+    this._sides(opts.sidesEl);
+  }
+  // oblique views (live Vexcel): one per side of the building, matched to the fire-service letters by the face they show
+  _sides(box) {
+    const obl = this.bundle.aerial.images.filter((i) => i.kind === "oblique" && (i.url || i.path));
+    if (!box || !obl.length) return;
+    const sides = this.bundle.site.sides || {}, FACE = { north: 0, east: 90, south: 180, west: 270 };
+    const letterOf = (im) => {
+      const face = im.shows_face in FACE ? FACE[im.shows_face] : ((im.heading_deg ?? 0) + 180) % 360;
+      let best = null;
+      for (const [k, s] of Object.entries(sides)) { const d = Math.abs(((s.bearing_deg - face) % 360 + 540) % 360 - 180); if (!best || d < best[1]) best = [k, d]; }
+      return best ? best[0] : "?";
+    };
+    const items = obl.map((im) => ({ im, letter: letterOf(im) })).sort((a, b) => a.letter.localeCompare(b.letter));
+    box.innerHTML = `<div class="sides-h">Sides <small>Vexcel obliques, one per face; click to open</small></div><div class="sides-row">` +
+      items.map(({ im, letter }, k) => `<button class="side-th" data-k="${k}" title="Side ${letter}: the ${im.shows_face || ""} face, camera looking ${im.look || ""}${im.capture_date ? ", " + im.capture_date : ""}"><img src="${im.url || "/" + im.path}" alt="Oblique view of side ${letter}" loading="lazy"><span class="lt">${letter}</span><small>${im.shows_face || ""} face</small></button>`).join("") + `</div>`;
+    box.hidden = false;
+    for (const b of box.querySelectorAll(".side-th")) b.onclick = () => { const it = items[Number(b.dataset.k)]; this.opts.onOblique?.(it.im, it.letter); };
   }
   px(lat, lon) {
     const [w, s, e, n] = this.im.bbox;
@@ -29,8 +48,8 @@ export class Aerial {
   }
   show(k) {
     const im = this.im = this.images[k], site = this.bundle.site, twin = this.bundle.twin;
-    this.img.src = im.url || "/" + im.path;
-    this.srcLabel.textContent = `${im.synthetic ? "synthetic" : "real"} imagery: ${im.source}${im.capture_date ? ", " + im.capture_date : ""} · ${im.gsd_m} m/px${/Vexcel/i.test(im.source) ? "" : " · not Vexcel"}`;
+    this.img.src = im.hd_url || im.url || "/" + im.path;
+    this.srcLabel.textContent = `${im.synthetic ? "synthetic" : "real"} imagery: ${im.source}${im.capture_date ? ", " + im.capture_date : ""} · ${im.hd_gsd_m || im.gsd_m} m/px${/Vexcel/i.test(im.source || "") ? "" : " · not Vexcel"}`;
     const svg = this.svg;
     svg.setAttribute("viewBox", `0 0 ${im.width} ${im.height}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid slice");

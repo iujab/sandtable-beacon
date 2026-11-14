@@ -93,7 +93,7 @@ flowchart LR
 **Main rubric (Healthcare).** Creativity: the building's own data decides between two possible positions of a phone, which is the "we didn't know you could do that with our data" moment. Utility: runs end to end, hands-free on the simulator, and the live phone path is written. Charity: finding trapped and injured people sooner, and knowing their condition before a rescuer reaches them. Avidity: three sensing modes, a reporting centre, a puck enclosure, a feasibility answer with sources.
 
 **Best Hardware Hack.** Pucks (Qorvo DWM3001CDK, power only, stock Nearby Interaction firmware), two iPhones, an Arduino UNO Q as a puck host and command post in a box, and a designed enclosure (`hardware/puck/`). The geometry a phone gets is set by where the hardware is placed, and the board shows exactly that.
-TODO(lead): after the first live run, replace this line with what ran on the owner's boards and phones (or "not run on hardware").
+Not run on hardware: as of this commit nothing here has run on the owner's boards or phones. Every phone, puck and crew in the figures and recordings is the simulator; the bring-up steps are in `hardware/BRINGUP.md`.
 
 **Best Physical AI.** The agent acts on measurements of the physical world (ranges from real or simulated radios, constrained by the physical walls of the twin) and directs physical movement (which crew goes where, by which stair, and what to search).
 

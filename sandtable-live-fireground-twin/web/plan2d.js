@@ -10,6 +10,31 @@ const el = (name, attrs = {}, text) => {
   return e;
 };
 
+// "HealthCareAndSocialAssist" (a record's code) -> "Health care and social assist"; plain text is left alone
+export function prettyIndustry(s) {
+  if (!s) return "";
+  if (/\s/.test(s)) return s;
+  const w = s.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return w.charAt(0) + w.slice(1).toLowerCase();
+}
+
+// a point well inside a room (the centroid of an L-shaped room can fall outside it): the grid point farthest from the edges
+export function labelPoint(poly) {
+  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+  const inside = (x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  const cx = xs.reduce((a, b) => a + b, 0) / xs.length, cy = ys.reduce((a, b) => a + b, 0) / ys.length;
+  const edge = (x, y) => { let m = 1e9; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L)); m = Math.min(m, Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy)); } return m; };
+  if (inside(cx, cy) && edge(cx, cy) > 0.25 * Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))) return [cx, cy];
+  let best = [cx, cy], bd = -1;
+  for (let i = 1; i < 24; i++) for (let j = 1; j < 24; j++) {
+    const x = Math.min(...xs) + (Math.max(...xs) - Math.min(...xs)) * i / 24, y = Math.min(...ys) + (Math.max(...ys) - Math.min(...ys)) * j / 24;
+    if (!inside(x, y)) continue;
+    const d = edge(x, y) - 0.02 * Math.hypot(x - cx, y - cy);
+    if (d > bd) { bd = d; best = [x, y]; }
+  }
+  return best;
+}
+
 export class Plan {
   constructor(svg, bundle, opts) {
     this.svg = svg; this.opts = opts; this.twin = bundle.twin; this.site = bundle.site;
@@ -17,7 +42,10 @@ export class Plan {
     this.floor = t.floors.find((f) => f.id === t.exercise_floor);
     const xs = this.floor.outline.map((p) => p[0]), ys = this.floor.outline.map((p) => p[1]);
     this.fx = Math.max(...xs); this.fy = Math.max(...ys);
-    const pad = 4.2;
+    // text and markers are sized in building metres: scale them down on a small floor (the fixture floor is k = 1)
+    this.k = Math.max(0.35, Math.min(1, Math.max(this.fx, this.fy) / 40));
+    svg.style.setProperty("--k", this.k);
+    const pad = 4.2 * this.k;
     this.homeBox = [-pad, -pad, this.fx + 2 * pad, this.fy + 2 * pad]; this.box = [...this.homeBox];
     svg.setAttribute("viewBox", this.homeBox.join(" "));
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -30,19 +58,26 @@ export class Plan {
     for (const k of ["outside", "rooms", "beaconlo", "scanlo", "walls", "labels", "tags", "preplan", "hazards", "routes", "scanhi", "beaconhi", "anchors", "units", "orient", "place"]) { this.g[k] = el("g", { class: `g-${k}` }); svg.appendChild(this.g[k]); }
     const floorNo = Number(this.floor.label);
     const hazardSuites = new Set(this.site.tenants.filter((q) => q.floor === floorNo && q.life_hazard).map((q) => q.suite));
+    // a scan of one suite has several rooms with the same suite number: name rooms by their label, the suite once
+    const suiteRooms = {};
+    for (const r of t.rooms.filter((q) => q.floor === this.floor.id && q.suite)) (suiteRooms[r.suite] ||= []).push(r);
     for (const r of t.rooms.filter((q) => q.floor === this.floor.id)) {
       const p = el("polygon", { points: r.polygon.map((q) => this.P(q).join(",")).join(" "), class: `r ${r.kind}`, "data-room": r.id });
       p.addEventListener("click", (ev) => this._click(ev, r));
       this.g.rooms.appendChild(p); this.roomEls[r.id] = p;
-      const c = this.centre(r.polygon);
+      const c = labelPoint(r.polygon), k = this.k;
       if (r.kind === "suite") {
-        this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] - 0.5, class: "rl", "data-room": r.id }, r.suite));
+        const group = suiteRooms[r.suite] || [r], shared = group.length > 1;
+        const main = !shared || group.reduce((a, q) => ((q.area_m2 || 0) > (a.area_m2 || 0) ? q : a), group[0]) === r;
+        this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] - 0.5 * k, class: "rl", "data-room": r.id }, shared ? r.label : r.suite));
         const ten = this.site.tenants.filter((q) => q.floor === floorNo && q.suite === r.suite);
-        const line = ten.length ? ten[0].industry.replace(/^Offices of /, "").replace(/\s*\(.*?\)/g, "").slice(0, 24) : (r.registered === false ? "no registration" : "");
-        if (line) this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 1.0, class: "rl small", "data-room": r.id }, line));
-        if (hazardSuites.has(r.suite)) this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 2.2, class: "rl hz", "data-room": r.id }, "LIFE HAZARD"));
+        const ind = prettyIndustry(ten[0]?.industry);
+        const line = ten.length && ind ? ind.replace(/^Offices of /, "").replace(/\s*\(.*?\)/g, "").slice(0, 24) : (r.registered === false ? "no registration" : "");
+        const sub = shared ? (main ? `Suite ${r.suite}${line ? " · " + line : ""}` : "") : line;
+        if (sub) this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 1.0 * k, class: "rl small", "data-room": r.id }, sub));
+        if (main && hazardSuites.has(r.suite)) this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 2.2 * k, class: "rl hz", "data-room": r.id }, "LIFE HAZARD"));
       } else if (r.kind !== "corridor") {
-        this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] - 1.5, class: "rl small" }, r.label));
+        this.g.labels.appendChild(el("text", { x: c[0], y: this.fy - c[1] - 1.5 * k, class: "rl small" }, r.label));
       }
     }
     for (const w of t.walls.filter((q) => q.floor === this.floor.id)) {
@@ -98,8 +133,7 @@ export class Plan {
     if (obs) (this._obs ||= []).push(m);
   }
   highlightSuite(suite, on) {
-    const r = this.twin.rooms.find((q) => q.suite === suite);
-    if (r && this.roomEls[r.id]) this.roomEls[r.id].classList.toggle("hot", on);
+    for (const r of this.twin.rooms.filter((q) => q.suite === suite)) this.roomEls[r.id]?.classList.toggle("hot", on);
   }
   setInject(on) { this.inject = on; for (const e of Object.values(this.roomEls)) e.classList.toggle("clickable", on); }
   _click(ev, room) {
@@ -133,17 +167,25 @@ export class Plan {
     if (!pp) { for (const m of this._obs || []) m.remove(); this._obs = []; return; }
     const t = pp.tactical || {};
     for (const h of t.life_hazards || []) this.roomEls[h.room]?.classList.add("lifehaz");
+    const seen = {};
     for (const [key, color, word] of [["attack_stair", "#ffc247", "ATTACK"], ["evac_stair", "#3fcf8e", "EVAC"]]) {
       const st = this.twin.stairs.find((s) => s.id === t[key]);
       if (!st) continue;
-      const r = this.rooms[st.room];
-      this.g.preplan.appendChild(el("polygon", { points: r.polygon.map((q) => this.P(q).join(",")).join(" "), class: "pp-stair", stroke: color }));
-      const c = this.centre(r.polygon);
-      this.g.preplan.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 1.7, class: "rl hz", style: `fill:${color}` }, word));
+      const r = this.rooms[st.room], door = this.twin.doors.find((d) => d.id === st.door);
+      if (r?.kind === "stair" || !door) {
+        this.g.preplan.appendChild(el("polygon", { points: r.polygon.map((q) => this.P(q).join(",")).join(" "), class: "pp-stair", stroke: color }));
+        const c = this.centre(r.polygon);
+        this.g.preplan.appendChild(el("text", { x: c[0], y: this.fy - c[1] + 1.7, class: "rl hz", style: `fill:${color}` }, word));
+      } else {
+        // the scan has no stair: the way in and out is the suite entrance, marked at its door
+        const p = this.P(door.at), n = seen[st.id] = (seen[st.id] || 0) + 1, k = this.k;
+        this.g.preplan.appendChild(el("circle", { cx: p[0], cy: p[1], r: 0.9 * k, class: "pp-door", stroke: color }));
+        this.g.preplan.appendChild(el("text", { x: p[0], y: p[1] - (0.9 + 0.9 * n) * k, class: "rl hz", style: `fill:${color}` }, `${word}: ${st.label}`));
+      }
     }
     for (const a of t.anchor_drops || []) {
       const p = this.P(a.at);
-      const m = el("path", { d: `M${p[0]} ${p[1] - 0.7} L${p[0] + 0.7} ${p[1]} L${p[0]} ${p[1] + 0.7} L${p[0] - 0.7} ${p[1]} Z`, class: "pp-drop" });
+      const q = 0.7 * this.k, m = el("path", { d: `M${p[0]} ${p[1] - q} L${p[0] + q} ${p[1]} L${p[0]} ${p[1] + q} L${p[0] - q} ${p[1]} Z`, class: "pp-drop" });
       m.appendChild(el("title", {}, `Planned UWB anchor drop ${a.id}: ${a.near}`));
       this.g.preplan.appendChild(m);
     }
@@ -186,14 +228,14 @@ export class Plan {
     const cx = this.fx / 2, cy = this.fy / 2;
     for (const [k, s] of Object.entries(this.site.sides || {})) {
       const d = dirOf(s.bearing_deg);
-      const tt = Math.min(Math.abs(d[0]) > 1e-3 ? cx / Math.abs(d[0]) : 1e9, Math.abs(d[1]) > 1e-3 ? cy / Math.abs(d[1]) : 1e9) + 1.35;
+      const tt = Math.min(Math.abs(d[0]) > 1e-3 ? cx / Math.abs(d[0]) : 1e9, Math.abs(d[1]) > 1e-3 ? cy / Math.abs(d[1]) : 1e9) + 1.35 * this.k;
       const p = this.P([cx + d[0] * tt, cy + d[1] * tt]);
       const g = el("g", { class: "side" });
-      g.append(el("circle", { cx: p[0], cy: p[1], r: 0.95 }), el("text", { x: p[0], y: p[1] }, k), el("title", {}, `Side ${k}${s.street ? ": " + s.street : ""}`));
+      g.append(el("circle", { cx: p[0], cy: p[1], r: 0.95 * this.k }), el("text", { x: p[0], y: p[1] }, k), el("title", {}, `Side ${k}${s.street ? ": " + s.street : ""}`));
       this.g.orient.appendChild(g);
     }
-    const n = dirOf(0), a = this.P([-1.3, this.fy - 1.4]), ang = -Math.atan2(n[1], n[0]) * 180 / Math.PI + 90;
-    const g = el("g", { class: "north", transform: `translate(${a[0]} ${a[1]}) rotate(${ang})` });
+    const n = dirOf(0), a = this.P([-1.3 * this.k, this.fy - 1.4 * this.k]), ang = -Math.atan2(n[1], n[0]) * 180 / Math.PI + 90;
+    const g = el("g", { class: "north", transform: `translate(${a[0]} ${a[1]}) rotate(${ang}) scale(${this.k})` });
     g.append(el("path", { d: "M0 -1.3 L0.65 0.8 L0 0.4 L-0.65 0.8 Z" }), el("text", { x: 0, y: -1.9 }, "N"));
     this.g.orient.appendChild(g);
   }
@@ -489,7 +531,7 @@ export class Plan {
     for (const [k, sd] of Object.entries(site.sides || {})) if (sd.street) {
       const t = this.g.orient.querySelector(`.side title`); // side letters are drawn by _orientation; the street name sits beside its letter
       const letter = [...this.g.orient.querySelectorAll(".side")].find((q) => q.querySelector("text")?.textContent === k);
-      if (letter) { const c = letter.querySelector("circle"); this.g.orient.appendChild(el("text", { x: Number(c.getAttribute("cx")) + 1.4, y: Number(c.getAttribute("cy")) + 0.05, class: "street" }, sd.street)); }
+      if (letter) { const c = letter.querySelector("circle"); this.g.orient.appendChild(el("text", { x: Number(c.getAttribute("cx")) + 1.4 * this.k, y: Number(c.getAttribute("cy")) + 0.05, class: "street" }, sd.street)); }
     }
   }
   update(st, selected) {
@@ -500,8 +542,9 @@ export class Plan {
       this.g.anchors.replaceChildren();
       for (const a of st.anchors || []) {
         const p = this.P([a.x, a.y]);
-        this.g.anchors.appendChild(el("path", { d: `M${p[0]} ${p[1] - 0.9} L${p[0] + 0.8} ${p[1] + 0.6} L${p[0] - 0.8} ${p[1] + 0.6} Z`, class: "anchor" }));
-        this.g.anchors.appendChild(el("text", { x: p[0], y: p[1] + 1.9, class: "anchor-l" }, a.id));
+        const k = this.k;
+        this.g.anchors.appendChild(el("path", { d: `M${p[0]} ${p[1] - 0.9 * k} L${p[0] + 0.8 * k} ${p[1] + 0.6 * k} L${p[0] - 0.8 * k} ${p[1] + 0.6 * k} Z`, class: "anchor" }));
+        this.g.anchors.appendChild(el("text", { x: p[0], y: p[1] + 1.9 * k, class: "anchor-l" }, a.id));
       }
     }
     // hazards
@@ -541,9 +584,9 @@ export class Plan {
       if (u.x == null) { g.style.display = "none"; continue; }
       g.style.display = "";
       const p = this.P([u.x, u.y]);
-      g.dot.setAttribute("cx", p[0]); g.dot.setAttribute("cy", p[1]); g.dot.setAttribute("r", this.zoomed ? 0.45 : 0.95);
-      g.sig.setAttribute("cx", p[0]); g.sig.setAttribute("cy", p[1]); g.sig.setAttribute("r", Math.max(1.0, u.sigma_m || 0));
-      g.lab.setAttribute("x", p[0]); g.lab.setAttribute("y", p[1] - (this.zoomed ? 0.75 : 1.5));
+      g.dot.setAttribute("cx", p[0]); g.dot.setAttribute("cy", p[1]); g.dot.setAttribute("r", (this.zoomed ? 0.45 : 0.95) * this.k);
+      g.sig.setAttribute("cx", p[0]); g.sig.setAttribute("cy", p[1]); g.sig.setAttribute("r", Math.max(1.0 * this.k, u.sigma_m || 0));
+      g.lab.setAttribute("x", p[0]); g.lab.setAttribute("y", p[1] - (this.zoomed ? 0.75 : 1.5) * this.k);
       g.classList.toggle("mayday", u.status === "mayday");
       g.dot.setAttribute("stroke", u.id === selected ? "#fff" : "#0b0e12");
     }

@@ -106,29 +106,52 @@ def _floor_index(twin, floor: str) -> int | None:
 
 
 def suites(site: dict, twin, floor: str | None = None, now_local_hour: float | None = None) -> list[dict]:
-    """One row per suite room of the twin's floor, joined to the record's tenants by suite number."""
+    """One row per suite of the twin's floor, joined to the record's tenants by suite number.
+
+    A suite may be one room of the twin (the fixture: a floor of suites) or several (a scan of one suite: offices,
+    a kitchen, a lobby, all carrying the same suite number): rooms are grouped by suite number, the row's `rooms` lists
+    them all, `room` is the largest (the representative for routes and doors) and the area is their sum.
+
+    The join is by suite number. The record's storey is used only to choose between tenants when the same suite number
+    exists on several floors of the record: the twin's floor index is not trusted to equal the record's storey."""
     floor = floor or twin.exercise_floor
     storey = _floor_index(twin, floor)
-    by_suite: dict[str, list[dict]] = {}
+    all_by_suite: dict[str, list[dict]] = {}
     for t in site.get("tenants", []):
-        if storey is not None and t.get("floor") not in (None, storey):
-            continue
-        by_suite.setdefault(str(t.get("suite")), []).append(t)
-    available = {str(a.get("suite")) for a in site.get("available_spaces", []) if storey is None or a.get("floor") in (None, storey)}
+        all_by_suite.setdefault(str(t.get("suite")), []).append(t)
 
-    rows = []
+    def tenants_of(suite: str) -> list[dict]:
+        ts = all_by_suite.get(suite, [])
+        floors = {t.get("floor") for t in ts}
+        if len(floors) <= 1:
+            return ts
+        on_storey = [t for t in ts if t.get("floor") in (None, storey)]
+        return on_storey                    # the number exists on several floors: only the matching storey counts
+
+    available = {str(a.get("suite")) for a in site.get("available_spaces", [])
+                 if len({x.get("floor") for x in site.get("available_spaces", []) if str(x.get("suite")) == str(a.get("suite"))}) <= 1
+                 or a.get("floor") in (None, storey)}
+
+    groups: dict[str, list[dict]] = {}
     for room in twin.rooms("suite"):
         if room.get("floor") != floor or not room.get("suite"):
             continue
-        suite = str(room["suite"])
-        tenants = by_suite.get(suite, [])
+        groups.setdefault(str(room["suite"]), []).append(room)
+
+    rows = []
+    for suite, rooms in groups.items():
+        rooms = sorted(rooms, key=lambda r: (-float(r.get("area_m2") or 0.0), r["id"]))
+        main = rooms[0]
+        area = {"area_m2": sum(float(r.get("area_m2") or 0.0) for r in rooms)}
+        tenants = tenants_of(suite)
         vacant = not tenants or suite in available
         names = [t.get("name") or t.get("industry") or "tenant" for t in tenants]
         hazards = list(dict.fromkeys(t["life_hazard"] for t in tenants if t.get("life_hazard")))
         hazmat = list(dict.fromkeys(t["hazmat"] for t in tenants if t.get("hazmat")))
         sfs = [t.get("sf") for t in tenants if isinstance(t.get("sf"), (int, float))]
         rows.append({
-            "suite": suite, "room": room["id"], "room_label": room.get("label") or f"Suite {suite}",
+            "suite": suite, "room": main["id"], "rooms": [r["id"] for r in rooms],
+            "room_label": (main.get("label") or f"Suite {suite}") if len(rooms) == 1 else f"Suite {suite}",
             "tenant": ("; ".join(names) if names else None),
             "tenants": len(tenants),
             "industry": ("; ".join(dict.fromkeys(t.get("industry") or "" for t in tenants)) or None),
@@ -140,7 +163,7 @@ def suites(site: dict, twin, floor: str | None = None, now_local_hour: float | N
             "sf_source": ("record" if sfs else "twin room area"),
             "record_source": (tenants[0].get("source") if tenants else None),
             "synthetic": any(bool(t.get("synthetic")) for t in tenants),
-            "expected": _expected([] if vacant and not tenants else tenants, room, now_local_hour),
+            "expected": _expected([] if vacant and not tenants else tenants, area, now_local_hour),
         })
     rows.sort(key=lambda r: r["suite"])
     return rows
@@ -195,11 +218,19 @@ def _walk_m(twin, src_room: str | None, dst_room: str) -> float:
         return 999.0
 
 
-def _door_of(twin, room_id: str) -> list[float] | None:
+def _door_of(twin, room_id: str, rooms: list[str] | None = None) -> list[float] | None:
+    """The door to throw a puck through: for a suite of several rooms, a door that leads out of the suite when there is one."""
+    group = set(rooms or [room_id])
+    inner = None
     for d in twin.data.get("doors", []):
-        if room_id in (d.get("rooms") or []):
-            return [float(d["at"][0]), float(d["at"][1])]
-    return None
+        dr = [x for x in (d.get("rooms") or []) if x]
+        if not group.intersection(dr):
+            continue
+        at = [float(d["at"][0]), float(d["at"][1])]
+        if any(x not in group for x in dr) or len(dr) < 2:
+            return at
+        inner = inner or at
+    return inner
 
 
 def accountability(site: dict, twin, floor: str | None, phones: list[dict], presence: list[dict], pucks: list[dict],
@@ -207,7 +238,7 @@ def accountability(site: dict, twin, floor: str | None, phones: list[dict], pres
     """The Accountability object of docs/BEACON_FEED.md section 2.4 (plus `next_puck` and `record_checks`)."""
     floor = floor or twin.exercise_floor
     rows = suites(site, twin, floor, now_local_hour)
-    by_room = {r["room"]: r for r in rows}
+    by_room = {rid: r for r in rows for rid in (r.get("rooms") or [r["room"]])}
     by_suite = {r["suite"]: r for r in rows}
 
     puck_room: dict[str, str | None] = {}
@@ -260,7 +291,7 @@ def accountability(site: dict, twin, floor: str | None, phones: list[dict], pres
 
     record_checks = []
     for r in rows:
-        scanned = r["room"] in scanned_rooms
+        scanned = any(rid in scanned_rooms for rid in (r.get("rooms") or [r["room"]]))
         if r["phones_opt_in"] > 0:
             state = "people-reported"
         elif r["cold_devices"] > 0:
@@ -322,7 +353,7 @@ def accountability(site: dict, twin, floor: str | None, phones: list[dict], pres
     next_puck = None
     for r in ranked:
         if r["_action"] == "scan":
-            next_puck = {"suite": r["suite"], "room": r["room"], "door": _door_of(twin, r["room"]),
+            next_puck = {"suite": r["suite"], "room": r["room"], "door": _door_of(twin, r["room"], r.get("rooms")),
                          "text": f"Next puck: Suite {r['suite']} ({r['why']})"}
             break
     for r in rows:

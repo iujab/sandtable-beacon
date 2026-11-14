@@ -136,12 +136,10 @@
   },
   "suite-310": {
    "keys": [
-    "e3e1f71fdf40945c2aa41809d20fcabb0063c5dade44fd9c8b0da0c945cbe580",
-    "dccc9c5d50314ffd49219e629e7d04883db031db2cc5f6d8fa3a2404895a2b4f",
-    "04ef24f7a1481496d52c7761119aac6bebedd55e428ec9e166d06f5d08ee4009",
-    "f3d37cf89accd5f733f2340d684667a9bc9ffb4a0afd5dee362459fa9080d8ac",
-    "4b63da02ada92c063e84116076b8fe4f80b3c950d78147c3749f7d149ef5cf82",
-    "ae2c2e9d12da2a2bc6d54bbeb5b3f2c4aafecc3705ee6fe70e796e0d5240cf68"
+    "abc48f8a2100cc1fef6ccddf38b4eb42dde137ea5bbfb42acd03a332003221ac",
+    "670234f0cdb9f00947c93a1d5bcfffef6a30616449d1ad2faa288b828b295427",
+    "a836a4d4a02a7b55dcd5e7a99b9eb6aa0b097ee1f02d5c287b2f17a1ea7a5497",
+    "ff4c47da6132cbc2c6e82968ab2695a8c915231e08d6ebb61287f44122f720d4"
    ],
    "models": [
     "claude-sonnet-5-5"
@@ -151,8 +149,8 @@
      {
       "route": {
        "attack_stair": "Stair B",
-       "leads_to": "the phone itself (B2: fix, within about 1 m)",
-       "length_m": 21,
+       "leads_to": "Suite 310, then the phone's spot in the south-west quarter of the room (B2: fix, within a metre or two)",
+       "length_m": 17,
        "to": "Suite 310",
        "via": [
         "South corridor",
@@ -166,8 +164,8 @@
      {
       "route": {
        "attack_stair": "Stair B",
-       "leads_to": "the phone itself (B3: fix, within about 1 m)",
-       "length_m": 20,
+       "leads_to": "Suite 310, then the phone's spot in the north-west quarter of the room (B3: fix, within a metre or two)",
+       "length_m": 17,
        "to": "Suite 310",
        "via": [
         "South corridor",
@@ -181,14 +179,15 @@
     ],
     "data": "SIMULATED (phones, pucks and devices from the simulator, not a measurement)",
     "limits_acknowledged": [
-     "All phone, puck and device data is simulated.",
-     "The 1 to 2 devices heard in Suite 310 are devices, not people.",
-     "Expected head counts are estimates from floor area and building-code load factors, so unaccounted people are a range (13 to 66 floor-wide), never one number.",
-     "The occupants' reports are what they typed or picked and may be out of date.",
-     "Seven occupied suites are unscanned, so nothing is known about them yet.",
-     "Vacant-on-record suites 303, 308, 309 and 311 have no pucks, so the record could be wrong there.",
+     "All phone, puck and device data is SIMULATED, not a measurement.",
+     "Occupant reports (trapped, injured, number of people, cannot move) are what they typed or picked and may be stale.",
+     "A fix is accurate to within a metre or two, not exact.",
+     "Devices heard in Suite 310 without the app are devices, not people.",
+     "Expected head counts are estimates from floor area and building-code load factors; unaccounted is a range (up to 5 in Suite 310, 13 to 66 elsewhere on the floor), not one number.",
+     "Seven occupied suites are unscanned, so nothing is known about who is in them.",
+     "Four suites are vacant on record (303, 308, 309, 311) and not scanned. No phone or device was heard there, so no record check was filed. The record could still be wrong.",
      "The record has no property-manager contact, so no tenant roll call is possible.",
-     "E1's puck run to Suite 301 depends on E1 finishing the rescue handoff first."
+     "The rescue crews were told to take the next puck only after Suite 310; no crew is yet assigned to scan Suite 301."
     ],
     "limits_standing": [
      "Devices heard without the app are devices, not people.",
@@ -198,32 +197,32 @@
     "next_puck": {
      "room": "r301",
      "suite": "301",
-     "why": "Highest-ranked suite with no puck in range: hospital outpatient, patients may be non-ambulatory. Door from East corridor, 22 m from Stair B."
+     "why": "Top-ranked unscanned suite: hospital outpatient, expected people doubled for mobility risk. Door from the East corridor, 22 m from Stair B."
     },
     "orders": [
      {
       "priority": "emergency",
       "target": "B2",
-      "text": "RIT from Command: Rescue in Suite 310, trapped occupants. Phone fix about 2 m from south wall, 2 m from west wall, within 1 m. Occupant reports 2 people, trapped, cannot move. Route Stair B, South corridor, West corridor.",
+      "text": "RIT from Command: Stair B, South corridor, West corridor, into Suite 310, 17 metres. Occupant in south-west quarter, within a metre or two. Reports trapped, 2 people, cannot move. Bring extrication and two-patient carry.",
       "to": "RIT"
      },
      {
-      "priority": "urgent",
+      "priority": "emergency",
       "target": "B3",
-      "text": "E1 from Command: Suite 310, injured occupant. Phone fix about 2 m from north wall, 4 m from west wall, within 1 m. Occupant reports injured, 1 person, cannot move. Route Stair B, South corridor, West corridor.",
+      "text": "E1 from Command: same route, Stair B, South corridor, West corridor, Suite 310. Occupant in north-west quarter, within a metre or two. Reports injured, 1 person, cannot move. Bring medical kit and carry device.",
       "to": "E1"
      },
      {
       "priority": "urgent",
       "target": null,
-      "text": "ALL from Command: Suite 310: 2 phones located, 3 people reported, 1 out safe. 1 to 2 devices heard, not people. Floor unaccounted, estimate: 13 to 66. Next puck: Suite 301, East corridor door; first free crew takes it.",
+      "text": "Command to all: Suite 310 has 3 people reported by phone, 2 cannot move, 1 is out safe. Unaccounted: 13 to 66 in other suites, up to 5 more in 310. Record estimates; devices heard are not people.",
       "to": "ALL"
      },
      {
-      "priority": "routine",
+      "priority": "urgent",
       "target": "301",
-      "text": "E1 from Command: When the Suite 310 injured occupant is handed off, carry the next puck to Suite 301, hospital outpatient on record. Route Stair B, South corridor, East corridor, door from East corridor, about 22 metres.",
-      "to": "E1"
+      "text": "Command to all: next puck goes to Suite 301, hospital outpatient. Route Stair B, South corridor, East corridor, door from East corridor, 22 metres. First free crew carries it after the Suite 310 rescue.",
+      "to": "ALL"
      }
     ],
     "priorities": [
@@ -232,21 +231,21 @@
       "rank": 1,
       "suite": "310",
       "target": "B2",
-      "why": "Occupant reports 2 people trapped, cannot move; high-confidence fix; dental office, patients may be sedated. RIT assigned."
+      "why": "Fix within a metre or two. Occupant reports trapped, 2 people, cannot move. Dental office, patients may be sedated. RIT assigned."
      },
      {
       "action": "rescue",
       "rank": 2,
       "suite": "310",
       "target": "B3",
-      "why": "Occupant reports 1 person injured, cannot move; high-confidence fix. E1 assigned because RIT is on the other fix."
+      "why": "Fix within a metre or two. Occupant reports injured, 1 person, cannot move. E1 assigned."
      },
      {
       "action": "scan",
       "rank": 3,
       "suite": "301",
       "target": null,
-      "why": "Hospital outpatient on record, expected about 4 (estimate, range 2 to 9), no puck in range. E1 told to carry the next puck once free."
+      "why": "Hospital outpatient suite with no puck in range. Record expects about 4 people (estimate, range 2 to 9); patients may be non-ambulatory. First crew free after Suite 310 carries the puck."
      }
     ],
     "priorities_source": "agent",
@@ -254,19 +253,20 @@
     "run": "phones#1",
     "sample": false,
     "simulated": true,
-    "summary": "RIT goes first to Suite 310 via Stair B, South corridor and West corridor (21 m) for the occupant reporting 2 people trapped who cannot move. E1 takes the injured occupant in Suite 310 (20 m, same route), who reports 1 person who cannot move. Both are high-confidence phone fixes, within about 1 m. Floor-wide unaccounted is an estimated 13 to 66 people, and Suite 310 alone 0 to 5. E1 has been told to carry the next puck to Suite 301 once the injured occupant is handed off.",
+    "summary": "RIT goes first to Suite 310 via Stair B, South corridor and West corridor (17 m), to the south-west quarter, where the occupant reports trapped, 2 people, cannot move. E1 takes the same route to the north-west quarter for the occupant who reports injured, 1 person, cannot move. E1 is used because both fixes are in one room and the two crews can work it in parallel. All units heard that 3 people are reported in Suite 310 and 1 is out safe. Unaccounted: up to 5 more in Suite 310 and 13 to 66 on the rest of the floor (estimate). The next puck goes to Suite 301.",
     "type": "agent_plan"
    },
-   "recorded_at": "2026-11-14T12:59:56-0600",
+   "recorded_at": "2026-11-14T13:08:24-0600",
    "recorded_with": "claude-cli",
-   "steps": 6
+   "steps": 4
   },
   "suite-310+309": {
    "keys": [
-    "e5039f0576fa6a0b279c7cef5b7373b996090c0cfb6fe8a31727f520eff0b4c0",
-    "7131bd5db83a31980bce1373b046f2b061f9a0cd420d23fe646652d28dce1d5f",
-    "b966fb79efdf74331048f6ec79f56b933b85fc06db704202ce02659112c620fe",
-    "d17d2b684ade0fd055d1154a90a65292dbc4ff0330fcdabf4797a58926e87055"
+    "76077bdcee59c7a1af9cc8ac38c11252e06dab2e3786ddc95edd51b2d72e0c59",
+    "372b833bfb0a68c5cb6f5dc9a065c0a9828e612e29e49c22f548995abbbcdd82",
+    "529bd0657a9ebb7006198482fc0f47d1892e6da409ea62d26952d3d9c74c810e",
+    "18c6b4d61cd32ce91418bb9ac4c1b5af35b2c798937e732d908bebe41398e0d0",
+    "43826e88f7ea1cab3514e8b3fb88c4bdca9391ddf11d565e9aedd5a957eac076"
    ],
    "models": [
     "claude-sonnet-5-5"
@@ -276,8 +276,23 @@
      {
       "route": {
        "attack_stair": "Stair B",
-       "leads_to": "the phone itself (B3: fix, within about 1 m)",
-       "length_m": 21,
+       "leads_to": "Suite 310, then the phone's spot in the south-west quarter of the room (B2: fix, within a metre or two)",
+       "length_m": 17,
+       "to": "Suite 310",
+       "via": [
+        "South corridor",
+        "West corridor"
+       ]
+      },
+      "target": "B2",
+      "task": "rescue",
+      "unit": "RIT"
+     },
+     {
+      "route": {
+       "attack_stair": "Stair B",
+       "leads_to": "Suite 310, then the phone's spot in the north-west quarter of the room (B3: fix, within a metre or two)",
+       "length_m": 17,
        "to": "Suite 310",
        "via": [
         "South corridor",
@@ -286,35 +301,20 @@
       },
       "target": "B3",
       "task": "rescue",
-      "unit": "RIT"
-     },
-     {
-      "route": {
-       "attack_stair": "Stair B",
-       "leads_to": "Suite 309",
-       "length_m": 22,
-       "to": "Suite 309",
-       "via": [
-        "South corridor",
-        "West corridor"
-       ]
-      },
-      "target": "309",
-      "task": "search",
       "unit": "E1"
      }
     ],
     "data": "SIMULATED (phones, pucks and devices from the simulator, not a measurement)",
     "limits_acknowledged": [
-     "All phone, puck and device data is SIMULATED, not a measurement.",
-     "Only B3 is a position (fix, about 1 m). B2 is a ring, an arc to search, not a place. B4 is a zone from signal strength with low confidence, a room to search.",
-     "The ring for B2 crosses Suites 309, 310 and 311 and the South corridor, so the injured occupant may not be in 309.",
-     "Occupant reports (trapped, injured, number of people, cannot move) are what they typed or picked and may be stale.",
-     "The unaccounted range of 13 to 66 rests on expected head counts estimated from floor area and building-code load factors. It is not a count of people.",
-     "Only people with the app are heard. People without the app or without a phone are invisible, and no devices were heard without the app.",
-     "The record lists Suite 309 as vacant but a phone reports from it. This is filed as a record check, and it is not proof either way.",
+     "All phone, puck and device data is simulated, not a measurement.",
+     "The two Suite 310 fixes are good to a metre or two, and each is the occupant's report at that moment and may be stale.",
+     "The Suite 309 phone is a zone, not a position, and the far-band probability is low (0.2): search the whole room.",
+     "Devices heard in Suite 310 without the app are devices, not people.",
+     "Expected head counts are estimates from floor area and load factors. The unaccounted figure is a range (about 13 to 66 on the floor; 0 to 5 in Suite 310), not one number.",
+     "Seven occupied suites have no puck in range and are unscanned, so nobody there is heard or counted.",
+     "Suites 303, 308 and 311 are vacant on record and not scanned, but the record can be wrong. The Suite 309 disagreement is filed for verification and is not proof either way.",
      "No property-manager contact is in the record, so no tenant roll call is possible.",
-     "Seven occupied suites are still unscanned. Only 2 pucks are placed, both in Suite 310, with 3 left in the kit."
+     "Anyone without the app, or without a phone, is not heard."
     ],
     "limits_standing": [
      "Devices heard without the app are devices, not people.",
@@ -324,31 +324,37 @@
     "next_puck": {
      "room": "r301",
      "suite": "301",
-     "why": "Ranked first by the record: hospital outpatient department, about 4 expected (estimate), patients possibly non-ambulatory. Door from the East corridor, 22 m from Stair B, no puck in range yet."
+     "why": "Highest-ranked suite with no puck in range: outpatient hospital where occupants may not leave unaided, about 4 expected (estimate, 2 to 9), 22 m from Stair B via the East corridor. E1 told."
     },
     "orders": [
      {
       "priority": "emergency",
-      "target": "B3",
-      "text": "RIT from Command: Rescue in Suite 310, fire room. Stair B, South corridor, West corridor, 21 m. Phone fix about 2 m from south wall and 2 m from west wall, within about 1 m. Occupants report 2 trapped, cannot move.",
+      "target": "B2",
+      "text": "RIT from Command: Rescue, Suite 310 fire room, southwest quarter, within a metre or two. Route: Stair B, South corridor, West corridor, 17 metres. Occupant reports trapped, 2 people, cannot move. Expect to carry both.",
       "to": "RIT"
      },
      {
       "priority": "urgent",
-      "target": "309",
-      "text": "E1 from Command: Search Suite 309. Stair B, South corridor, West corridor, 22 m. One occupant reports injured, cannot move; ring about 8 m, no position, search the arc. Another reports sheltering, can move; room only, low confidence.",
+      "target": "B3",
+      "text": "E1 from Command: Rescue, Suite 310 northwest quarter, within a metre or two. Same route: Stair B, South corridor, West corridor. Occupant reports injured, 1 person, cannot move. RIT has two trapped in the southwest quarter.",
       "to": "E1"
+     },
+     {
+      "priority": "routine",
+      "target": "309",
+      "text": "RIT from Command: After Suite 310, search Suite 309, 5 m left off the West corridor. One occupant reports sheltering, can move. Room only, low confidence. Record says vacant.",
+      "to": "RIT"
      },
      {
       "priority": "urgent",
       "target": null,
-      "text": "ALL from Command: Simulated data. Suite 310: 3 people reported by phone, 2 trapped. Suite 309: injured and sheltering reports. 1 person out. Still unaccounted on floor: 13 to 66, record estimate. Devices are not people.",
+      "text": "ALL from Command: Simulated data. Three phones inside report 4 people: Suite 310 three, cannot move; Suite 309 one sheltering. One is out. Unaccounted: estimated 13 to 66. Next puck to Suite 301 via East corridor.",
       "to": "ALL"
      },
      {
       "priority": "routine",
       "target": "301",
-      "text": "E1 from Command: After Suite 309, carry the next puck to Suite 301, door from the East corridor, 22 m from Stair B. Hospital outpatient, record expects about 4 people, estimate.",
+      "text": "E1 from Command: After the Suite 310 rescue, carry the next puck to Suite 301: Stair B, South corridor, East corridor, 22 metres, door off the East corridor. Outpatient hospital; occupants may not leave unaided. Head count is an estimate.",
       "to": "E1"
      }
     ],
@@ -357,22 +363,22 @@
       "action": "rescue",
       "rank": 1,
       "suite": "310",
-      "target": "B3",
-      "why": "Fix within about 1 m in the fire room. Occupants report 2 trapped, cannot move. Dental tenant, so patients may be sedated."
+      "target": "B2",
+      "why": "Fix within a metre or two, south-west quarter of the fire room. Occupant reports trapped, 2 people, cannot move. RIT first."
      },
      {
-      "action": "search",
+      "action": "rescue",
       "rank": 2,
-      "suite": "309",
-      "target": "B2",
-      "why": "Ring only, about 8 m from the puck in 310, and 40% of the arc crosses 309. Occupant reports injured, 1 person, cannot move. Search the arc."
+      "suite": "310",
+      "target": "B3",
+      "why": "Fix within a metre or two, north-west quarter of the fire room. Occupant reports injured, 1 person, cannot move. E1, because RIT is on the two trapped."
      },
      {
       "action": "search",
       "rank": 3,
       "suite": "309",
       "target": "B4",
-      "why": "Zone from Bluetooth signal strength, low confidence. Occupant reports sheltering, 1 person, can move. Search the room."
+      "why": "Zone only (Bluetooth signal strength, low confidence): search the whole room, no position. Occupant reports sheltering, 1 person, can move. Record lists the suite as vacant."
      }
     ],
     "priorities_source": "agent",
@@ -380,18 +386,18 @@
      {
       "status": "filed locally (fixture mode)",
       "suite": "309",
-      "text": "Suite 309 is vacant on record, but one opt-in phone reports 1 person sheltering who can move. Location is a zone from Bluetooth signal strength (low confidence, SIMULATED data), not a position. The phone has no registered home suite. Separately, the ring of the injured occupant crosses Suite 309 for about 40% of its arc. Verify the record: tenant or occupancy of Suite 309."
+      "text": "Vacant on record, but one opt-in phone hears in Suite 309 by Bluetooth signal strength (zone, low confidence, simulated data). Occupant reports 1 person, sheltering, can move. Verify the record for Suite 309."
      }
     ],
     "run": "phones#1",
     "sample": false,
     "simulated": true,
-    "summary": "RIT goes first to Suite 310, the fire room, via Stair B, South corridor and West corridor (21 m). The B3 fix is high-confidence and the occupants report 2 trapped who cannot move. E1 searches Suite 309 (22 m): one injured occupant who cannot move, on an 8 m ring from the puck (an arc, not a position), and one sheltering occupant who can move, located only to the room with low confidence. Still unaccounted on the floor: 13 to 66 people, a record-based estimate on SIMULATED data. E1 carries the next puck to Suite 301 after 309.",
+    "summary": "RIT goes first to the Suite 310 fire room, south-west quarter, where the occupant reports 2 trapped who cannot move. E1 takes the injured occupant in the north-west quarter, 1 person who cannot move. Both go by Stair B, South corridor and West corridor, 17 m. RIT searches Suite 309 after 310. E1 carries the next puck to Suite 301 after the 310 rescue. All data is simulated.",
     "type": "agent_plan"
    },
-   "recorded_at": "2026-11-14T12:53:26-0600",
+   "recorded_at": "2026-11-14T13:09:19-0600",
    "recorded_with": "claude-cli",
-   "steps": 4
+   "steps": 5
   },
   "walk-through": {
    "brief": {

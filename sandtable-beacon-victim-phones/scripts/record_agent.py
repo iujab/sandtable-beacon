@@ -9,6 +9,8 @@ Situations (built without the server, deterministic):
   sample     fixtures/beacon/sample_beacons.json (the hand-made sample; also the fake engine's "fix" phase)
   suite-310  the scripted scene fixtures/beacon/scenarios/suite-310.json run through the real simulator, session and
              locator on a FIXED clock (0.1 s steps from a fixed epoch, 30 s), so its brief is the same on every run
+  suite-310+309  the same scene plus an occupant sheltering in Suite 309, which the record lists as vacant and which
+             they registered in the app (a disagreement between the record and the phones)
 
 Recording uses LLM_BACKEND (default here: claude-cli) with LLM_RECORD=1: every model reply is written to
 fixtures/llm_cache/<sha256 of the canonical request>.json by beacon/llm.py. Nothing is hand-written. The index
@@ -35,7 +37,7 @@ from beacon.llm import CACHE_DIR, LLM  # noqa: E402
 from beacon.tools import brief_of  # noqa: E402
 
 INDEX = CACHE_DIR / "RUNS.json"
-SITUATIONS = ("sample", "suite-310")
+SITUATIONS = ("sample", "suite-310", "suite-310+309")
 SCENE_EPOCH = 1794679200.0          # fixed clock for the scripted scene (Sat Nov 14 2026, 12:00 CST); never shown anywhere
 SCENE_SECONDS = 30.0
 SCENE_DT = 0.1
@@ -45,7 +47,14 @@ def sample_source() -> dict:
     return json.loads(config.SAMPLE_JSON.read_text(encoding="utf-8"))
 
 
-def scene_session(name: str = "suite-310", seconds: float = SCENE_SECONDS):
+# The suite-310 scene plus one opt-in occupant sheltering next door in Suite 309, which the building record lists as
+# vacant (no active business registration) and which they registered in the app: the record disagrees with the phones.
+EXTRA_309 = {"key": "shelter-309", "room": "r309", "x": 3.6, "y": 12.4, "opt_in": True, "uwb": True, "chip": "U2", "model": "iPhone 15",
+             "pointing": False, "report": {"status": "sheltering", "people": 1, "can_move": True, "battery_pct": 77, "floor_reported": 3,
+                                           "home_suite": "309", "platform": "ios", "safe_outside": False}}
+
+
+def scene_session(name: str = "suite-310", seconds: float = SCENE_SECONDS, extra_phones: list | None = None):
     """The scripted scene through the real simulator, session and locator on a fixed clock. Returns the session."""
     from beacon.session import BeaconSession
     from beacon.sim import World
@@ -53,6 +62,8 @@ def scene_session(name: str = "suite-310", seconds: float = SCENE_SECONDS):
     s = BeaconSession(twin_raw, site, labels=config.labels(site, twin_raw), source="sim")
     w = World(twin_raw, seed=config.SIM_SEED)
     sc = json.loads((config.SCENARIOS_DIR / f"{name}.json").read_text(encoding="utf-8"))
+    if extra_phones:
+        sc["phones"] = list(sc.get("phones") or []) + [dict(p) for p in extra_phones]
     w.load_scenario(sc)
     s.set_pucks([dict(p) for p in w.pucks], room=sc.get("room"), floor=sc.get("floor"))
     n = int(round(seconds / SCENE_DT))
@@ -75,6 +86,8 @@ def situation_source(name: str, brief_file: str | None = None):
         return sample_source()
     if name == "suite-310":
         return scene_session("suite-310")
+    if name == "suite-310+309":
+        return scene_session("suite-310", extra_phones=[EXTRA_309])
     if name == "brief-file":
         return json.loads(Path(brief_file).read_text(encoding="utf-8"))
     raise SystemExit(f"unknown situation {name!r}")

@@ -108,3 +108,12 @@ Decisions (lead):
 - **Scout (radar) and Crews (tags) become secondary, simulation-only modes** behind a mode switch, each with one honest line. The ESP32 firmware (L08's echo reader, the kit's ranging) does not run on nRF52833 boards and there is no nRF toolchain here, so neither is attempted on hardware. The radar feasibility answer the owner asked for stays.
 - Builders re-tasked mid-flight: R3 (server) to the Beacon link, accountability, report and the `beacon` exercise script; R4 (agent) to phone situations and tools; R5 (board) to the Phones layer, accountability panel and mode switch; R8 stops ESP32 firmware and rewrites the hardware guide; R9 retargets the enclosure to the DWM3001CDK with a battery bank and a UNO Q host variant; new builder U2 builds the reporting page. Contract: `docs/BEACON_BOARD_CONTRACT.md`.
 - Main track stays Healthcare (emergency care before the hospital: finding trapped people and getting rescuers to them).
+
+## 11. Sponsor keys arrive, 12:55 CST: live layers in private
+
+Matterport and Vexcel keys are on the build machine; CoStar is a password-protected data extract that has not arrived yet. Owner's hard rule: "don't push the data at all", while the tree is being published to a public repository every 15 minutes.
+
+Decisions (lead):
+- Three builders take the layers live now: Matterport (correct the adapter against the real GraphQL schema, pick a scanned commercial suite in Los Angeles or Houston as the demo building, normalise it into the twin, Showcase SDK view on localhost), Vexcel (real ortho, obliques, structure attributes for that building; the agent's vision tool run on real imagery), and plumbing (CoStar read from a local extract folder through one mapping table, public context for any LA or Houston address, `.env.example`, the self-check, the swap guide rewritten from what was actually done).
+- **Privacy by construction**: everything fetched or derived in live mode lives under a path containing a directory named `live` (`data/live/...`); the model replay cache switches to a private directory in live mode; `fixtures/llm_cache/` only ever holds recordings made against fixture data; the publish check refuses key values and tracked `live` paths. The public repository keeps the fixture-mode demo exactly as it is; live mode is what the owner shows at the table.
+- Prefer a Los Angeles building: the open-data pipeline for hydrants, footprint and parcel already works for City of Los Angeles addresses.

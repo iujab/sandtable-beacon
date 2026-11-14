@@ -99,17 +99,33 @@ class Story:
                 y += 0.5
             x += 0.5
         pts.sort(key=lambda q: math.dist(q, (cx, cy)))
+        import random
         ctx = locate.Context(tw, floor=self.floor)
         ph = (float(self.trapped["x"]), float(self.trapped["y"]))
-        for q in pts[:60]:
+        rnd = random.Random(310)
+        best = None
+        for q in pts[:80]:
             pk = [self.p1, {"id": "P2", "x": q[0], "y": q[1]}]
-            rs = [{"puck": p["id"], "kind": "uwb", "d_m": math.dist((p["x"], p["y"]), ph), "los": 0.9, "n": 5} for p in pk]
-            e = locate.estimate(ctx, pk, rs)
-            c = e.get("candidates") or []
-            if e.get("geometry") == "candidates" and len(c) == 2 and all(k.get("room") == self.room for k in c) \
-                    and math.dist((c[0]["x"], c[0]["y"]), (c[1]["x"], c[1]["y"])) >= 3.0:
-                self.p2_careless = {"id": "P2", "x": round(q[0], 2), "y": round(q[1], 2)}
-                return
+            # the spot must leave two well separated in-room candidates not once but under range noise too,
+            # so that the "cannot choose" moment holds still on the board
+            ok, sep = 0, 0.0
+            for trial in range(8):
+                jitter = 0.0 if trial == 0 else 0.15
+                rs = [{"puck": p["id"], "kind": "uwb", "d_m": math.dist((p["x"], p["y"]), ph) + rnd.gauss(0.0, jitter), "los": 0.9, "n": 5} for p in pk]
+                e = locate.estimate(ctx, pk, rs)
+                c = e.get("candidates") or []
+                if e.get("geometry") == "candidates" and len(c) == 2 and all(k.get("room") == self.room for k in c):
+                    d = math.dist((c[0]["x"], c[0]["y"]), (c[1]["x"], c[1]["y"]))
+                    if d >= 3.0:
+                        ok += 1
+                        sep = d if trial == 0 else sep
+            if best is None or (ok, sep) > best[0]:
+                best = ((ok, sep), q)
+            if ok == 8:
+                break
+        if best is not None and best[0][0] >= 6:
+            q = best[1]
+            self.p2_careless = {"id": "P2", "x": round(q[0], 2), "y": round(q[1], 2)}
 
     # ---- control
     def start(self) -> None:
@@ -235,12 +251,11 @@ class Story:
                 model = self.neighbour.get("model") or "phone"
                 self._say(5, "second phone", f"a second phone ({model}) reports from {nlabel}: it resolves the same way")
                 got = await self._wait(lambda: self._geom(nk) == "fix", 4.0, 8.0)
-                if not got and self.neighbour.get("uwb", True):
-                    # a puck's link is blocked (the holder's body, in the simulator): the app asks the occupant to hold the phone up
-                    self._upsert(self.neighbour, pointing=True, camera_assist=True)
-                    self._say(5, "phone held up", "only one puck reaches that phone; the app asks the occupant to hold it up toward "
-                                                  "the door: its direction estimate turns the ring into a point")
-                    await self._wait(lambda: self._geom(nk) == "fix", 3.0, 8.0)
+                if not got:
+                    # No bearing fallback: an iPhone 14 or 15 reports no direction to an accessory. A ring stays a ring.
+                    g = self._geom(nk)
+                    self._say(5, "second phone", "only one puck reaches that phone, so it stays a ring: a third puck would decide"
+                              if g == "ring" else f"that phone stays {g}: the board does not guess")
 
             if self.out is not None:
                 ok_key = self.out["key"]

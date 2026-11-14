@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 12:50 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 12:55 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,7 +8,7 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 72% | Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging. |
+| Command board | `sandtable-live-fireground-twin/` | building | 72% | Sponsor keys arrived (Matterport, Vexcel; CoStar extract pending): three builders taking the layers live in private (nothing sponsor-derived is published). In parallel: the owner two-puck Beacon scene on the board, replay-deterministic script, board polish. Then recordings, replay checks, independent judge, packaging. |
 | Phones and pucks | `sandtable-beacon-victim-phones/` | building | 32% | building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
@@ -67,7 +67,7 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging.
+**Being worked on now:** Sponsor keys arrived (Matterport, Vexcel; CoStar extract pending): three builders taking the layers live in private (nothing sponsor-derived is published). In parallel: the owner two-puck Beacon scene on the board, replay-deterministic script, board polish. Then recordings, replay checks, independent judge, packaging.
 
 **Left to build (agents):**
 
@@ -90,10 +90,10 @@ Taken from each part's `project.json` at sync time.
 
 **Needed from you:**
 
-- CoStar toolkit and keys (COSTAR_API_KEY, COSTAR_BASE_URL, COSTAR_PROPERTY_ID; MATTERPORT_TOKEN_ID/SECRET/MODEL_ID; VEXCEL_API_KEY): see docs/TOOLKIT_SWAP.md
-- ANTHROPIC_API_KEY for live agent decisions with real phones (the recorded turns only cover the scripted simulator scene)
+- The CoStar Data Extract zip (the hackathon kit): put it under .secrets/costar-kit/ on the build machine, or unzip it on the laptop and set COSTAR_KIT_DIR
+- On the laptop: copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost)
+- ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)
 - Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for
-- Confirmation of the sponsors' terms before any live sponsor response is committed (keep them under fixtures/live/ or data/ until then)
 
 **Finished:**
 

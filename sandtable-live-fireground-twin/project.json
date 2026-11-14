@@ -51,7 +51,7 @@
   "status": "building",
   "progress": {
     "percent": 72,
-    "phase": "Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging.",
+    "phase": "Sponsor keys arrived (Matterport, Vexcel; CoStar extract pending): three builders taking the layers live in private (nothing sponsor-derived is published). In parallel: the owner two-puck Beacon scene on the board, replay-deterministic script, board polish. Then recordings, replay checks, independent judge, packaging.",
     "done": [
       "Crew tracking product with pre-plan agent, mayday exercise, replayed real-model runs (morning)",
       "Real open-data fixture for 7325 Medical Center Dr, footprint-fitted synthetic twin, spatial engine",
@@ -79,12 +79,12 @@
       "7. No hardware for Scout (radar) or Crews (tags): both run simulated only on these boards."
     ],
     "needs_from_owner": [
-      "CoStar toolkit and keys (COSTAR_API_KEY, COSTAR_BASE_URL, COSTAR_PROPERTY_ID; MATTERPORT_TOKEN_ID/SECRET/MODEL_ID; VEXCEL_API_KEY): see docs/TOOLKIT_SWAP.md",
-      "ANTHROPIC_API_KEY for live agent decisions with real phones (the recorded turns only cover the scripted simulator scene)",
-      "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for",
-      "Confirmation of the sponsors' terms before any live sponsor response is committed (keep them under fixtures/live/ or data/ until then)"
+      "The CoStar Data Extract zip (the hackathon kit): put it under .secrets/costar-kit/ on the build machine, or unzip it on the laptop and set COSTAR_KIT_DIR",
+      "On the laptop: copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost)",
+      "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
+      "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T12:44:05-06:00"
+    "updated": "2026-11-14T12:52:35-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",

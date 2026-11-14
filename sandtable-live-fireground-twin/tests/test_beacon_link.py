@@ -112,7 +112,14 @@ def test_rescue_of_a_phone_with_a_fix_then_out_ends_through_all_out():
     assert r.inc.phones["B1"]["status"] == "reached" and r.kinds()[-1] == "phone_reached" and r.situations[-1]["data"]["people"] == 2
     r.inc.assign("RIT", "exit", "exit")
     r.step(40)
-    assert r.inc.phones["B1"]["status"] == "out" and r.inc.phase == "terminated" and r.kinds()[-1] == "all_out"
+    assert r.inc.phones["B1"]["status"] == "out" and r.inc.phase != "terminated"          # other phones still inside: not over
+    for pid in sorted(r.inc.phones):
+        if pid != "B1":
+            r.inc.hand_over(pid, "test")
+    r.step(1)
+    assert r.inc.phase == "terminated" and r.kinds()[-1] == "all_out"
+    par = next(e["text"] for e in r.inc.timeline if e["kind"] == "par")
+    assert "Handed over" in par and "B2" in par
 
 
 def test_feeds_draw_phones_as_what_they_are():

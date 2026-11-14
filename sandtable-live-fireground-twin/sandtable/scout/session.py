@@ -28,6 +28,8 @@ from .. import config
 
 log = logging.getLogger("sandtable.scout")
 SAMPLE_SCAN = config.FIXTURES / "scout" / "sample_scan.json"
+DEMO_SCENE = config.FIXTURES / "scout" / "demo_scene.json"          # the demo seed, chosen once at build time (scripts/choose_scout_seed.py)
+ABLATION = config.RESULTS_DIR / "scout_ablation.json"               # the measured detection rate over many simulated throws
 PHASES = ("idle", "thrown", "ranging", "located", "registered", "scanning", "done", "failed")
 BASE_LIMITS = [
     "A coarse echo map and outline, not a LiDAR-grade model",
@@ -135,6 +137,31 @@ def _r(v, nd=2):
     return None if v is None else round(float(v), nd)
 
 
+def demo_seed(room: str, n_pucks: int) -> int:
+    """The build-time demo seed for this room and puck count (fixtures/scout/demo_scene.json), else 310."""
+    try:
+        d = json.loads(DEMO_SCENE.read_text(encoding="utf-8"))
+        if d.get("room") == room and int(d.get("n_pucks") or 0) == n_pucks:
+            return int(d["seed"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return 310
+
+
+def detection_rate(n_pucks: int) -> str | None:
+    """'in simulation the radar finds a breathing person in about N of M throws' from results/scout_ablation.json, when it exists."""
+    try:
+        d = json.loads(ABLATION.read_text(encoding="utf-8"))
+        row = ((d.get("per_pucks") or {}).get(str(n_pucks)) or {}).get("reach") or {}
+        hit = row.get("within_1.0m") or row.get("reported") or {}
+        if hit.get("n"):
+            return (f"In simulation the radar finds a breathing person in about {hit['k']} of {hit['n']} throws of {n_pucks} pucks "
+                    f"(within 1 m; results/scout_ablation.json). This demo throw was chosen as one where it does")
+    except (OSError, ValueError, AttributeError, TypeError):
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------- the session
 class ScoutSession:
     def __init__(self, twin, provider, emit: Callable[[dict], None], incident=None, clock: Callable[[], float] = time.time):
@@ -155,7 +182,7 @@ class ScoutSession:
     def running(self) -> bool:
         return self.phase not in ("idle", "done", "failed") or bool(self._task and not self._task.done())
 
-    def start(self, room_id: str | None = None, n_pucks: int = 5, seed: int = 310) -> asyncio.Task:
+    def start(self, room_id: str | None = None, n_pucks: int = 5, seed: int | None = None) -> asyncio.Task:
         """Starts deploy() as a background task (what the server and the exercise script call)."""
         if self.running:
             raise RuntimeError("a scan is already running")
@@ -185,8 +212,10 @@ class ScoutSession:
         return {**self._truth, "note": "SIMULATION GROUND TRUTH for evaluation scripts only. Never shown as a result.", "scan_id": (self.scan or {}).get("id")}
 
     # ---- the pipeline
-    async def deploy(self, room_id: str | None = None, n_pucks: int = 5, seed: int = 310) -> dict:
+    async def deploy(self, room_id: str | None = None, n_pucks: int = 5, seed: int | None = None) -> dict:
         room = room_id or fire_room(self.twin, self.provider)
+        if seed is None:
+            seed = demo_seed(room, int(n_pucks))
         self.twin.room(room)                                           # validates the reference
         self.room, self._truth, self.fallback_reason, self.pucks = room, None, None, []
         self._n += 1
@@ -367,6 +396,9 @@ class ScoutSession:
         limits = list(BASE_LIMITS)
         limits.insert(0, "SIMULATED: no puck has been built; ranges and radar frames come from the simulator" +
                       (f" (noise model: {json.dumps(_jsonable(noise), sort_keys=True)})" if noise else ""))
+        rate = detection_rate(len(pucks))
+        if rate:
+            limits.insert(1, rate)
         if vic.get("why"):
             limits.append(vic["why"])
         if len(pucks) == 2:
@@ -386,7 +418,7 @@ class ScoutSession:
             "mismatches": _jsonable(mm or []),
             "resolution": {"range_m": round(float(tap) * 0.299792458, 2) if tap else None, "bandwidth_mhz": meta.get("bandwidth_mhz"),
                            "tap_ns": tap, "carrier_mhz": meta.get("carrier_mhz")},
-            "limits": limits,
+            "limits": limits, "seed": sc.get("seed"),
             "timing": {**timing, "scan_s": dur, "shown_s": show, "compressed": True, "frame_hz": meta.get("frame_hz") or sc.get("frame_hz")},
         }
         return self._decorate(_jsonable(scan), room_hint=room)

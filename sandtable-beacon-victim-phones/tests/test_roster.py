@@ -231,7 +231,7 @@ def test_record_check_when_a_vacant_suite_has_phones_or_devices(twin, site):
     ra, rb = suite_rooms(twin)[a]["id"], suite_rooms(twin)[b]["id"]
     acc = roster.accountability(site, twin, FLOOR, [fix("B1", ra, people=1)], [cold("C1", rb, 2)], [puck(twin)])
     checks = {c["suite"]: c["text"] for c in acc["record_checks"]}
-    assert a in checks and "vacant on record" in checks[a] and "people report" in checks[a]
+    assert a in checks and "vacant on record" in checks[a] and "1 person reports from it" in checks[a]
     assert b in checks and "devices" in checks[b]
     assert row(acc, a)["state"] == "people-reported"
     assert row(acc, b)["state"] == "devices-heard"

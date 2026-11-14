@@ -76,10 +76,11 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
       return false;
     };
     // the published geometry can change back and forth for a moment: shoot only once it has held still
-    const held = async (geometry, holdMs, timeout) => {
+    const held = async (geometry, holdMs, timeout, step = null) => {
       const end = Date.now() + timeout;
       let since = null;
       while (Date.now() < end) {
+        if (step !== null && ((await story()).step || 0) > step) return false;
         const b = await get("/api/beacons");
         const ok = (b.phones || []).some((p) => p.geometry === geometry);
         since = ok ? since || Date.now() : null;
@@ -88,10 +89,10 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
       }
       return false;
     };
-    if (await stepAnd(2, "ring", "a ring") && await held("ring", 1800, 8000)) await shot(board, "01_ring");
-    let gotChoose = false;
-    if (await stepAnd(3, "candidates", "two candidates") && await held("candidates", 1800, 8000)) { await shot(board, "02_cannot_choose"); gotChoose = true; }
-    if (await stepAnd(4, "fix", "a fix from two pucks") && await held("fix", 2200, 9000)) await shot(board, "03_fix_two_pucks");
+    if (await stepAnd(2, "ring", "a ring") && await held("ring", 1800, 8000, 2)) await shot(board, "01_ring");
+    let gotChoose = false, gotFix = false;
+    if (await stepAnd(3, "candidates", "two candidates") && await held("candidates", 1800, 8000, 3)) { await shot(board, "02_cannot_choose"); gotChoose = true; }
+    if (await stepAnd(4, "fix", "a fix from two pucks") && await held("fix", 2200, 9000, 4)) { await shot(board, "03_fix_two_pucks"); gotFix = true; }
     if (await stepAnd(7, null, "the accountability step", 60000)) {
       await sleep(3000);
       await board.hover("table.acct tbody tr.r1").catch(() => {});
@@ -99,10 +100,10 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
     }
     const end = Date.now() + 100000;
     while (Date.now() < end) { const st = await story(); if (st.done || !st.running) break; await sleep(1000); }
-    if (!gotChoose) {
+    if (!gotChoose || !gotFix) {
       // the walk-through did not leave two candidates on this engine: stage the careless layout by hand, derived from
       // the fire room's own box (two pucks on a line through the middle of the room, the phone off that line)
-      console.log("  staging the careless two-puck layout by hand for ui_02_cannot_choose");
+      console.log("  staging the two-puck layouts by hand (careless, then slid to the wall) for the missing shots");
       await post("/api/reset");
       const bundle = await get("/api/bundle");
       const roomId = bundle.config.room, room = bundle.twin.rooms.find((r) => r.id === roomId);
@@ -116,7 +117,18 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
       const end2 = Date.now() + 20000;
       while (Date.now() < end2) { const b = await get("/api/beacons"); if ((b.phones || []).some((p) => p.geometry === "candidates")) break; await sleep(300); }
       await sleep(2500);
-      await shot(board, "02_cannot_choose");
+      if (!gotChoose) await shot(board, "02_cannot_choose");
+      if (!gotFix) {
+        // slide P2 to where the recommended layout puts it (along the door wall): the mirror spot leaves the room
+        const lay = await get(`/api/layout?room=${encodeURIComponent(roomId)}&n=2`).catch(() => null);
+        if (lay && (lay.pucks || []).length >= 2) {
+          await post("/api/pucks", { pucks: lay.pucks.map((q) => ({ id: q.id, x: q.x, y: q.y })), merge: true });
+          const end3 = Date.now() + 20000;
+          let since = null;
+          while (Date.now() < end3) { const b = await get("/api/beacons"); const ok = (b.phones || []).some((p) => p.geometry === "fix"); since = ok ? since || Date.now() : null; if (since && Date.now() - since > 2200) break; await sleep(250); }
+          await shot(board, "03_fix_two_pucks");
+        }
+      }
       await post("/api/sim/phone", { key: "shots-careless", remove: true });
     }
     const agent = await get("/api/agent").catch(() => null);

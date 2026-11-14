@@ -198,8 +198,9 @@ class AppState:
             return out
         people = []
         for e in sorted(inc.phones.values(), key=lambda q: q["id"]):
-            rp = (raw_phones.get(e["id"]) or {}).get("report") or {}
-            gd = phone_geometry(raw_phones.get(e["id"])) or {}
+            rp = (e.get("raw") or raw_phones.get(e["id"]) or {}).get("report") or {}
+            raw = e.get("raw") or raw_phones.get(e["id"])
+            gd = phone_geometry(raw) or {}
             reasons = [q.get("reason") or "" for q in gd.get("pruned") or []]
             searched = [r for r in reasons if r.startswith("searched by")]
             how = (f"two candidates; a crew's search removed one ({searched[0]})" if searched else
@@ -210,7 +211,7 @@ class AppState:
                            "how_found": how,
                            "report": {"status": e.get("report_status"), "people": e.get("people"), "can_move": e.get("can_move"), "text": rp.get("text")},
                            "where": e.get("label"), "room": e.get("room"), "room_label": e.get("room_label"), "geometry": e.get("geometry"),
-                           "geometry_detail": phone_geometry(raw_phones.get(e["id"])), "text": e.get("text"),
+                           "geometry_detail": gd, "text": e.get("text"),
                            "located_t_rel": rel(e.get("located_t")), "assigned": e.get("rescuer"), "assigned_t_rel": rel(e.get("assigned_t")),
                            "reached_t_rel": rel(e.get("reached_t")), "out_t_rel": rel(e.get("out_t")), "simulated": e.get("simulated", True), "sample": e.get("sample", False)})
         scan_v = {v["id"]: v for v in (inc.scan or {}).get("victims") or []}
@@ -498,7 +499,7 @@ async def scout_deploy(request: Request):
         if room:
             s.twin.room(room)
         n = int(body.get("n") or 5)
-        seed = int(body.get("seed") or 310)
+        seed = int(body["seed"]) if body.get("seed") is not None else None      # None: the build-time demo seed
     except (TypeError, ValueError) as exc:
         raise HTTPException(400, str(exc))
     if not 1 <= n <= 8:

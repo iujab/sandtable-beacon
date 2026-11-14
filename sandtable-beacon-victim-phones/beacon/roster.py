@@ -305,7 +305,7 @@ def accountability(site: dict, twin, floor: str | None, phones: list[dict], pres
         if r["vacant"] and (r["phones_opt_in"] > 0 or r["cold_devices"] > 0):
             record_checks.append({"suite": r["suite"], "room": r["room"],
                                   "text": f"Suite {r['suite']} is vacant on record but "
-                                          + (f"{r['people_reported']} people report from it" if r["phones_opt_in"] else f"about {r['cold_devices']} devices are heard in it")
+                                          + (f"{r['people_reported']} {'person reports' if r['people_reported'] == 1 else 'people report'} from it" if r["phones_opt_in"] else f"about {r['cold_devices']} devices are heard in it")
                                           + ": verify the record"})
         r["_score"], r["_action"], r["why"] = score, action, why
 

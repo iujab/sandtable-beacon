@@ -1,7 +1,7 @@
 {
  "command": "bash run_tests.sh",
- "passed": 148,
- "failed": 0,
- "duration_s": 85,
- "last_run": "2026-11-14T12:40:16-0600"
+ "passed": 147,
+ "failed": 1,
+ "duration_s": 76,
+ "last_run": "2026-11-14T12:54:37-0600"
 }

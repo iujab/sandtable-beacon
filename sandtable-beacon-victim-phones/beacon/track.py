@@ -16,13 +16,18 @@ from collections import deque
 
 from . import locate, models
 
-__all__ = ["PhoneTrack", "LINK_STALE_S", "BEARING_FRESH_S", "UWB_WINDOW", "BLE_WINDOW", "HOLD_N"]
+__all__ = ["PhoneTrack", "LINK_STALE_S", "BEARING_FRESH_S", "UWB_WINDOW", "BLE_WINDOW", "HOLD_N", "HOLD_DOWN_N"]
 
 LINK_STALE_S = 5.0
 BEARING_FRESH_S = 3.0
 UWB_WINDOW = 7
 BLE_WINDOW = 10
 HOLD_N = 2
+# Demotion is slower than promotion: with an unchanged set of pucks and links, a published geometry is replaced by a
+# weaker one (fix -> candidates -> ring -> zone) only after HOLD_DOWN_N consecutive estimates, so that a borderline
+# posterior does not flicker on the board. When the pucks or the links change, HOLD_N applies (the evidence changed).
+HOLD_DOWN_N = 6
+_RANK = {"none": 0, "zone": 1, "ring": 2, "candidates": 3, "fix": 4}
 REPORT_FRESH_S = 10.0
 MOVE_WINDOW_S = 3.0          # range history looked at for `moving`
 MOVE_RANGE_M = 0.6           # a smoothed range changing by more than this within MOVE_WINDOW_S means the phone moves
@@ -191,8 +196,13 @@ class PhoneTrack:
             return self._finish(est, ranges, bearing, now, noise)
         est = locate.estimate(ctx, pucks, ranges, bearing, prior, noise, want_heat=want_heat)
         g = est["geometry"]
+        by_id = {p["id"]: p for p in pucks or []}
+        sig = (frozenset((r["puck"], r["kind"], round(float(by_id[r["puck"]]["x"]), 1), round(float(by_id[r["puck"]]["y"]), 1)) for r in ranges),
+               bearing["puck"] if bearing else None)
+        same_evidence = sig == getattr(self, "_published_sig", None)     # same pucks and links as when the geometry was published
         if self.published is None or g == self.published["geometry"]:
             self.published = est
+            self._published_sig = sig
             self._pending_geom, self._pending_n = None, 0
             held = False
         else:
@@ -200,8 +210,11 @@ class PhoneTrack:
                 self._pending_n += 1
             else:
                 self._pending_geom, self._pending_n = g, 1
-            if self._pending_n >= HOLD_N:
+            weaker = _RANK.get(g, 0) < _RANK.get(self.published["geometry"], 0)
+            need = HOLD_DOWN_N if (weaker and same_evidence) else HOLD_N
+            if self._pending_n >= need:
                 self.published = est
+                self._published_sig = sig
                 self._pending_geom, self._pending_n = None, 0
                 held = False
             else:

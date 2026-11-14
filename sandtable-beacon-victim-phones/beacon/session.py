@@ -696,7 +696,8 @@ class BeaconSession:
                 raise ValueError(f"obs[{i}]: {exc}")
             # The iOS app re-sends each board's latest reading (with its original time) in every batch for up to 25 s,
             # because boards are shared by taking turns: the same reading must count once.
-            if o["kind"] in ("uwb", "sos", "bearing") and item.get("t") is not None:
+            mapped = o.get("puck") is not None or o.get("accessory") in self._accessories
+            if mapped and o["kind"] in ("uwb", "sos", "bearing") and item.get("t") is not None:
                 key = (o.get("eid"), o["kind"], o.get("accessory") or o.get("puck"))
                 if key in seen and o["t"] <= seen[key]:
                     skipped += 1
@@ -746,6 +747,7 @@ class BeaconSession:
     def reset(self) -> None:
         with self._lock:
             self._pending.clear()
+            self.__dict__.pop("_seen_readings", None)
             self._clear()
             self._persist()
             self._latest = self._build(time.time(), [], [])

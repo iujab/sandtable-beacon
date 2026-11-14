@@ -84,13 +84,19 @@ def test_replay_hit_reproduces_the_recorded_sample_plan(sample, tmp_path):
     assert plan["orders"] and plan["priorities"] and plan["limits_acknowledged"]
 
 
-def test_replay_hit_reproduces_the_recorded_scene_plan(scene, tmp_path):
-    rec = INDEX["runs"]["suite-310"]
-    plan, _msgs, agent = run(scene, LLM("replay"), tmp_path)
+@pytest.mark.parametrize("name", ["suite-310", "suite-310+309"])
+def test_replay_hit_reproduces_the_recorded_scene_plans(name, tmp_path):
+    if not HAVE_SIM:
+        pytest.skip("simulator or locator not available")
+    rec = INDEX["runs"][name]
+    plan, _msgs, agent = run(_script().situation_source(name), LLM("replay"), tmp_path)
     if plan["backend"] != "replay":
-        pytest.fail("the recorded suite-310 run no longer replays: the scenario, simulator or locator changed; "
-                    "re-record with `LLM_BACKEND=claude-cli .venv/bin/python scripts/record_agent.py --situation suite-310`")
+        pytest.fail(f"the recorded {name} run no longer replays: the scenario, simulator or locator changed; "
+                    f"re-record with `LLM_BACKEND=claude-cli .venv/bin/python scripts/record_agent.py --situation {name}`")
     assert comparable(plan) == rec["plan"]
+    if name == "suite-310+309":                                # the record disagrees with the phones: the model filed it
+        assert [c["suite"] for c in plan["record_checks"]] == ["309"]
+        assert plan["record_checks"][0]["status"] == "filed locally (fixture mode)"
 
 
 def test_every_recorded_file_is_one_real_reply_of_an_indexed_run():
@@ -139,12 +145,14 @@ def test_llm_error_gives_the_labelled_fallback(sample, tmp_path):
 
 
 def test_fallback_files_the_record_disagreements(tmp_path, twin):
-    brief = brief_of(json.loads(config.SAMPLE_JSON.read_text(encoding="utf-8")))
-    brief = json.loads(json.dumps(brief))
-    for p in brief["phones"]:
+    from beacon import roster
+    b = json.loads(config.SAMPLE_JSON.read_text(encoding="utf-8"))
+    for p in b["phones"]:
         if p["id"] == "B4":
             p["report"]["home_suite"] = "309"                  # a user registered to a suite the record lists as vacant
-    plan, _msgs, _agent = run(brief, LLM("replay", cache_dir=tmp_path / "empty"), tmp_path)
+    b["accountability"] = roster.accountability(config.site_raw(), twin, b["floor"], b["phones"], b["presence"], b["pucks"],
+                                                labels=config.labels(), focus_room=b["room"])
+    plan, _msgs, _agent = run(b, LLM("replay", cache_dir=tmp_path / "empty"), tmp_path)
     assert [c["suite"] for c in plan["record_checks"]] == ["309"]
     assert plan["record_checks"][0]["status"] == "filed locally (fixture mode)"
     filed = json.loads((tmp_path / "data" / "record_checks.json").read_text(encoding="utf-8"))

@@ -489,8 +489,9 @@ class ToolBox:
         prop = self.site.get("property") or {}
         try:
             from . import roster
-            factors = {k: v["sf_per_person"] for k, v in roster.LOAD_FACTORS_SF.items()}
-            util = {"open_hours_share": roster.UTILISATION_OPEN, "closed_hours_share": roster.UTILISATION_CLOSED, "open_hours": list(roster.OPEN_HOURS)}
+            factors = {k: int(round(v["sf_per_person"])) for k, v in roster.LOAD_FACTORS_SF.items()}
+            util = {"open_hours_pct": int(round(100 * roster.UTILISATION_OPEN)), "outside_open_hours_pct": int(round(100 * roster.UTILISATION_CLOSED)),
+                    "open_hours": f"{int(roster.OPEN_HOURS[0]):02d}:00 to {int(roster.OPEN_HOURS[1]):02d}:00 local"}
         except Exception:
             factors, util = None, None
         return {"record": self._record_label(), "floor": self._floor_label(),

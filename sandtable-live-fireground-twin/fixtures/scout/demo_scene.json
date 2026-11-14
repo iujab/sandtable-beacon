@@ -1,0 +1,20 @@
+{
+ "schema": "sandtable.scout_demo_scene/1",
+ "room": "r310",
+ "n_pucks": 5,
+ "seed": 310,
+ "rule": "the first seed from 310 upward for which the full pipeline locates a breathing person within 0.6 m of the simulator's truth",
+ "tried": [
+  {
+   "seed": 310,
+   "located": true,
+   "error_m": 0.34,
+   "truth_bpm": 13.7,
+   "reported_bpm": 14.4
+  }
+ ],
+ "found_on_try": 1,
+ "simulated": true,
+ "note": "Chosen once at build time by scripts/choose_scout_seed.py, never at run time. The detection rate over many throws is in results/scout_ablation.json and in every scan's limits.",
+ "generated": "2026-11-14T12:53:15-0600"
+}

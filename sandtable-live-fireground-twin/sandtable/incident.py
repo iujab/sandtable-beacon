@@ -298,6 +298,9 @@ class Incident:
                         v["status"], v["reached_t"], v["rescuer"] = "reached", self.clock(), r["id"]
                         if self.phase in ("operations", "rescue"):
                             self.phase = "egress"
+                        for other in crews:                           # anyone else sent to the same person stands down where they are
+                            if other is not r and (other["assignment"] or {}).get("target") == v["id"]:
+                                self.assign(other["id"], "hold", source="reflex")
                         if v.get("kind") == "phone":
                             self._log("phone", f"{r['label']} has reached phone {v['id']} in {v['room_label']}: {v['what']}", r["id"])
                             self._situation("phone_reached", r["id"], {"phone": v["id"], "rescuer": r["id"], "geometry": v["geometry"], "room": v["room"],
@@ -485,6 +488,7 @@ class Incident:
                 task = (self.units[e["rescuer"]]["assignment"] or {}).get("task") or "rescue"
                 self.assign(e["rescuer"], task, p["id"], source="reflex")
             e["detail"] = self._phone_detail(p, tgt)
+            e["raw"] = p                                        # the phone as last seen while it was a target (the report draws it)
             e.update({"geometry": geom, "method": p.get("method"), "report_status": status, "people": people, "can_move": rep.get("can_move"),
                       "what": what, "text": p.get("text"), "state": status, "confidence": p.get("confidence"), "simulated": bool(obj.get("simulated", True)),
                       "sample": bool(obj.get("sample"))})

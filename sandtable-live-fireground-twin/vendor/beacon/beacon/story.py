@@ -120,15 +120,15 @@ class Story:
         ctx = locate.Context(tw, floor=self.floor)
         ph = (float(self.trapped["x"]), float(self.trapped["y"]))
         rnd = random.Random(310)
-        best = None
+        shortlist = []
         for q in pts[:80]:
             pk = [self.p1, {"id": "P2", "x": q[0], "y": q[1]}]
-            # the spot must leave two well separated in-room candidates not once but under range noise too,
-            # so that the "cannot choose" moment holds still on the board
+            # the spot must leave two well separated in-room candidates not once but under range noise too
             ok, sep = 0, 0.0
             for trial in range(8):
-                jitter = 0.0 if trial == 0 else 0.15
-                rs = [{"puck": p["id"], "kind": "uwb", "d_m": math.dist((p["x"], p["y"]), ph) + rnd.gauss(0.0, jitter), "los": 0.9, "n": 5} for p in pk]
+                jitter = 0.0 if trial == 0 else 0.12
+                # distance only, as a real iPhone session delivers it (no line-of-sight value)
+                rs = [{"puck": p["id"], "kind": "uwb", "d_m": math.dist((p["x"], p["y"]), ph) + rnd.gauss(0.0, jitter), "n": 5} for p in pk]
                 e = locate.estimate(ctx, pk, rs)
                 c = e.get("candidates") or []
                 if e.get("geometry") == "candidates" and len(c) == 2 and all(k.get("room") == self.room for k in c):
@@ -136,13 +136,58 @@ class Story:
                     if d >= 3.0:
                         ok += 1
                         sep = d if trial == 0 else sep
-            if best is None or (ok, sep) > best[0]:
-                best = ((ok, sep), q)
-            if ok == 8:
-                break
-        if best is not None and best[0][0] >= 6:
-            q = best[1]
-            self.p2_careless = {"id": "P2", "x": round(q[0], 2), "y": round(q[1], 2)}
+            if ok >= 7:
+                shortlist.append((sep, q))
+        if not shortlist:
+            return
+        # Second pass: play the short list through the real pipeline (simulated world, tracker, the phone's own key and
+        # seed) and keep the spot where "two candidates" appears soonest and holds: the "cannot choose" moment must not
+        # flicker on the board.
+        shortlist.sort(reverse=True)
+        best = None
+        try:
+            from . import sim
+            from .track import PhoneTrack
+            for _sep, q in shortlist[:6]:
+                w = sim.World(tw, seed=int(getattr(self.state.world, "seed", config.SIM_SEED)))
+                w.set_pucks([{"id": "P1", "x": self.p1["x"], "y": self.p1["y"]}])
+                tp = self.trapped
+                w.upsert_phone(tp["key"], ph[0], ph[1], opt_in=True, uwb=True, chip=tp.get("chip") or "U1", model=tp.get("model"),
+                               report=dict(tp.get("report") or {}))
+                tr, t, k, seq = None, 1000.0, 0, []
+
+                def run(dur, keep):
+                    nonlocal tr, t, k
+                    end = t + dur
+                    while t < end:
+                        t += 0.1
+                        k += 1
+                        for o in w.step(t):
+                            if o.get("eid") and o.get("kind") in ("uwb", "sos", "bearing", "report"):
+                                if tr is None:
+                                    tr = PhoneTrack(o["eid"])
+                                tr.add(o)
+                        if tr is not None and k % 3 == 0:
+                            g = tr.estimate(ctx, w.pucks, t)["geometry"]
+                            if keep:
+                                seq.append(g)
+
+                run(3.0, False)
+                w.set_pucks([{"id": "P1", "x": self.p1["x"], "y": self.p1["y"]}, {"id": "P2", "x": q[0], "y": q[1]}])
+                if tr is not None:
+                    for pid in ("P1", "P2"):
+                        tr.forget_puck(pid, t)
+                run(7.0, True)
+                tail = seq[5:]                      # after the first second and a half
+                share = (sum(1 for g in tail if g == "candidates") / len(tail)) if tail else 0.0
+                if best is None or share > best[0]:
+                    best = (share, q)
+                if share >= 0.99:
+                    break
+        except Exception:
+            log.exception("careless-spot rehearsal failed; using the first short-listed spot")
+        q = best[1] if best is not None and best[0] >= 0.8 else shortlist[0][1]
+        self.p2_careless = {"id": "P2", "x": round(q[0], 2), "y": round(q[1], 2)}
 
     # ---- control
     def start(self) -> None:

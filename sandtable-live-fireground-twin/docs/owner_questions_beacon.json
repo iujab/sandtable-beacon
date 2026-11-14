@@ -1,7 +1,7 @@
 {
  "source": "lane L16's project.json (the Beacon module, vendored in vendor/beacon/)",
- "vendored": "2026-11-14T13:44:26-0600",
- "commit": "c3bbf8fd9975a1f6fca8e3bc374447624ee8ac28",
+ "vendored": "2026-11-14T14:22:31-0600",
+ "commit": "095fd6736b8c58f65ace804557286a4951bb645b",
  "owner_questions": [
   {
    "q": "Can a UWB board range a victim's phone over UWB at all?",
@@ -13,7 +13,7 @@
   },
   {
    "q": "One puck or two for angle?",
-   "a": "Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room: one position in 77% of cases (48% by the twin's walls alone, 29% after the occupant's stated suite, shown as dismissed), median error 0.26 m, a wrong position in 1.1%; the rest stay a ring because only one puck reached the phone. Pucks dropped mid-room: one position in only 18%, and the board says 'cannot choose' in 57%. Better if you have it: a third puck gives one position in 88% with 0.20 m median error and no assumption. An iPhone 14 or 15 reports no direction to an accessory, so do not count on the phone's bearing."
+   "a": "Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks, and an iPhone 14 or 15 reports no direction that could choose. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room, with what a real iPhone delivers (distance only): one position in 76% of cases (35% because the twin rules the mirror spot out, 42% after the occupant's stated suite, shown as dismissed), median error 0.26 m, 1.5% of the positions shown wrong; the rest stay a ring (one puck did not reach the phone) or two spots. Pucks dropped mid-room: one position in only 4%, and the board says 'cannot choose' in 86%. Caveat: if the occupant states the wrong suite, the few positions that then appear are wrong. Better if you have it: a third puck gives one position in 84% with 0.20 m median error."
   },
   {
    "q": "Will the phone keep answering with the screen off?",
@@ -21,7 +21,7 @@
   },
   {
    "q": "Can we put both UWB boards on one device we throw in?",
-   "a": "It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the bearing error is 22, 17 and 14 degrees (median), the sideways error 1.7, 1.3 and 1.3 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 5 degrees and 0.38 m sideways."
+   "a": "It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the median bearing error is 37, 19 and 22 degrees (10 cm is no better than guessing), the sideways error 2.2, 1.5 and 1.4 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 7 degrees and 0.47 m sideways."
   },
   {
    "q": "Two pucks: one on a battery bank with the UNO Q, one powered by the Android phone?",
@@ -33,7 +33,7 @@
   },
   {
    "q": "Two victims' iPhones on two pucks at once?",
-   "a": "One iPhone can range both pucks at once. One board, on Qorvo's stock firmware, serves only one phone at a time (forum reports). So for two victims either the phones take turns (a switch in our app: each phone ranges a board for about 4 seconds and releases it; untested), or each puck position carries two boards, one per phone (you have five boards; continuous ranging, no turn-taking). Prove one phone on both pucks first."
+   "a": "One iPhone can range both pucks at once. One board, on Qorvo's stock firmware, serves only one phone at a time (forum reports). So for two victims either the phones take turns (a switch in our app; simulated: a position after 3.5 s in the median, 9 s at the 90th percentile, and 23% of phones still without one after 24 s; untested on hardware), or each puck position carries two boards, one per phone (you have five boards; continuous ranging, no turn-taking). Prove one phone on both pucks first."
   },
   {
    "q": "Where does the server run at the table, and how do the iPhones reach it?",

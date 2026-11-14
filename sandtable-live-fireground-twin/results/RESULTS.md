@@ -11,29 +11,29 @@ From `vendor/beacon/results/eval_beacon.json`, made by lane L16's `scripts/eval_
 | Method | Pucks | Twin used | What was published: fix / candidates / ring / zone / nothing | Fix error, median (p90) | Truth inside what was published | Wrong fixes (of all trials) | Room right |
 |---|---|---|---|---|---|---|---|
 | UWB range (app) | 1 | yes | 0% / 0% / 73% / 14% / 12% | no fixes | 85% | 0% | 8% |
-| UWB range (app) | 2 | no | 11% / 41% / 43% / 0% / 4% | 0.48 m (1.03 m) | 96% | 0% | no room published |
-| UWB range (app) | 2 | yes | 28% / 22% / 36% / 10% / 4% | 0.49 m (1.09 m) | 94% | 0% | 90% |
-| UWB range (app) | 3 | no | 51% / 10% / 39% / 0% / 0% | 0.28 m (0.83 m) | 91% | 3% | no room published |
-| UWB range (app) | 3 | yes | 53% / 7% / 32% / 8% / 0% | 0.28 m (0.78 m) | 91% | 2% | 93% |
-| UWB range (app) | 5 | yes | 61% / 3% / 29% / 7% / 0% | 0.19 m (0.64 m) | 97% | 0% | 95% |
-| Bluetooth signal strength (app) | 1 | yes | 0% / 0% / 30% / 53% / 17% | no fixes | 63% | 0% | 42% |
-| Bluetooth signal strength (app) | 3 | yes | 13% / 1% / 49% / 34% / 2% | 1.45 m (2.42 m) | 78% | 0% | 60% |
+| UWB range (app) | 2 | no | 2% / 56% / 38% / 0% / 4% | 0.41 m (0.57 m) | 96% | 0% | no room published |
+| UWB range (app) | 2 | yes | 3% / 40% / 42% / 10% / 4% | 0.38 m (0.56 m) | 93% | 0% | 86% |
+| UWB range (app) | 3 | no | 47% / 13% / 40% / 0% / 0% | 0.27 m (0.76 m) | 92% | 2% | no room published |
+| UWB range (app) | 3 | yes | 46% / 9% / 38% / 8% / 0% | 0.28 m (0.76 m) | 93% | 1% | 92% |
+| UWB range (app) | 5 | yes | 60% / 3% / 30% / 7% / 0% | 0.21 m (0.67 m) | 97% | 0% | 95% |
+| Bluetooth signal strength (app) | 1 | yes | 0% / 0% / 29% / 54% / 17% | no fixes | 63% | 0% | 43% |
+| Bluetooth signal strength (app) | 3 | yes | 12% / 2% / 49% / 34% / 2% | 1.79 m (2.45 m) | 78% | 0% | 60% |
 
-**Thrown pucks, two of them:** with UWB ranges from two pucks thrown from the door, using the twin's walls and outline raised the share of phones published as one point from 11% to 28% and cut the share left as two candidates from 41% to 22%; wrong fixes: 0% without the twin, 0% with it. A third puck without the twin published a point in 51% of trials.
+**Thrown pucks, two of them:** with UWB ranges from two pucks thrown from the door, using the twin's walls and outline raised the share of phones published as one point from 2% to 3% and cut the share left as two candidates from 56% to 40%; wrong fixes: 0% without the twin, 0% with it. A third puck without the twin published a point in 47% of trials.
 **Phones without the app** (cold Bluetooth count, 600 simulated 10 s windows): the published device band contained the true number of advertising devices in the room 60% of the time, and the count read zero while devices were present 37% of the time. This is why the board shows a count band and never people.
 
 **Two boards on one device, or separate pucks?** From `vendor/beacon/results/eval_layouts.json` (same simulator; phone 2 to 8 m away, 50 trials per row; rows with a phone bearing are in the file and left out here, because an iPhone 14 or 15 reports no direction to these boards):
 
 | Layout | Published as one point | Bearing error, median | Both mirror sides still open | Twin cut it to one point |
 |---|---|---|---|---|
-| two boards on one device, 0.1 m apart | 0% | 33 deg | 100% | 0% |
-| two boards on one device, 0.3 m apart | 0% | 17 deg | 100% | 0% |
-| two boards on one device, 0.5 m apart | 0% | 22.4 deg | 98% | 0% |
-| two separate pucks 2 m apart | 0% | 7.4 deg | 100% | 0% |
-| two separate pucks 3 m apart | 2% | 6 deg | 98% | 2% |
-| two separate pucks 4 m apart | 4% | 4.5 deg | 96% | 2% |
-| three separate pucks (thrown) | 58% | n/a | n/a | 0% |
-| one puck + the phone's bearing | 72% | n/a | n/a | 59% |
+| two boards on one device, 0.1 m apart | 0% | 36.9 deg | 100% | 0% |
+| two boards on one device, 0.3 m apart | 0% | 19 deg | 100% | 0% |
+| two boards on one device, 0.5 m apart | 0% | 21.6 deg | 98% | 0% |
+| two separate pucks 2 m apart | 0% | 8.1 deg | 100% | 0% |
+| two separate pucks 3 m apart | 2% | 6.7 deg | 98% | 2% |
+| two separate pucks 4 m apart | 4% | 4.2 deg | 96% | 2% |
+| three separate pucks (thrown) | 56% | n/a | n/a | 0% |
+| one puck + the phone's bearing | 63% | n/a | n/a | 50% |
 
 ### Two-puck demo: what the twin does with two pucks (lane L16's evaluation, SIMULATED)
 
@@ -49,18 +49,18 @@ Assumptions, as the file states them:
 
 | Layout | Trials | One point, by the twin alone | One point, after the occupant's stated suite | One point, total | Two places (cannot choose) | Ring or other | Wrong point (share of all trials) | Point error, median (p90) |
 |---|---|---|---|---|---|---|---|---|
-| door-wall | 800 | 37% | 24% | 61% | 19% | 21% | 1.1% | 0.26 m (0.76 m) |
-| exterior-wall | 800 | 71% | 0% | 71% | 11% | 18% | 1.6% | 0.25 m (0.79 m) |
-| careless | 800 | 4% | 0% | 4% | 86% | 10% | 0.0% | 0.28 m (0.66 m) |
-| three-pucks (door-wall pair + far corner) | 400 | 78% | 3% | 81% | 12% | 7% | 1.0% | 0.19 m (0.59 m) |
+| door-wall | 800 | 35% | 42% | 76% | 3% | 21% | 1.1% | 0.26 m (0.77 m) |
+| exterior-wall | 800 | 70% | 0% | 70% | 11% | 18% | 1.6% | 0.25 m (0.78 m) |
+| careless | 800 | 4% | 0% | 4% | 86% | 10% | 0.1% | 0.3 m (0.73 m) |
+| three-pucks (door-wall pair + far corner) | 400 | 78% | 6% | 84% | 8% | 8% | 1.0% | 0.2 m (0.59 m) |
 
 **When the occupant names the wrong suite** (the phone is really in a neighbouring room (r309, r311, within 6 m of the fire room) but the occupant says the fire room): how often the statement produced a wrong point.
 
 | Layout | Trials | Wrong point caused by the statement | Ring or other (no point) | Two places |
 |---|---|---|---|---|
-| door-wall | 300 | 4.0% | 92% | 3% |
-| exterior-wall | 300 | 0.0% | 98% | 1% |
-| careless | 300 | 0.7% | 89% | 11% |
+| door-wall | 300 | 6.0% | 92% | 1% |
+| exterior-wall | 300 | 0.0% | 99% | 1% |
+| careless | 300 | 0.0% | 89% | 11% |
 
 ### Scout: the pucks as a radar (SIMULATED)
 
@@ -110,11 +110,11 @@ From `results/replay_check_*.json` (`scripts/check_replay.py`, run against a liv
 | mayday | guided | 4A1T | 68.6 s | 5 / 0 / 0 | none |
 | mayday | hands-free | 3A2T | 75.9 s | 5 / 0 / 0 | none |
 | mayday | hands-free | 4A1T | 75.9 s | 5 / 0 / 0 | none |
-| beacon | hands-free | 3A2T | 87.0 s | 7 / 0 / 0 | none |
+| beacon | hands-free | 3A2T | 87.9 s | 7 / 0 / 0 | none |
 | mayday | hands-free | 3A2T | 81.4 s | 5 / 0 / 0 | none |
-| scout | hands-free | 3A2T | 71.1 s | 4 / 0 / 0 | none |
+| scout | hands-free | 3A2T | 72.1 s | 4 / 0 / 0 | none |
 
-Recorded agent responses: 51 files in `fixtures/llm_cache/`, model claude-sonnet-5-5, recorded through the Claude CLI between 2026-11-14T10:44 and 2026-11-14T13:04 (local time). The demo replays them; nothing in that folder is hand-written.
+Recorded agent responses: 50 files in `fixtures/llm_cache/`, model claude-sonnet-5-5, recorded through the Claude CLI between 2026-11-14T10:44 and 2026-11-14T14:19 (local time). The demo replays them; nothing in that folder is hand-written.
 Headless-browser walk of the board (`results/ui_walk.json`, `scripts/shots.cjs`): beacon 65.7 s, 16 screenshots, 0 console messages; mayday 80 s, 14 screenshots, 0 console messages; scout 64.6 s, 13 screenshots, 0 console messages.
-Tests (`bash run_tests.sh`, offline, replay-mode model): 179 passed, 2 failed in 132 s, last run 2026-11-14T13:47.
+Tests (`bash run_tests.sh`, offline, replay-mode model): 182 passed, 0 failed in 125 s, last run 2026-11-14T14:22.
 

@@ -185,8 +185,8 @@ def _who(view: dict) -> str:
 def _where(view: dict) -> str:
     g = view.get("geometry")
     if g == "fix":
-        rests = "; ".join(a.get("text") or "" for a in view.get("rests_on") or [] if a.get("text"))
-        return f"Located {view.get('where')}" + (f" (rests on a statement: {rests})" if rests else "")
+        rests = "; ".join(a.get("means") or "" for a in view.get("rests_on") or [] if a.get("means"))
+        return f"Located {view.get('where')}" + (f" ({rests})" if rests else "")
     if g == "candidates":
         n = len(view.get("candidates") or [])
         return f"{'Two' if n == 2 else n} possible spots in {view.get('room_label') or 'the room'}, not a position: check {'both' if n == 2 else 'all'}"

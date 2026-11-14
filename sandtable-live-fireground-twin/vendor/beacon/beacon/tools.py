@@ -112,6 +112,12 @@ def brief_of(source) -> dict:
     return with_stated_evidence(brief_from_beacons(b), b)
 
 
+# What a dismissed mirror spot rests on, in fixed words (the published assumption text carries a share in percent that
+# changes from run to run, so it never reaches the prompt).
+STATEMENT_WORDS = {"occupant-statement": "the occupant's stated suite", "search-room": "command's search room"}
+_DISMISSED_ROOM = re.compile(r"^in (.+?), not in ")
+
+
 def with_stated_evidence(brief: dict, beacons: dict | None) -> dict:
     """Adds what docs/BEACON_FEED.md A8 publishes and the brief may lack: a phone's `assumptions` (a mirror candidate
     dismissed on the occupant's stated suite or on command's search room: kind, room, text) and `conflict`, and the
@@ -126,6 +132,13 @@ def with_stated_evidence(brief: dict, beacons: dict | None) -> dict:
                                  for a in src["assumptions"] if isinstance(a, dict)]
         if src.get("conflict") and not ph.get("conflict"):
             ph["conflict"] = src["conflict"] if isinstance(src["conflict"], str) else (src["conflict"] or {}).get("text")
+        dismissed = [{"by": q.get("by"), "reason": q.get("reason")} for q in src.get("pruned") or []
+                     if isinstance(q, dict) and q.get("by") in STATEMENT_WORDS]
+        if dismissed and not ph.get("dismissed"):
+            ph["dismissed"] = dismissed
+        if src.get("last_known") and not ph.get("last_known"):
+            lk = src["last_known"]
+            ph["last_known"] = {"geometry": lk.get("geometry"), "room": lk.get("room"), "room_label": lk.get("room_label")}
     if beacons.get("search_room") and not brief.get("search_room"):
         sr = beacons["search_room"]
         brief["search_room"] = {"room": sr.get("room"), "room_label": sr.get("room_label")} if isinstance(sr, dict) else sr
@@ -395,7 +408,16 @@ class ToolBox:
             return view
         view["report"] = report
         if p.get("assumptions"):                       # A8: a position that rests on a statement, not on the measurements alone
-            view["rests_on"] = [{"kind": a.get("kind"), "room_label": self._label(a.get("room")), "text": a.get("text")} for a in p["assumptions"]]
+            spots = sorted({m.group(1) for d in p.get("dismissed") or [] for m in [_DISMISSED_ROOM.match(str(d.get("reason") or ""))] if m})
+            view["rests_on"] = []
+            for a in p["assumptions"]:
+                basis = STATEMENT_WORDS.get(a.get("kind"), "a statement")
+                room = self._label(a.get("room"))
+                view["rests_on"].append({
+                    "basis": basis, "room_label": room,
+                    "mirror_spot_dismissed_in": spots or None,
+                    "means": (f"position rests on {basis}" + (f" ({room})" if room else "") + ": the mirror spot"
+                              + (f" in {' and '.join(spots)}" if spots else "") + " was dismissed on that statement, not on the measurements")})
         if p.get("conflict"):
             view["conflict"] = str(p["conflict"])[:300]
         if geom == "fix":
@@ -405,6 +427,8 @@ class ToolBox:
             view["where"] = ", ".join(x for x in [f"in {view['room_label']}" if view["room_label"] else None,
                                                   f"{part} of the room" if part else None,
                                                   uncertainty_words(p.get("sigma_m"))] if x)
+            if view.get("rests_on"):
+                view["where"] += "; " + "; ".join(sorted({f"position rests on {r['basis']}" for r in view["rests_on"]}))
         elif geom == "candidates":
             cands = p.get("candidates") or []
             view["room_label"] = p.get("room_label")
@@ -423,6 +447,10 @@ class ToolBox:
             view["room_label"] = z.get("room_label") or p.get("room_label")
             view["zone"] = {"room_label": view["room_label"], "band": z.get("band"), "puck": z.get("puck"), "prob": tenth(z.get("prob"))}
             view["where"] = f"in {view['room_label'] or 'an unknown room'} by Bluetooth signal strength: search the room"
+        elif p.get("stale") and p.get("last_known"):
+            lk = p["last_known"]
+            view["last_known"] = {"geometry": lk.get("geometry"), "room_label": lk.get("room_label") or self._label(lk.get("room"))}
+            view["where"] = f"not heard recently (stale): last known as a {lk.get('geometry')} in {view['last_known']['room_label'] or 'an unknown room'}, search there"
         else:
             view["where"] = "heard, no position"
         return view
@@ -581,7 +609,9 @@ class ToolBox:
             if geom == "fix" and ph.get("x") is not None:
                 room = ph.get("room") or self.twin.locate(ph["x"], ph["y"], self.brief.get("floor"))["room"]
                 part = part_of_room(self.twin, room, ph["x"], ph["y"])
-                return room, f"{self._label(room)}, then the phone's spot in the {part} of the room ({t}: fix, {uncertainty_words(ph.get('sigma_m'))})", room
+                rests = sorted({STATEMENT_WORDS.get(a.get("kind"), "a statement") for a in ph.get("assumptions") or []})
+                return room, (f"{self._label(room)}, then the phone's spot in the {part} of the room ({t}: fix, {uncertainty_words(ph.get('sigma_m'))}"
+                              + "".join(f"; position rests on {r}" for r in rests) + ")"), room
             if geom == "candidates" and ph.get("candidates"):
                 rooms = sorted({c.get("room") or self.twin.locate(c["x"], c["y"], self.brief.get("floor"))["room"] for c in ph["candidates"]},
                                key=lambda r: str(r))
@@ -596,6 +626,10 @@ class ToolBox:
                 room = next((rid for rid, r in self.twin._rooms.items() if r.get("label") == lab), None)
             if geom == "zone" and ph.get("zone"):
                 room = ph["zone"].get("room")
+            if room is None and ph.get("stale") and ph.get("last_known"):
+                room = ph["last_known"].get("room")
+                if room in self.twin._rooms:
+                    return room, f"{self._label(room)}, where {t} was last known (stale: not heard recently; search the room)", room
             if room is None:
                 room = ph.get("room")
             if room in self.twin._rooms:

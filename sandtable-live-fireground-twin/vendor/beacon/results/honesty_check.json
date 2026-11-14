@@ -64,10 +64,10 @@
    "reports_los": false,
    "steps": 950,
    "phone_steps": 1400,
-   "fix_steps": 717,
+   "fix_steps": 712,
    "wrong_fix_steps": 0,
    "duration_s": 190.0,
-   "fix_share_of_phone_steps": 0.512,
+   "fix_share_of_phone_steps": 0.509,
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
@@ -97,7 +97,7 @@
     {
      "seed": 310,
      "steps": 475,
-     "fix_steps": 446,
+     "fix_steps": 442,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -112,7 +112,7 @@
     {
      "seed": 20261114,
      "steps": 475,
-     "fix_steps": 271,
+     "fix_steps": 270,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -133,40 +133,18 @@
    "reports_los": false,
    "steps": 1200,
    "phone_steps": 2400,
-   "fix_steps": 600,
+   "fix_steps": 0,
    "wrong_fix_steps": 0,
    "duration_s": 240.0,
-   "fix_share_of_phone_steps": 0.25,
+   "fix_share_of_phone_steps": 0.0,
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
-   "worst_fix": {
-    "ratio": 0.124,
-    "t_s": 87.4,
-    "phone": "B1",
-    "truth_key": "trapped-310",
-    "err_m": 0.242,
-    "sigma_m": 0.65,
-    "threshold_m": 1.95,
-    "published": [
-     2.32,
-     1.9
-    ],
-    "truth": [
-     2.1,
-     1.8
-    ],
-    "truth_room": "r310",
-    "published_room": "r310",
-    "assumptions": [],
-    "after": "second phone sharing",
-    "since_s": 87.4,
-    "seed": 310
-   },
+   "worst_fix": null,
    "per_seed": [
     {
      "seed": 310,
      "steps": 600,
-     "fix_steps": 600,
+     "fix_steps": 0,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -196,23 +174,23 @@
    "reports_los": false,
    "steps": 900,
    "phone_steps": 1800,
-   "fix_steps": 646,
+   "fix_steps": 432,
    "wrong_fix_steps": 0,
    "duration_s": 180.0,
-   "fix_share_of_phone_steps": 0.359,
+   "fix_share_of_phone_steps": 0.24,
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 0.497,
-    "t_s": 5.0,
+    "ratio": 0.575,
+    "t_s": 1.8,
     "phone": "B2",
     "truth_key": "iphone15-310",
-    "err_m": 0.805,
-    "sigma_m": 0.54,
-    "threshold_m": 1.62,
+    "err_m": 0.948,
+    "sigma_m": 0.55,
+    "threshold_m": 1.65,
     "published": [
-     3.74,
-     7.13
+     3.8,
+     7.26
     ],
     "truth": [
      3.4,
@@ -222,14 +200,14 @@
     "published_room": "r310",
     "assumptions": [],
     "after": "second phone sharing",
-    "since_s": 5.0,
+    "since_s": 1.8,
     "seed": 310
    },
    "per_seed": [
     {
      "seed": 310,
      "steps": 450,
-     "fix_steps": 434,
+     "fix_steps": 288,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -246,7 +224,7 @@
     {
      "seed": 20261114,
      "steps": 450,
-     "fix_steps": 212,
+     "fix_steps": 144,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -269,42 +247,44 @@
    "reports_los": false,
    "steps": 780,
    "phone_steps": 1090,
-   "fix_steps": 347,
-   "wrong_fix_steps": 67,
+   "fix_steps": 227,
+   "wrong_fix_steps": 3,
    "duration_s": 156.0,
-   "fix_share_of_phone_steps": 0.318,
-   "wrong_share_of_fix_steps": 0.1931,
+   "fix_share_of_phone_steps": 0.208,
+   "wrong_share_of_fix_steps": 0.0132,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 3.818,
-    "t_s": 31.8,
+    "ratio": 1.072,
+    "t_s": 21.6,
     "phone": "B1",
     "truth_key": "dragged",
-    "err_m": 3.818,
-    "sigma_m": 0.31,
+    "err_m": 1.072,
+    "sigma_m": 0.25,
     "threshold_m": 1.0,
     "published": [
-     7.3,
-     6.73
+     6.92,
+     4.86
     ],
     "truth": [
-     10.7,
-     8.47
+     7.64,
+     5.65
     ],
-    "truth_room": "rcW",
+    "truth_room": "r310",
     "published_room": "r310",
-    "assumptions": [],
-    "after": "dragged dragged to (10.7, 8.5) in West corridor",
-    "since_s": 0.3,
+    "assumptions": [
+     "Mirror candidate dismissed because the occupant says they are in Suite 310. On the measurements alone it was 7% likely."
+    ],
+    "after": "dragged dragged to (7.6, 5.7) in Suite 310",
+    "since_s": 0.1,
     "seed": 20261114
    },
    "per_seed": [
     {
      "seed": 310,
      "steps": 390,
-     "fix_steps": 208,
-     "wrong_fix_steps": 46,
-     "wrong_share_of_fix_steps": 0.2212,
+     "fix_steps": 139,
+     "wrong_fix_steps": 0,
+     "wrong_share_of_fix_steps": 0.0,
      "events": [
       "t=0.0 s: door-wall pucks",
       "t=0.0 s: phone placed deep in the room",
@@ -316,9 +296,9 @@
     {
      "seed": 20261114,
      "steps": 390,
-     "fix_steps": 139,
-     "wrong_fix_steps": 21,
-     "wrong_share_of_fix_steps": 0.1511,
+     "fix_steps": 88,
+     "wrong_fix_steps": 3,
+     "wrong_share_of_fix_steps": 0.0341,
      "events": [
       "t=0.0 s: door-wall pucks",
       "t=0.0 s: phone placed deep in the room",
@@ -328,7 +308,7 @@
      ]
     }
    ],
-   "pass": false
+   "pass": true
   },
   "exercise-scale-changed": {
    "name": "exercise-scale-changed",
@@ -336,10 +316,10 @@
    "reports_los": false,
    "steps": 600,
    "phone_steps": 600,
-   "fix_steps": 291,
+   "fix_steps": 292,
    "wrong_fix_steps": 0,
    "duration_s": 120.0,
-   "fix_share_of_phone_steps": 0.485,
+   "fix_share_of_phone_steps": 0.487,
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
@@ -369,7 +349,7 @@
     {
      "seed": 310,
      "steps": 300,
-     "fix_steps": 291,
+     "fix_steps": 292,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -408,16 +388,16 @@
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 0.124,
-    "t_s": 2.8,
+    "ratio": 0.132,
+    "t_s": 2.0,
     "phone": "B1",
     "truth_key": "trapped-310",
-    "err_m": 0.242,
-    "sigma_m": 0.65,
-    "threshold_m": 1.95,
+    "err_m": 0.261,
+    "sigma_m": 0.66,
+    "threshold_m": 1.98,
     "published": [
-     2.13,
-     2.04
+     2.12,
+     2.06
     ],
     "truth": [
      2.1,
@@ -427,7 +407,7 @@
     "published_room": "r310",
     "assumptions": [],
     "after": "trapped phone sharing",
-    "since_s": 2.8,
+    "since_s": 2.0,
     "seed": 310
    },
    "per_seed": [
@@ -471,16 +451,16 @@
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 0.497,
-    "t_s": 5.0,
+    "ratio": 0.575,
+    "t_s": 1.8,
     "phone": "B2",
     "truth_key": "iphone15-310",
-    "err_m": 0.805,
-    "sigma_m": 0.54,
-    "threshold_m": 1.62,
+    "err_m": 0.948,
+    "sigma_m": 0.55,
+    "threshold_m": 1.65,
     "published": [
-     3.74,
-     7.13
+     3.8,
+     7.26
     ],
     "truth": [
      3.4,
@@ -490,7 +470,7 @@
     "published_room": "r310",
     "assumptions": [],
     "after": "second phone sharing",
-    "since_s": 5.0,
+    "since_s": 1.8,
     "seed": 310
    },
    "per_seed": [
@@ -536,16 +516,16 @@
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 0.534,
-    "t_s": 42.4,
+    "ratio": 0.575,
+    "t_s": 1.8,
     "phone": "B2",
     "truth_key": "iphone15-310",
-    "err_m": 0.865,
-    "sigma_m": 0.54,
-    "threshold_m": 1.62,
+    "err_m": 0.948,
+    "sigma_m": 0.55,
+    "threshold_m": 1.65,
     "published": [
-     3.73,
-     7.2
+     3.8,
+     7.26
     ],
     "truth": [
      3.4,
@@ -555,7 +535,7 @@
     "published_room": "r310",
     "assumptions": [],
     "after": "second phone sharing",
-    "since_s": 42.4,
+    "since_s": 1.8,
     "seed": 310
    },
    "per_seed": [
@@ -592,23 +572,23 @@
    "reports_los": false,
    "steps": 600,
    "phone_steps": 1200,
-   "fix_steps": 601,
+   "fix_steps": 551,
    "wrong_fix_steps": 0,
    "duration_s": 120.0,
-   "fix_share_of_phone_steps": 0.501,
+   "fix_share_of_phone_steps": 0.459,
    "wrong_share_of_fix_steps": 0.0,
    "invariant_violations": {},
    "worst_fix": {
-    "ratio": 0.547,
-    "t_s": 25.8,
+    "ratio": 0.551,
+    "t_s": 5.8,
     "phone": "B2",
     "truth_key": "iphone15-310",
-    "err_m": 0.886,
-    "sigma_m": 0.54,
-    "threshold_m": 1.62,
+    "err_m": 0.877,
+    "sigma_m": 0.53,
+    "threshold_m": 1.59,
     "published": [
-     3.76,
-     7.21
+     3.78,
+     7.19
     ],
     "truth": [
      3.4,
@@ -618,14 +598,14 @@
     "published_room": "r310",
     "assumptions": [],
     "after": "second phone sharing",
-    "since_s": 25.8,
+    "since_s": 5.8,
     "seed": 310
    },
    "per_seed": [
     {
      "seed": 310,
      "steps": 300,
-     "fix_steps": 392,
+     "fix_steps": 365,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -637,7 +617,7 @@
     {
      "seed": 20261114,
      "steps": 300,
-     "fix_steps": 209,
+     "fix_steps": 186,
      "wrong_fix_steps": 0,
      "wrong_share_of_fix_steps": 0.0,
      "events": [
@@ -650,9 +630,7 @@
    "pass": true
   }
  },
- "pass": false,
- "failed": [
-  "phone-dragged-into-next-room"
- ],
+ "pass": true,
+ "failed": [],
  "runtime_s": 10.6
 }

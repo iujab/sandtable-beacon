@@ -50,6 +50,9 @@ def two_puck_block() -> str:
     fs = d.get("false_statement", {}).get("door-wall")
     if fs:
         worst = max((v.get("statement_fix", 0.0) for v in (fs.get("by_true_room") or {}).values()), default=None)
+        ts = turns_sentence()
+        if ts:
+            lines += ["", ts]
         lines += ["",
                   f"\"Ring or less\" is mostly a phone that only one puck reached (a blocked link in the simulation). "
                   f"A wrong position is one more than three sigma or 1.5 m from the truth.",
@@ -112,12 +115,42 @@ def main_block() -> str:
     return "\n".join(lines)
 
 
+def honesty_block() -> str:
+    d = json.loads((ROOT / "results" / "honesty_check.json").read_text(encoding="utf-8"))
+    sc = d["scenarios"]
+    items = sc.items() if isinstance(sc, dict) else [(x.get("name"), x) for x in sc]
+    worst_name, worst = None, -1.0
+    steps = 0
+    for name, v in items:
+        steps += int(v.get("steps") or 0)
+        w = float(v.get("wrong_share_of_fix_steps") or 0.0)
+        if w > worst:
+            worst_name, worst = name, w
+    n = len(list(sc))
+    return (f"**Simulated self-check** (`scripts/honesty_check.py`, results in `results/honesty_check.json`): {n} adversarial scenes on the simulator "
+            f"(the walk-through, the mid-room layout held for two minutes, a puck moved while ranging, the phone dragged into the next room, the exercise scale changed, "
+            f"a phone going quiet, stop sharing, two phones on shared boards), {steps:,} steps. In every scene: no coordinates without a position, no dot for a stale phone, "
+            f"nothing republished after stop sharing. A position is counted wrong when it is more than three sigma and more than a metre from the truth: "
+            f"{'no scene shows any' if worst <= 0 else f'the worst scene ({worst_name}) shows {pct1(worst)} of its position steps wrong, and the others none' if sum(1 for _n, v in items if float(v.get('wrong_share_of_fix_steps') or 0) > 0) == 1 else f'the worst scene ({worst_name}) shows {pct1(worst)} of its position steps wrong'}. "
+            f"The check fails above {pct(d['thresholds']['max_wrong_share_of_fix_steps'])}; it currently {'passes' if d.get('pass') else 'FAILS'}.")
+
+
+def turns_sentence() -> str:
+    d = json.loads((ROOT / "results" / "eval_two_puck.json").read_text(encoding="utf-8"))
+    t = (d.get("two_phones") or {}).get("turns")
+    if not t:
+        return ""
+    return (f"Two phones taking turns on two boards (simulated, {t['phone_scenes']} phone scenes): the wait for a position is {t['wait_first_fix']['median_s']:.1f} s in the median "
+            f"and {t['wait_first_fix']['p90_s']:.0f} s at the 90th percentile; {pct(t['wait_first_fix']['never_within_scene'])} get none within the scene; "
+            f"{pct1(t['wrong_fix_rate_of_fixes'])} of the positions shown are wrong.")
+
+
 TARGETS = {
     "docs/PHONE_FEASIBILITY.md": {"LAYOUT_NUMBERS": layouts_block, "TWO_PUCK_NUMBERS": two_puck_block},
     "hardware/BRINGUP.md": {"LAYOUT_NUMBERS": two_puck_block},
     "hardware/LAYOUT.md": {"LAYOUT_NUMBERS": two_puck_block},
     "hardware/PUCK.md": {"LAYOUT_NUMBERS": layouts_block},
-    "README.md": {"TWO_PUCK_NUMBERS": two_puck_block, "LAYOUT_NUMBERS": layouts_block, "MAIN_NUMBERS": main_block},
+    "README.md": {"TWO_PUCK_NUMBERS": two_puck_block, "LAYOUT_NUMBERS": layouts_block, "MAIN_NUMBERS": main_block, "HONESTY_NUMBERS": honesty_block},
 }
 
 

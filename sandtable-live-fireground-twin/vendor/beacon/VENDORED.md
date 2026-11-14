@@ -1,8 +1,8 @@
 # Vendored: the Beacon module (lane L16)
 
-A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T13:44:26-0600.
+A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T14:22:31-0600.
 
-Source: commit `c3bbf8fd9975a1f6fca8e3bc374447624ee8ac28` (2026-11-14T13:43:42-06:00): "Board and simulated phone: judge's findings (phone lifecycle, labels, stale phones, agent staleness)". Copied with `git archive`, so only committed files are here; 8 uncommitted change(s) in the source tree were not copied.
+Source: commit `095fd6736b8c58f65ace804557286a4951bb645b` (2026-11-14T14:20:11-06:00): "Recorded agent run for the final walk-through; final screenshots; manifest". Copied with `git archive`, so only committed files are here.
 
 It is that team's work, credited to them; it is copied (not linked) so this repository stands alone. Do not edit it here: change the sibling project and re-run `python scripts/vendor_beacon.py`. This file is generated from the copy.
 
@@ -10,18 +10,18 @@ It is that team's work, credited to them; it is copied (not linked) so this repo
 
 | Directory | Files | Bytes |
 |---|---|---|
-| top level | 4 | 24,913 |
+| top level | 4 | 26,426 |
 | `apps/` | 18 | 160,498 |
-| `beacon/` | 28 | 599,214 |
-| `docs/` | 9 | 270,615 |
-| `figures/` | 22 | 5,153,824 |
-| `fixtures/` | 27 | 609,511 |
-| `hardware/` | 10 | 112,685 |
-| `results/` | 4 | 385,977 |
-| `scripts/` | 6 | 160,671 |
-| `tests/` | 16 | 187,030 |
-| `web/` | 16 | 315,254 |
-| **total** | **160** | **7,980,192** |
+| `beacon/` | 28 | 614,158 |
+| `docs/` | 9 | 272,930 |
+| `figures/` | 22 | 5,240,561 |
+| `fixtures/` | 26 | 582,526 |
+| `hardware/` | 10 | 113,119 |
+| `results/` | 4 | 398,088 |
+| `scripts/` | 6 | 163,387 |
+| `tests/` | 16 | 209,004 |
+| `web/` | 16 | 315,325 |
+| **total** | **159** | **8,096,022** |
 
 Skipped: nothing among the committed files of the copied directories. Never copied: `data/`, virtualenvs, caches, build outputs, `.env*`, keys and signing material, any `live` directory.
 
@@ -33,7 +33,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 
 | File | Bytes |
 |---|---|
-| `README.md` | 19,927 |
+| `README.md` | 21,440 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.pbxproj` | 11,924 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.xcworkspace/contents.xcworkspacedata` | 135 |
 | `apps/ios/SandtableBeacon.xcodeproj/xcshareddata/xcschemes/SandtableBeacon.xcscheme` | 2,912 |
@@ -53,7 +53,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `apps/ios/tools/syntax_check.log` | 594 |
 | `apps/ios/tools/syntax_check.py` | 3,027 |
 | `beacon/__init__.py` | 0 |
-| `beacon/agent.py` | 28,833 |
+| `beacon/agent.py` | 28,813 |
 | `beacon/agent_routes.py` | 4,222 |
 | `beacon/autoscene.py` | 7,548 |
 | `beacon/config.py` | 8,923 |
@@ -76,40 +76,40 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `beacon/server.py` | 51,276 |
 | `beacon/session.py` | 89,032 |
 | `beacon/sim.py` | 65,059 |
-| `beacon/story.py` | 18,071 |
-| `beacon/tools.py` | 42,309 |
-| `beacon/track.py` | 14,540 |
+| `beacon/story.py` | 20,464 |
+| `beacon/tools.py` | 44,818 |
+| `beacon/track.py` | 24,602 |
 | `beacon/twin.py` | 28,794 |
-| `docs/BEACON_FEED.md` | 31,567 |
+| `docs/BEACON_FEED.md` | 33,665 |
 | `docs/CONTRACTS.md` | 27,889 |
 | `docs/COSTAR_TIE_IN.md` | 10,003 |
 | `docs/IOS_BUILD.md` | 32,558 |
-| `docs/PHONE_FEASIBILITY.md` | 16,684 |
+| `docs/PHONE_FEASIBILITY.md` | 16,901 |
 | `docs/PRIVACY.md` | 3,018 |
 | `docs/research/android_ble_models.md` | 52,784 |
 | `docs/research/ios_ni.md` | 64,314 |
 | `docs/research/puck_hardware.md` | 31,798 |
-| `figures/eval_area_vs_pucks.png` | 107,979 |
-| `figures/eval_bearing.png` | 123,303 |
-| `figures/eval_error_vs_pucks.png` | 173,172 |
-| `figures/eval_geometry_share.png` | 77,111 |
-| `figures/eval_layouts.png` | 266,770 |
-| `figures/eval_layouts_diagram.png` | 120,325 |
-| `figures/eval_storyboard.png` | 168,014 |
-| `figures/eval_twin_pruning.png` | 134,108 |
-| `figures/eval_two_puck.png` | 167,924 |
-| `figures/eval_two_puck_map.png` | 279,363 |
-| `figures/ui_00_no_pucks.png` | 306,228 |
-| `figures/ui_01_ring.png` | 336,486 |
-| `figures/ui_02_cannot_choose.png` | 319,074 |
-| `figures/ui_03_fix_two_pucks.png` | 292,686 |
-| `figures/ui_04_accountability.png` | 340,829 |
-| `figures/ui_05_phone.png` | 142,784 |
-| `figures/ui_05b_phone_full.png` | 264,600 |
-| `figures/ui_06_agent.png` | 341,455 |
-| `figures/ui_07_floor.png` | 354,859 |
-| `figures/ui_08_1280x720.png` | 277,369 |
-| `figures/ui_09_layout.png` | 286,709 |
+| `figures/eval_area_vs_pucks.png` | 117,533 |
+| `figures/eval_bearing.png` | 123,809 |
+| `figures/eval_error_vs_pucks.png` | 171,410 |
+| `figures/eval_geometry_share.png` | 81,259 |
+| `figures/eval_layouts.png` | 269,238 |
+| `figures/eval_layouts_diagram.png` | 119,813 |
+| `figures/eval_storyboard.png` | 160,299 |
+| `figures/eval_twin_pruning.png` | 141,283 |
+| `figures/eval_two_puck.png` | 169,902 |
+| `figures/eval_two_puck_map.png` | 281,466 |
+| `figures/ui_00_no_pucks.png` | 283,921 |
+| `figures/ui_01_ring.png` | 316,114 |
+| `figures/ui_02_cannot_choose.png` | 298,383 |
+| `figures/ui_03_fix_two_pucks.png` | 291,832 |
+| `figures/ui_04_accountability.png` | 318,575 |
+| `figures/ui_05_phone.png` | 143,662 |
+| `figures/ui_05b_phone_full.png` | 261,941 |
+| `figures/ui_06_agent.png` | 346,638 |
+| `figures/ui_07_floor.png` | 429,966 |
+| `figures/ui_08_1280x720.png` | 265,250 |
+| `figures/ui_09_layout.png` | 375,591 |
 | `figures/ui_report.png` | 272,676 |
 | `fixtures/beacon/ingest_example.json` | 739 |
 | `fixtures/beacon/ios_batch_examples.json` | 6,768 |
@@ -119,11 +119,10 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `fixtures/beacon/scenarios/suite-310.json` | 3,710 |
 | `fixtures/building/site.json` | 21,725 |
 | `fixtures/building/twin.json` | 41,869 |
-| `fixtures/llm_cache/00b0fd36a5821d9862732d581f68ae4bdb683ea823c890c8c5f9804f32b7e167.json` | 32,800 |
+| `fixtures/llm_cache/11dea0ad7bc46eeb40e34be1fe77523c02aa30d7d972ae75e174c32830cb48c3.json` | 25,909 |
 | `fixtures/llm_cache/18c6b4d61cd32ce91418bb9ac4c1b5af35b2c798937e732d908bebe41398e0d0.json` | 32,173 |
 | `fixtures/llm_cache/372b833bfb0a68c5cb6f5dc9a065c0a9828e612e29e49c22f548995abbbcdd82.json` | 25,881 |
 | `fixtures/llm_cache/43826e88f7ea1cab3514e8b3fb88c4bdca9391ddf11d565e9aedd5a957eac076.json` | 34,932 |
-| `fixtures/llm_cache/46698cfd11b6c9be6fd81c332cf05ad2ba71af6d29f043fe9294b340c06e927c.json` | 25,164 |
 | `fixtures/llm_cache/529bd0657a9ebb7006198482fc0f47d1892e6da409ea62d26952d3d9c74c810e.json` | 30,240 |
 | `fixtures/llm_cache/58791946f7764f339c81c0a75d96fbfcb47716cfd378c428d8ad83fcca100fb2.json` | 31,056 |
 | `fixtures/llm_cache/62a4dd319555045a162497990591b6f0c6d006b89ae98af763ec8769f93f0e42.json` | 35,395 |
@@ -131,16 +130,16 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `fixtures/llm_cache/76077bdcee59c7a1af9cc8ac38c11252e06dab2e3786ddc95edd51b2d72e0c59.json` | 8,871 |
 | `fixtures/llm_cache/91f9636e327333af83351f3abcbe5e2e447eb370cf56856ccd66c9808e93804b.json` | 26,664 |
 | `fixtures/llm_cache/94a096e537fce4f194bc0b8d4390e625df0da948229f2ca2cf0da96820628eab.json` | 8,887 |
-| `fixtures/llm_cache/9a365a08275a0bc1d4081a0fbc7d254025d69d6f5ee5453a141fb945dfd8c649.json` | 30,174 |
-| `fixtures/llm_cache/RUNS.json` | 44,080 |
+| `fixtures/llm_cache/9684f711cb6e8d8839809c32f2067a875980ee33cd6ba63b419fe7cdf21b3597.json` | 33,288 |
+| `fixtures/llm_cache/RUNS.json` | 45,186 |
 | `fixtures/llm_cache/a836a4d4a02a7b55dcd5e7a99b9eb6aa0b097ee1f02d5c287b2f17a1ea7a5497.json` | 28,598 |
 | `fixtures/llm_cache/abc48f8a2100cc1fef6ccddf38b4eb42dde137ea5bbfb42acd03a332003221ac.json` | 8,705 |
-| `fixtures/llm_cache/dfff13867e1a9e0783e1e4df0c5578cdb5c69e8a24cf2cedcd384d9e2851ae37.json` | 28,427 |
 | `fixtures/llm_cache/f4ff09d1b0f6a7fce38767a4a89e3288e51f92e5271f8524d0991634973d2a43.json` | 8,761 |
+| `fixtures/llm_cache/fb1ccfd360ac53c3eebcd5824da69045e60222dedba60feb7b57878da0a974ca.json` | 29,277 |
 | `fixtures/llm_cache/ff4c47da6132cbc2c6e82968ab2695a8c915231e08d6ebb61287f44122f720d4.json` | 32,543 |
-| `hardware/BRINGUP.md` | 39,281 |
+| `hardware/BRINGUP.md` | 39,498 |
 | `hardware/FLASH.md` | 10,319 |
-| `hardware/LAYOUT.md` | 5,777 |
+| `hardware/LAYOUT.md` | 5,994 |
 | `hardware/PUCK.md` | 16,432 |
 | `hardware/UNO_Q.md` | 11,376 |
 | `hardware/jlink/.gitignore` | 119 |
@@ -149,36 +148,36 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `hardware/puck_sketch.svg` | 5,593 |
 | `hardware/two_puck_layout.svg` | 8,027 |
 | `requirements.txt` | 309 |
-| `results/eval_beacon.json` | 107,466 |
-| `results/eval_layouts.json` | 240,587 |
-| `results/eval_two_puck.json` | 22,541 |
-| `results/honesty_check.json` | 15,383 |
+| `results/eval_beacon.json` | 119,984 |
+| `results/eval_layouts.json` | 240,559 |
+| `results/eval_two_puck.json` | 22,485 |
+| `results/honesty_check.json` | 15,060 |
 | `run_demo.sh` | 2,945 |
 | `run_tests.sh` | 1,732 |
 | `scripts/eval_beacon.py` | 104,553 |
-| `scripts/fill_numbers.py` | 9,585 |
+| `scripts/fill_numbers.py` | 11,950 |
 | `scripts/honesty_check.py` | 21,097 |
 | `scripts/record_agent.py` | 13,481 |
 | `scripts/shots.cjs` | 11,318 |
-| `scripts/stop_demo.sh` | 637 |
+| `scripts/stop_demo.sh` | 988 |
 | `tests/conftest.py` | 1,458 |
-| `tests/test_agent.py` | 14,149 |
-| `tests/test_eval_smoke.py` | 2,646 |
+| `tests/test_agent.py` | 15,702 |
+| `tests/test_eval_smoke.py` | 2,647 |
 | `tests/test_external_bundle.py` | 8,031 |
 | `tests/test_feeds.py` | 9,035 |
-| `tests/test_honesty_check.py` | 1,869 |
+| `tests/test_honesty_check.py` | 1,935 |
 | `tests/test_host.py` | 14,980 |
 | `tests/test_ios_wire.py` | 13,503 |
-| `tests/test_locate.py` | 18,869 |
+| `tests/test_locate.py` | 27,521 |
 | `tests/test_models.py` | 5,261 |
 | `tests/test_report.py` | 7,376 |
 | `tests/test_roster.py` | 12,441 |
 | `tests/test_server.py` | 21,495 |
 | `tests/test_session.py` | 25,126 |
 | `tests/test_sim.py` | 23,056 |
-| `tests/test_track.py` | 7,735 |
-| `web/app.html` | 6,562 |
-| `web/app.js` | 46,188 |
+| `tests/test_track.py` | 19,437 |
+| `web/app.html` | 6,663 |
+| `web/app.js` | 46,158 |
 | `web/common.js` | 6,000 |
 | `web/index.html` | 9,271 |
 | `web/phone.css` | 9,620 |

@@ -73,13 +73,13 @@ At 5 m, 20 degrees of bearing error is 1.8 m sideways, and the mirror ambiguity 
 
 | Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
 |---|---|---|---|---|---|---|
-| Two boards on one device, 0.1 m apart | 33 degrees | 2.34 m | 100% | 0% | n/a | 16.1 m2 |
-| Two boards on one device, 0.3 m apart | 17 degrees | 1.51 m | 100% | 0% | n/a | 15.5 m2 |
-| Two boards on one device, 0.5 m apart | 22 degrees | 1.51 m | 98% | 0% | n/a | 12.5 m2 |
-| Two separate pucks 2 m apart | 7 degrees | 0.71 m | 100% | 0% | n/a | 5.3 m2 |
-| Two separate pucks 3 m apart | 6 degrees | 0.42 m | 98% | 2% | 0.34 m | 3.5 m2 |
-| Two separate pucks 4 m apart | 5 degrees | 0.34 m | 96% | 4% | 0.33 m | 2.8 m2 |
-| Three separate pucks (thrown) | n/a | n/a | n/a | 58% | 0.23 m | 1.2 m2 |
+| Two boards on one device, 0.1 m apart | 37 degrees | 2.19 m | 100% | 0% | n/a | 16.0 m2 |
+| Two boards on one device, 0.3 m apart | 19 degrees | 1.55 m | 100% | 0% | n/a | 15.4 m2 |
+| Two boards on one device, 0.5 m apart | 22 degrees | 1.38 m | 98% | 0% | n/a | 12.8 m2 |
+| Two separate pucks 2 m apart | 8 degrees | 0.60 m | 100% | 0% | n/a | 5.5 m2 |
+| Two separate pucks 3 m apart | 7 degrees | 0.47 m | 98% | 2% | 0.44 m | 3.5 m2 |
+| Two separate pucks 4 m apart | 4 degrees | 0.30 m | 96% | 4% | 0.34 m | 3.0 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 56% | 0.21 m | 1.2 m2 |
 
 Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
 <!-- LAYOUT_NUMBERS:END -->
@@ -97,14 +97,16 @@ Two boards on one device never produce a position: the locator publishes a ring.
 
 | Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position: share of the positions shown (share of all trials) | Position error, median / 90th percentile |
 |---|---|---|---|---|---|---|---|
-| Both pucks just inside the wall the door is in (recommended) | 61% | 37% | 24% | 19% | 21% | 1.9% (1.1%) | 0.26 m / 0.76 m |
-| Both pucks along the outside wall | 71% | 71% | 0% | 11% | 18% | 2.3% (1.6%) | 0.25 m / 0.79 m |
-| Both pucks mid-room (careless) | 4% | 4% | 0% | 86% | 10% | 0.0% (0.0%) | 0.28 m / 0.66 m |
-| Three pucks: the door-wall pair plus one in the far corner | 81% | 78% | 3% | 12% | 7% | 1.2% (1.0%) | 0.19 m / 0.59 m |
+| Both pucks just inside the wall the door is in (recommended) | 76% | 35% | 42% | 3% | 21% | 1.5% (1.1%) | 0.26 m / 0.77 m |
+| Both pucks along the outside wall | 70% | 70% | 0% | 11% | 18% | 2.3% (1.6%) | 0.25 m / 0.78 m |
+| Both pucks mid-room (careless) | 4% | 4% | 0% | 86% | 10% | 3.0% (0.1%) | 0.30 m / 0.73 m |
+| Three pucks: the door-wall pair plus one in the far corner | 84% | 78% | 6% | 8% | 8% | 1.2% (1.0%) | 0.20 m / 0.59 m |
+
+Two phones taking turns on two boards (simulated, 100 phone scenes): the wait for a position is 3.5 s in the median and 9 s at the 90th percentile; 23% get none within the scene; 2.7% of the positions shown are wrong.
 
 "Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
 
-When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 4.3% of trials and 100% of those positions are wrong (4.0% of trials are wrong positions produced by the statement; 13.8% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 6.3% of trials and 100% of those positions are wrong (6.0% of trials are wrong positions produced by the statement; 22.5% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
 <!-- TWO_PUCK_NUMBERS:END -->
 
 **Better if you have it:** a third puck, not in line with the other two, gives a position with no assumption at all.

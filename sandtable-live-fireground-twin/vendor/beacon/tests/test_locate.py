@@ -440,3 +440,170 @@ def test_one_estimate_under_30_ms(twin, ctx, room):
             locate.estimate(ctx, pk, rs, br)
             ts.append(time.perf_counter() - t0)
         assert sorted(ts)[3] < 0.030, (rs, sorted(ts))
+
+
+# ---- round 2: the mirror guarantee (two pucks or pucks in a line, no bearing) ----------------------------------
+
+def static_uwb(twin, p, phone, rng, n=7):
+    """A smoothed UWB range as the simulator makes it: a static per-link error (link bias, body block) that the
+    median does not remove, white noise reduced by the median, no line-of-sight score (as from an iPhone)."""
+    u = N["uwb"]
+    d = math.dist((p["x"], p["y"]), phone)
+    w = twin.walls_crossed((p["x"], p["y"]), phone)
+    body = rng.random() < u["body_block_prob"]
+    m, s_static = models.uwb_expected(d, w, N, body=body, n_samples=10 ** 9)
+    v = m + rng.normal(0.0, s_static) + rng.normal(0.0, u["sigma_los_m"]) / math.sqrt(n)
+    return {"puck": p["id"], "kind": "uwb", "d_m": max(0.05, v), "n": n}
+
+
+def mirror_explained(twin, ctx, e, P):
+    """The structural guarantee, checked from outside: the mirror image of a published fix across the pucks' line lies
+    in the fix's own 2-sigma ellipse, or is outside the building / in a wall / beyond the range model, and is listed in
+    `pruned` with a reason."""
+    a, b = (P[0]["x"], P[0]["y"]), (P[-1]["x"], P[-1]["y"])
+    mx, my = mirror((e["x"], e["y"]), a, b)
+    if locate.inside(e, mx, my):
+        return True
+    near = [q for q in e["pruned"] if math.dist((q["x"], q["y"]), (mx, my)) <= max(1.0, 2.5 * e["sigma_m"])]
+    if not near:
+        return False
+    outline = twin.floor()["outline"]
+    u = N["uwb"]
+    impossible = (not _pip((mx, my), outline)) or locate._in_wall(ctx, mx, my) or any(
+        twin.walls_crossed((p["x"], p["y"]), (mx, my)) > u["max_walls"] or math.dist((p["x"], p["y"]), (mx, my)) > u["max_range_m"]
+        for p in P)
+    return impossible
+
+
+def test_mirror_guarantee_rule_is_stated():
+    assert isinstance(locate.geometry_rules.get("mirror_guarantee"), str) and "mirror" in locate.geometry_rules["mirror_guarantee"]
+    assert 0 < locate.geometry_rules["mirror_weight_floor"] <= 0.5
+
+
+def test_two_pucks_never_publish_a_fix_whose_mirror_is_unexplained(twin, ctx, room):
+    rng = np.random.default_rng(2026)
+    fixes = cands = 0
+    for _ in range(160):
+        a = at(room, rng.uniform(0.4, room["w"] - 0.4), rng.uniform(0.4, room["h"] - 0.4))
+        b = at(room, rng.uniform(0.4, room["w"] - 0.4), rng.uniform(0.4, room["h"] - 0.4))
+        phone = at(room, rng.uniform(0.4, room["w"] - 0.4), rng.uniform(0.4, room["h"] - 0.4))
+        if math.dist(a, b) < 1.0 or min(math.dist(phone, a), math.dist(phone, b)) < 0.6:
+            continue
+        P = pucks_at(a, b)
+        e = locate.estimate(ctx, P, [static_uwb(twin, p, phone, rng) for p in P])
+        check_shape(e)
+        if e["geometry"] == "fix":
+            fixes += 1
+            assert mirror_explained(twin, ctx, e, P), (P, phone, e["x"], e["y"], e["pruned"], e["debug"].get("mirror"))
+        if e["geometry"] == "candidates":
+            cands += 1
+            assert len(e["candidates"]) == 2
+            ws = sorted(c["weight"] for c in e["candidates"])
+            if not e["debug"]["mirror"].get("wall_separated"):
+                assert ws[0] >= locate.geometry_rules["mirror_weight_floor"] - 1e-9
+    assert cands > fixes > 0
+
+
+def test_close_mirror_spots_are_two_candidates_not_a_dot_between_them(twin, ctx, room):
+    # the judged scene: P1 by the door, P2 mid-room, a phone 1.1 m from P2 whose mirror spot is 2 m away in the room;
+    # one 90% HPD component used to join the two spots and its centroid (on the puck) was published as a fix
+    dx, dy = room["door"]
+    P = pucks_at((dx - 0.35, dy - 0.5), at(room, 0.42 * room["w"], 0.64 * room["h"]))
+    phone = (P[1]["x"] - 0.6, P[1]["y"] + 0.9)
+    mir = mirror(phone, (P[0]["x"], P[0]["y"]), (P[1]["x"], P[1]["y"]))
+    assert twin.locate(*mir)["room"] == FIRE_ROOM and math.dist(phone, mir) > 1.5
+    rng = np.random.default_rng(5)
+    for k in range(12):
+        rs = [uwb(twin, p, phone) for p in P] if k == 0 else [static_uwb(twin, p, phone, rng) for p in P]
+        for r in rs:
+            r.pop("los", None)
+        e = locate.estimate(ctx, P, rs)
+        check_shape(e)
+        assert e["geometry"] in ("candidates", "ring"), (k, e["geometry"], e["x"], e["y"])
+        if e["geometry"] == "candidates" and k == 0:
+            pts = [(c["x"], c["y"]) for c in e["candidates"]]
+            assert min(math.dist(q, phone) for q in pts) < 0.8 and min(math.dist(q, mir) for q in pts) < 0.8
+
+
+def test_phone_near_the_baseline_is_one_honest_region_or_a_ring(twin, ctx, room):
+    a, b = at(room, 0.84 * room["w"], room["h"] / 2), at(room, 0.53 * room["w"], room["h"] / 2)
+    P = pucks_at(a, b)
+    rng = np.random.default_rng(9)
+    for off in (0.0, 0.15, 0.3):
+        phone = at(room, 0.25 * room["w"], room["h"] / 2 + off)
+        mir = mirror(phone, a, b)
+        for k in range(8):
+            rs = [static_uwb(twin, p, phone, rng) for p in P] if k else [dict(uwb(twin, p, phone), los=None) for p in P]
+            e = locate.estimate(ctx, P, rs)
+            check_shape(e)
+            assert e["geometry"] in ("fix", "ring", "candidates")
+            if e["geometry"] == "fix":
+                # one merged region: it covers the spot and its mirror (never a tight fix on one side)
+                assert mirror_explained(twin, ctx, e, P)
+                fm = mirror((e["x"], e["y"]), a, b)
+                assert locate.inside(e, *fm)
+
+
+def test_mirror_behind_a_wall_without_los_stays_a_candidate(twin, ctx, room):
+    P = story_pucks(room)[:2]
+    phone = at(room, 2.4, 2.1)
+    mir = mirror(phone, (P[0]["x"], P[0]["y"]), (P[1]["x"], P[1]["y"]))
+    mroom = twin.locate(*mir)
+    assert mroom["room"] != FIRE_ROOM and all(twin.walls_crossed((p["x"], p["y"]), mir) <= N["uwb"]["max_walls"] for p in P)
+    rs = [dict(uwb(twin, p, phone), los=None) for p in P]          # an iPhone reports a distance only
+    e = locate.estimate(ctx, P, rs)
+    check_shape(e)
+    # a short baseline far from the phone: each side spreads over a metre, so a ring (two arcs); never a fix
+    assert e["geometry"] in ("candidates", "ring")
+    assert locate.inside(e, *phone) and locate.inside(e, *mir)      # both spots stay on the board
+    if e["geometry"] == "candidates":
+        assert {c["room"] for c in e["candidates"]} == {FIRE_ROOM, mroom["room"]}
+        assert all(c["weight"] > 0 for c in e["candidates"])
+    assert e["room"] is None
+    # pucks 4 m apart along the room's diagonal: both spots are compact, so two candidates, one behind the wall
+    a, b = at(room, 0.85 * room["w"], 0.8 * room["h"]), at(room, 0.45 * room["w"], 0.45 * room["h"])
+    P2 = pucks_at(a, b)
+    phone2 = at(room, 0.6 * room["w"], 0.15 * room["h"])
+    mir2 = mirror(phone2, a, b)
+    if twin.locate(*mir2)["room"] != FIRE_ROOM and _pip(mir2, twin.floor()["outline"]) and \
+            all(twin.walls_crossed((p["x"], p["y"]), mir2) <= N["uwb"]["max_walls"] for p in P2):
+        e2 = locate.estimate(ctx, P2, [dict(uwb(twin, p, phone2), los=None) for p in P2])
+        assert e2["geometry"] in ("candidates", "ring")
+        assert locate.inside(e2, *phone2)
+
+
+def test_pruned_reasons_are_deterministic(twin, ctx, room):
+    a, b = at(room, 1.0, 1.0), at(room, 1.0, 4.0)
+    phone = at(room, 4.0, 3.0)
+    P = pucks_at(a, b)
+    rs = [uwb(twin, p, phone) for p in P]
+    e1 = locate.estimate(ctx, P, rs)
+    e2 = locate.estimate(ctx, list(reversed(P)), list(reversed(rs)))
+    assert e1["pruned"] and e1["pruned"] == e2["pruned"]
+    texts = set()
+    rng = np.random.default_rng(4)
+    for _ in range(10):
+        jit = [dict(r, d_m=r["d_m"] + rng.normal(0, 0.03)) for r in rs]
+        e = locate.estimate(ctx, P, jit)
+        texts.update(q["reason"] for q in e["pruned"])
+        for q in e["pruned"]:
+            assert q["reason"] == q["reasons"][0]
+    assert texts == {"outside the building"}
+
+
+def test_confidence_coverage_two_pucks(twin, ctx, room):
+    rng = np.random.default_rng(202)
+    P = story_pucks(room)[:2]
+    hits, confs, geoms = [], [], {}
+    for _ in range(200):
+        phone = at(room, rng.uniform(0.4, room["w"] - 0.4), rng.uniform(0.4, room["h"] - 0.4))
+        if min(math.dist(phone, (p["x"], p["y"])) for p in P) < 1.0:
+            continue
+        e = locate.estimate(ctx, P, [static_uwb(twin, p, phone, rng) for p in P])
+        geoms[e["geometry"]] = geoms.get(e["geometry"], 0) + 1
+        hits.append(locate.inside(e, *phone))
+        confs.append(e["confidence"])
+        if e["geometry"] == "fix":
+            assert math.dist((e["x"], e["y"]), phone) <= max(3 * e["sigma_m"], 1.0) or e["pruned"]
+    rate, mean_conf = float(np.mean(hits)), float(np.mean(confs))
+    assert rate >= mean_conf - 0.12, (rate, mean_conf, geoms)

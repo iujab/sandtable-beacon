@@ -126,7 +126,7 @@ function renderCaption(phones) {
       : `One puck hears it: ${num(p.ring.r_m)} m from ${esc(p.ring.puck)}, direction unknown.${pruned ? " The twin rules out the dashed part of the ring (outside the building or inside a wall)." : ""}`;
   } else if (g === "candidates") {
     const n = (p.candidates || []).length, pr = (p.pruned || []).length;
-    x = `Cannot choose: ${n} possible spots${n === 2 ? ", mirror images across the line between the pucks" : ""}.${pr ? ` ${pr} more ruled out.` : ""} A puck slid to a wall, another puck, or the phone held up and pointed picks one.`;
+    x = `Cannot choose: ${n} possible spots${n === 2 ? ", mirror images across the line between the pucks" : ""}.${pr ? ` ${pr} more ruled out.` : ""} A puck slid to a wall, or another puck, picks one.`;
   } else if (g === "fix") {
     const nP = (p.ranges || []).length;
     x = `Located${p.room_label ? ` in ${esc(p.room_label)}` : ""} to ±${num(p.sigma_m)} m: ${p.method === "uwb-twr+bearing" ? "a range plus the phone's own direction to the puck" : p.method === "ble-rssi" ? "Bluetooth signal strength from several pucks" : nP ? `UWB ranges from ${nP} pucks` : "UWB ranges"}.`;

@@ -242,10 +242,30 @@ def test_candidates_are_two_spots_never_a_position(sample, twin, tmp_path):
 def test_stated_evidence_is_shown(sample, twin, tmp_path):
     b = json.loads(json.dumps(sample))
     fixp = next(p for p in b["phones"] if p["geometry"] == "fix")
-    fixp["assumptions"] = [{"kind": "occupant-statement", "room": "r310", "text": "Mirror candidate dismissed because the occupant says Suite 310."}]
+    # as beacon/prune.py publishes it: the assumption's text carries a share that changes from run to run
+    fixp["assumptions"] = [{"kind": "occupant-statement", "room": "r310", "rooms": ["r310"],
+                            "text": "Mirror candidate dismissed because the occupant says they are in Suite 310. On the measurements alone it was 4% likely."}]
+    fixp["pruned"] = [{"x": 12.0, "y": 2.0, "by": "occupant-statement", "weight": 0.04,
+                       "reason": "in Suite 311, not in Suite 310: the occupant says they are in Suite 310"}]
     box = ToolBox(brief_of(b), twin, config.site_raw(), record_path=tmp_path / "rc.json")
     v = next(p for p in box.call("get_phones", {})["phones"] if p["id"] == fixp["id"])
-    assert v["rests_on"][0]["room_label"] == "Suite 310" and "occupant says" in v["rests_on"][0]["text"]
+    r = v["rests_on"][0]
+    assert r["room_label"] == "Suite 310" and r["mirror_spot_dismissed_in"] == ["Suite 311"]
+    assert "position rests on the occupant's stated suite" in r["means"] and "position rests on the occupant's stated suite" in v["where"]
+    assert "%" not in json.dumps(v) and "likely" not in json.dumps(v)           # no noise-dependent number reaches the prompt
+    route = box.call("route_to", {"target": fixp["id"]})
+    assert "position rests on the occupant's stated suite" in route["leads_to"]
+
+
+def test_stale_phone_is_searched_where_last_known(sample, twin, tmp_path):
+    b = json.loads(json.dumps(sample))
+    ph = next(p for p in b["phones"] if p["geometry"] == "fix")
+    ph.update({"geometry": "none", "stale": True, "x": None, "y": None, "sigma_m": None,
+               "last_known": {"geometry": "fix", "room": "r310", "room_label": "Suite 310", "age_s": 31.0}})
+    box = ToolBox(brief_of(b), twin, config.site_raw(), record_path=tmp_path / "rc.json")
+    v = next(p for p in box.call("get_phones", {})["phones"] if p["id"] == ph["id"])
+    assert "stale" in v["where"] and "Suite 310" in v["where"] and "age_s" not in json.dumps(v)
+    assert "last known" in box.call("route_to", {"target": ph["id"]})["leads_to"]
 
 
 @pytest.mark.parametrize("cache", ["recorded", "empty"])

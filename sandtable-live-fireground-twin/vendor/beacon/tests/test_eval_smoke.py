@@ -46,7 +46,7 @@ def test_quick_eval_runs_and_writes_valid_json(tmp_path):
     for v in tp["layouts"].values():
         assert abs(sum(v["outcome_share"].values()) - 1.0) < 1e-6
     assert set(tp["false_statement"]) == {"door-wall", "exterior-wall", "careless"}
-    assert "/home/" not in json.dumps([b, lay, tp])                      # the tree is public: no machine paths
+    assert str(Path.home()) not in json.dumps([b, lay, tp])               # the tree is public: no machine paths
     for name in ("eval_error_vs_pucks", "eval_area_vs_pucks", "eval_bearing", "eval_twin_pruning", "eval_geometry_share",
                  "eval_storyboard", "eval_layouts", "eval_layouts_diagram", "eval_two_puck", "eval_two_puck_map"):
         assert (fig / f"{name}.png").stat().st_size > 10_000, name

@@ -83,7 +83,7 @@
       "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T14:08:58-06:00"
+    "updated": "2026-11-14T14:22:47-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",

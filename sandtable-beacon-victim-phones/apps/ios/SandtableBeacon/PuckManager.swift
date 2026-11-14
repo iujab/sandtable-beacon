@@ -27,6 +27,7 @@
 // Threading: queue nil = every callback on the main queue; the timer runs on main too.
 
 import Foundation
+import Combine
 import CoreBluetooth
 import NearbyInteraction
 
@@ -563,6 +564,11 @@ extension PuckManager: CBCentralManagerDelegate {
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let name = advertisedName ?? peripheral.name ?? "Puck"
         let now = nowSeconds()
+        // A board whose key is known (it was connected before) keeps a fresh signal
+        // reading from its advertisements, e.g. while another phone has its turn.
+        if let key = knownKeys[peripheral.identifier] {
+            rssiCache[key] = TimedValue(value: Double(value), t: now)
+        }
         if var existing = candidates[peripheral.identifier] {
             existing.rssi = (existing.rssi * 2 + value) / 3
             existing.lastSeen = now

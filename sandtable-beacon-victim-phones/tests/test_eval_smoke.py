@@ -27,7 +27,8 @@ def test_quick_eval_runs_and_writes_valid_json(tmp_path):
     assert took < 20.0, f"--quick took {took:.1f} s"
     b = json.loads((res / "eval_beacon.json").read_text())
     lay = json.loads((res / "eval_layouts.json").read_text())
-    for d in (b, lay):
+    tp = json.loads((res / "eval_two_puck.json").read_text())
+    for d in (b, lay, tp):
         assert d["simulated"] is True and d["quick"] is True
         assert d["noise_model"]["noise"]["uwb"]["sigma_los_m"] > 0
         assert d["trial_counts"] and d["base_seed"]
@@ -41,6 +42,11 @@ def test_quick_eval_runs_and_writes_valid_json(tmp_path):
     assert "band_covers_true_advertising" in b["cold"]
     assert lay["recommendation"]
     assert {r["layout"] for r in lay["rows"]} == {"one-device", "two-pucks", "three-pucks", "one-puck-bearing"}
+    assert set(tp["layouts"]) >= {"door-wall", "exterior-wall", "careless"}
+    for v in tp["layouts"].values():
+        assert abs(sum(v["outcome_share"].values()) - 1.0) < 1e-6
+    assert set(tp["false_statement"]) == {"door-wall", "exterior-wall", "careless"}
+    assert "/home/" not in json.dumps([b, lay, tp])                      # the tree is public: no machine paths
     for name in ("eval_error_vs_pucks", "eval_area_vs_pucks", "eval_bearing", "eval_twin_pruning", "eval_geometry_share",
-                 "eval_storyboard", "eval_layouts", "eval_layouts_diagram"):
+                 "eval_storyboard", "eval_layouts", "eval_layouts_diagram", "eval_two_puck", "eval_two_puck_map"):
         assert (fig / f"{name}.png").stat().st_size > 10_000, name

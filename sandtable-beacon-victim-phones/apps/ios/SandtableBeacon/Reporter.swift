@@ -16,6 +16,7 @@
 // "Stop sharing" sends {"kind": "bye"} and stops everything.
 
 import Foundation
+import Combine
 import UIKit
 import NearbyInteraction
 

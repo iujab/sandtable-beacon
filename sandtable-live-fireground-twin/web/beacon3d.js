@@ -20,7 +20,7 @@ export class Beacon3D {
     const m = mat(0x9aa4ae, 0.85);
     for (const a of [Math.PI / 4, -Math.PI / 4]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.08), m); b.position.copy(this.V(q.x, q.y, 0.12)); b.rotation.y = a; this._o(b, 27); }
     this._flat(new THREE.RingGeometry(0.34, 0.4, 32), mat(0x9aa4ae, 0.6), q.x, q.y, 0.11, 27);
-    this._lab(`ruled out: ${q.reason}`, "#c9d1d9", "rgba(30,36,44,.85)", 0.017).position.copy(this.V(q.x, q.y, 0.5));
+    this._lab(`ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`, "#c9d1d9", "rgba(30,36,44,.85)", 0.017).position.copy(this.V(q.x, q.y, 0.5));
     this._pickable(q.x, q.y, 0.45, { tip: `Ruled out: ${q.reason}` });
     if (strike) {
       // the resolution moment: the twin deletes the mirror place (big red X, then the grey ghost stays)

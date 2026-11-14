@@ -42,32 +42,45 @@
  "status": "building",
  "progress": {
   "percent": 32,
-  "phase": "re-planned for the owner's two-puck live demo: layout that makes two rings give one answer, turn-taking for two iPhones, hotspot networking with a QR code; all builders updated",
+  "phase": "building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now",
   "done": [
-   "docs/BEACON_FEED.md v1 frozen plus additions for the live iPhone path",
-   "docs/CONTRACTS.md",
-   "research notes with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md",
-   "beacon/roster.py: tenant roster against phones (accountability table, priorities, next puck), smoke-tested",
-   "locator and tracker (grid Bayes over the twin's floor; ring / candidates / fix / zone with honest geometry), 37 tests"
+   "Feed contract for the command board: docs/BEACON_FEED.md (v1 frozen, additions A1 to A8 for the live iPhone path and the two-puck demo)",
+   "Research with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md; summary and decisions in docs/PHONE_FEASIBILITY.md",
+   "Locator and tracker (ring, two candidates, position; never a dot where the geometry only supports a ring): 37 tests pass",
+   "Two-puck layout recommendation (beacon/layout.py) and visible dismissal of a mirror spot on stated evidence (beacon/prune.py)",
+   "Tenant roster against phones: accountability table, priorities, where the next puck goes (beacon/roster.py)",
+   "Privacy design: docs/PRIVACY.md"
   ],
   "left_software": [
-   "locator, simulator, server, board (building)",
-   "iOS occupant app (uncompiled Swift, close to Apple's and Qorvo's samples)",
-   "UNO Q puck host",
-   "tenant roster accountability and command-agent hand-off",
-   "evaluation incl. the owner's two-boards-on-one-device question",
-   "feasibility write-up, privacy, tests, review, README, PITCH"
+   "Server: simulated flow and live mode (POST /api/ingest from the iPhone app), then a clean-clone check of `bash run_demo.sh --source live --lan`",
+   "iOS occupant app in apps/ios (Swift, uncompiled): finish, syntax-check, independent API review; expect compiler errors on first build and paste them back",
+   "Board on port 1885: two-puck walk-through, 'cannot choose' state, puck placement, QR code for the app",
+   "Evaluation: two-puck layouts (how often two pucks give one answer), two boards on one device, error against number of pucks",
+   "Puck host for the UNO Q (heartbeat, experimental debug-channel reader, optional cold Bluetooth count)",
+   "Command agent turn (tenant roster against phones: priorities, radio orders, next puck) and the incident report page",
+   "README, PITCH, DEVPOST, tests, independent skeptical review"
   ],
   "left_hardware": [
-   "to be written: flash stock Qorvo firmware, build the iOS app in Xcode, place pucks, first range"
+   "1. (5 min) Power one DWM3001CDK from USB. Install Qorvo's free 'Qorvo Nearby Interaction' app from the App Store on the iPhone 14 and see whether the board already shows up and ranges. If it does, that board needs no flashing.",
+   "2. (15 to 30 min, once) Get the firmware: Qorvo 'Nearby Interaction' package for the DWM3001CDK (file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex inside the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582. It is an email form; a work or school address works better than Gmail. Keep the .hex outside the repository folder.",
+   "3. (10 min per board) Flash through the on-board J-Link: micro-USB DATA cable into port J9, SEGGER J-Flash Lite (free, segger.com), device NRF52833_XXAA, erase, program, reset. Guide: hardware/FLASH.md (being written).",
+   "4. (5 min per board) Prove each board with Qorvo's app: distance on the phone, check it against a tape measure at 1 m and 3 m.",
+   "5. (20 to 40 min) Build our app: open apps/ios/SandtableBeacon.xcodeproj in Xcode, choose your team, run on the iPhone 14, then the iPhone 15. Guide: docs/IOS_BUILD.md (being written). If it does not compile, paste the errors back.",
+   "6. (10 min) Network: open a hotspot on the Android phone; join it with the laptop and both iPhones. On the laptop: `bash run_demo.sh --source live --lan` (Windows: see README). Open the board, scan its QR code with each iPhone's camera to fill in the server address.",
+   "7. (10 min) Pucks: puck A on a battery bank beside the UNO Q, puck B on the Android phone through a USB-OTG adapter into the board's J-Link port (J9). Stand both upright, 15 cm or more off the floor, component-free side toward the room. Both just inside the 'door wall' of your taped room, about 4 m apart in building metres (hardware/BRINGUP.md gives the taped-rectangle distances).",
+   "8. (5 min) On the board, click each puck onto the plan where it stands and set the exercise scale. Press a status button in the app on the iPhone 14: a ring, then a position.",
+   "9. (15 min) Second victim: iPhone 15. Switch 'Take turns' on in the app on both phones (the stock firmware serves one phone per board), or power two more boards so each puck position has one board per phone.",
+   "10. (10 min) Rehearse the two-minute run-through and the fallback ladder in hardware/BRINGUP.md."
   ],
   "needs_from_owner": [
-   "Qorvo Nearby Interaction firmware for the DWM3001CDK: file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex (or the QANI hex inside the DW3_QM33 SDK), from qorvo.com/products/d/da008212 or da008582: an email form, a work or school address works better than Gmail. First test whether the boards already range with Qorvo's free App Store app 'Qorvo Nearby Interaction'",
-   "SEGGER J-Link software (J-Flash Lite) on the Mac, free from segger.com",
-   "Xcode on the Mac with an Apple ID for signing; Developer Mode switched on on both iPhones",
-   "one USB battery bank (or wall adapter) and a micro-USB DATA cable per puck"
+   "Qorvo Nearby Interaction firmware for the DWM3001CDK (step 2 above): only you can submit Qorvo's download form",
+   "SEGGER J-Link software on the Mac or laptop (free download, no account)",
+   "Xcode with your Apple ID; Developer Mode on both iPhones (Settings > Privacy & Security > Developer Mode)",
+   "A USB-C OTG adapter for the Android phone, two micro-USB DATA cables, one battery bank (a second as the fallback for puck B), tape and a tape measure",
+   "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
+   "CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then"
   ],
-  "updated": "2026-11-14T12:36:48-06:00"
+  "updated": "2026-11-14T12:48:25-06:00"
  },
  "owner_questions": [
   {
@@ -80,7 +93,7 @@
   },
   {
    "q": "One puck or two for angle?",
-   "a": "Two pucks, as you chose, can give one answer if you place them right. One puck gives a ring; two give two mirror points across the line between the pucks. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart): the mirror point then falls outside the room, and the board dismisses it, by the twin's walls when it is two walls away, otherwise on the occupant's stated suite, shown as dismissed. Pucks mid-room leave two points nothing can decide, and the board says so. Better if you have it: a third puck gives a position with no assumption. An iPhone 14 or 15 does not report direction to an accessory, so do not count on the phone's bearing. Simulated success rates follow when the evaluation finishes."
+   "a": "Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room: one position in 77% of cases (48% by the twin's walls alone, 29% after the occupant's stated suite, shown as dismissed), median error 0.26 m, a wrong position in 1.1%; the rest stay a ring because only one puck reached the phone. Pucks dropped mid-room: one position in only 18%, and the board says 'cannot choose' in 57%. Better if you have it: a third puck gives one position in 88% with 0.20 m median error and no assumption. An iPhone 14 or 15 reports no direction to an accessory, so do not count on the phone's bearing."
   },
   {
    "q": "Will the phone keep answering with the screen off?",
@@ -88,7 +101,7 @@
   },
   {
    "q": "Can we put both UWB boards on one device we throw in?",
-   "a": "It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow."
+   "a": "It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the bearing error is 22, 17 and 14 degrees (median), the sideways error 1.7, 1.3 and 1.3 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 5 degrees and 0.38 m sideways."
   },
   {
    "q": "Two pucks: one on a battery bank with the UNO Q, one powered by the Android phone?",
@@ -130,8 +143,15 @@
   "last_run": null
  },
  "limitations": [
-  "Nothing has run on hardware; all results are simulated.",
-  "The iOS app is uncompiled source (no Mac on the build machine)."
+  "Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.",
+  "The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.",
+  "Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.",
+  "Bring-up guides are written from documentation and forum reports, not from a board.",
+  "With Qorvo's stock firmware one board serves one phone at a time, and the range is read by the phone app, not by the puck: the phone needs a network path to the server and the app must stay open.",
+  "An iPhone 14 or 15 reports distance but no direction to an accessory.",
+  "A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.",
+  "The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.",
+  "Not a life-safety product."
  ],
  "team": {
   "lead_model": "claude-fable-5-2",

@@ -46,6 +46,10 @@ struct SandtableBeaconApp: App {
                         pucks: model.pucks,
                         reporter: model.reporter,
                         sensors: model.sensors)
+                .onOpenURL { url in
+                    // sandtablebeacon://server?url=http://HOST:1885 (QR code on the board page)
+                    _ = model.settings.applyConfigURL(url)
+                }
         }
     }
 }

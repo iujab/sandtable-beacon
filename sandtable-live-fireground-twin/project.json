@@ -2,7 +2,7 @@
   "lane": "L01",
   "slug": "sandtable-live-fireground-twin",
   "title": "Sandtable Beacon",
-  "tagline": "Pucks thrown into a burning building find the people inside by their phones; they appear in the right room of a map built from the building record, the aerial photo and the 3D twin, and an AI command agent routes the rescue and writes the report.",
+  "tagline": "Pucks in a burning building hear the occupants' phones; each phone appears in the right room of a map built from the building's own data (record, aerial, 3D twin), drawn only as precisely as the measurement allows, and an AI command agent routes the rescue and writes the report.",
   "main_track": "healthcare",
   "primary_target": "costar",
   "special_tracks": [
@@ -11,25 +11,32 @@
     "physical-ai",
     "amazon"
   ],
-  "abstract": "When a commercial building burns, the commander does not know who is still inside or where. Sandtable Beacon is the command and reporting centre for that question. Before the crews arrive, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. Crews then throw small pucks into the building. Occupants phones answer them: with the opt-in app a phone is ranged by UWB and Bluetooth and drawn as what the measurement supports (a ring, two candidates, a fix); without it the pucks only count devices. Each located phone appears in the right room of the map, next to who the record says should be there. The agent prioritises, routes a crew through the twin, issues the radio order, re-plans, and writes the report a command post keeps. Two secondary modes run in simulation: a UWB radar that finds an untagged breathing person, and tagged crew tracking.",
-  "aha": "A phone answers a puck: a ring appears in the twin, collapses to a point in Suite 310 beside the tenant the building record expects there, and the agent sends the rescue team by the route the twin allows.",
+  "abstract": "When a commercial building is on fire, the incident commander's hardest question is who is still inside, and where. Sandtable Beacon is a command and reporting centre for that question. When the alarm comes in, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. A crew then places small pucks (Qorvo DWM3001CDK boards: Bluetooth and UWB) in the building. Occupants who opened the opt-in app are ranged through their phones, and each phone is drawn as what the measurement supports: a ring, two candidate points, or one point, in the right room and beside the tenant the building record expects there. Phones without the app are only a device count. The agent prioritises, routes a rescue crew through the twin, issues the radio order, re-plans and writes the report the command post keeps. Sponsor layers run as labelled fixtures; positions are simulated until the boards run.",
+  "aha": "Two pucks give each phone two possible places, mirror images of each other; the twin's walls rule one out, so phone 1 lands as a point in the dentist's office the building record expects to be full, while phone 2 honestly stays 'two places: search both'. The building's own data does the job of a third puck.",
   "how_it_works": [
-    "Pre-plan: a tool-using agent reads the building record, the aerial image and the twin",
-    "Pucks go in: Bluetooth and UWB anchors that occupants phones answer (module by lane L16)",
-    "Each phone is drawn as what the measurement supports: ring, candidates, fix, or a device count",
-    "Accountability: the record tenants set against the phones still inside",
-    "Command: the agent prioritises, routes a crew through the twin, radios the order, re-plans",
-    "Report: the hand-off a command post keeps; GeoJSON and Cursor-on-Target feeds"
+    "Pre-plan: a tool-using agent reads the building record (CoStar layer), the aerial image (Vexcel layer, through a vision tool) and the 3D twin (Matterport layer)",
+    "Pucks in: DWM3001CDK boards on stock firmware, positions tape-measured and clicked onto the plan; opt-in iPhones range them and report status (lane L16's Beacon module)",
+    "Drawn honestly: one puck a ring, two pucks two candidates, the twin deletes impossible ones, a point only for a fix; no app means a device count, never people",
+    "Accountability: the record's tenants and expected occupancy per suite set against the phones heard, as ranges",
+    "Command: the agent prioritises, routes a crew through the twin, radios the order, re-routes when a phone's geometry improves, requests EMS",
+    "Report and feeds: a printable command-post report, GeoJSON and Cursor-on-Target"
   ],
   "stack": [
-    "Python 3",
-    "FastAPI",
-    "three.js",
-    "uwb-kit stream v1",
-    "Claude (anthropic | claude-cli | replay)"
+    "Python 3 (FastAPI, uvicorn, numpy)",
+    "three.js and SVG (no-build web app)",
+    "Claude via the Anthropic SDK, the Claude CLI, or replay of recorded real runs (claude-sonnet-5-5 recordings)",
+    "Lane L16 Beacon module (vendor/beacon): locator, tracker, simulator, iOS app (Apple Nearby Interaction)",
+    "Qorvo DWM3001CDK on stock Nearby Interaction firmware",
+    "Bench uwb-kit (vendor/uwbkit) for the simulated Crews mode",
+    "Scout radar simulator and DSP adapted from lane L08",
+    "GeoJSON, Cursor-on-Target 2.0",
+    "Public open data: LA County assessor and LARIAC, City of LA business listings and GeoHub, US Census TIGERweb, USDA NAIP"
   ],
   "sponsor_tech": {
-    "costar": "CoStar building record (construction, sprinklers, tenants, vacancy, contacts), Matterport Model API + Showcase SDK (floors, rooms, sweeps, tags, geocoordinates), Vexcel API v2 (ortho, oriented, DSM, structure). Typed adapters with live and labelled fixture modes; fixture mode uses real open data plus a synthetic interior."
+    "costar": "Building record: tenants by suite and floor, business category (life hazards inferred), vacancy, construction, stories, area; drives who-is-expected-where in the accountability table and the agent's priorities. Fixture mode only (real public data for 7325 Medical Center Dr, Los Angeles, CoStar-only fields empty); live adapter is a mapping table to fill (docs/TOOLKIT_SWAP.md).",
+    "matterport": "3D twin: rooms, walls, doors, stairs, walking graph; routes the crew and prunes impossible phone candidates (outside the outline, inside a wall, behind a wall on a line-of-sight link). Fixture: synthetic interior fitted to the real footprint. Live adapter written against the Model API GraphQL samples, never called.",
+    "vexcel": "Aerial: the sides of the building, approach, staging, hydrants; the agent looks at the image through a vision tool. Fixture: real USDA NAIP imagery. Live adapter written from the public Vexcel API v2 OpenAPI spec, never called.",
+    "anthropic": "Claude as the command agent (tool use in a plan, act, re-plan loop); the demo replays recorded real responses; the anthropic backend is written and not exercised (no key on the build machine)."
   },
   "hardware": {
     "used": [
@@ -43,8 +50,8 @@
   },
   "status": "building",
   "progress": {
-    "percent": 68,
-    "phase": "Beacon runs end to end on the board against the vendored Beacon module (live, simulated): phones resolve zone -> ring -> fix, the agent routes the rescue team, report written. Now: two-puck setup (click-to-place pucks, two rings -> two candidates, the twin deletes the mirror), replay determinism for recordings, write-ups, radar ablation, then recordings and an independent judge.",
+    "percent": 72,
+    "phase": "Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging.",
     "done": [
       "Crew tracking product with pre-plan agent, mayday exercise, replayed real-model runs (morning)",
       "Real open-data fixture for 7325 Medical Center Dr, footprint-fitted synthetic twin, spatial engine",
@@ -55,32 +62,41 @@
       "Radar feasibility write-up with sources; puck enclosure (DWM3001CDK + cell, UNO Q host brick)"
     ],
     "left_software": [
-      "Beacon link consuming lane L16 feed (sample first, live when its server is up)",
-      "Phones layer, accountability panel, mode switch, reporting page",
-      "Agent situations and tools for located phones; new recordings",
-      "Scout radar engine landing as a simulated mode; ablation for the feasibility answer",
-      "Re-cut README, DEVPOST, PITCH; vendor L16 module; independent judge"
+      "Two-puck scene on the board: click-to-place pucks, two rings per phone, pruned mirror candidate, 'cannot choose' state (board builder, in progress)",
+      "Hands-free beacon script on a frozen two-puck Beacon run so recorded agent turns replay exactly (server builder, in progress)",
+      "Record the agent's turns for the beacon, scout and mayday scripts with a real model: bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py",
+      "README, DEVPOST, PITCH re-cut around Beacon (write-ups builder, in progress)",
+      "Independent skeptical-judge review and fixes",
+      "Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py"
     ],
     "left_hardware": [
-      "Beacon hardware bring-up is in lane L16 (DWM3001CDK pucks, iPhone app); this board only needs the Beacon server URL"
+      "1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow sandtable-beacon-victim-phones/hardware (vendored here under vendor/beacon/hardware). Works when http://localhost:1885/healthz answers with source 'pucks'.",
+      "2. Start this board next to it (about 2 min): python -m sandtable.demo --beacon-url http://localhost:1885 (Windows: .venv\\Scripts\\python -m sandtable.demo --beacon-url http://localhost:1885). Works when the board at http://localhost:1810/ shows the Beacon badge as connected and not SIM.",
+      "3. Tape-measure the two pucks from two walls of the demo room, click 'Place pucks' and click them onto the room plan (fine-tune the metres in the dialog). Works when P1 and P2 show on the plan as 'placed by hand'.",
+      "4. Open the occupant app on the two iPhones. Works when each phone appears as two rings crossing at two points; where the twin's walls remove the mirror point it becomes a fix, otherwise the board says it cannot choose.",
+      "5. Click 'Dispatch alarm' before step 4 so the agent has the pre-plan; with ANTHROPIC_API_KEY set and LLM_BACKEND=anthropic the agent decides live, otherwise the labelled fallback policy routes the crew.",
+      "6. Optional: the crew phone page http://localhost:1810/crew.html?unit=RIT on the Android phone (adb reverse tcp:1810 tcp:1810).",
+      "7. No hardware for Scout (radar) or Crews (tags): both run simulated only on these boards."
     ],
     "needs_from_owner": [
-      "CoStar toolkit and keys (COSTAR_API_KEY, Matterport token id/secret, VEXCEL_API_KEY)",
-      "ANTHROPIC_API_KEY for live model decisions outside the recorded script"
+      "CoStar toolkit and keys (COSTAR_API_KEY, COSTAR_BASE_URL, COSTAR_PROPERTY_ID; MATTERPORT_TOKEN_ID/SECRET/MODEL_ID; VEXCEL_API_KEY): see docs/TOOLKIT_SWAP.md",
+      "ANTHROPIC_API_KEY for live agent decisions with real phones (the recorded turns only cover the scripted simulator scene)",
+      "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for",
+      "Confirmation of the sponsors' terms before any live sponsor response is committed (keep them under fixtures/live/ or data/ until then)"
     ],
-    "updated": "2026-11-14T12:31:54-06:00"
+    "updated": "2026-11-14T12:44:05-06:00"
   },
   "rubric": {
-    "Use of the data (30%)": "Three layers joined by one coordinate chain; each does a job the others cannot",
-    "Agentic depth (30%)": "Plan, act and re-plan loop with spatial, record, vision and action tools over a reflex layer",
-    "Usefulness (25%)": "Tabletop drills on real buildings and pre-plan drafts are usable on Monday",
-    "Demo and polish (15%)": "One-screen command board plus a physical rig a judge can touch"
+    "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",
+    "Agentic depth (30%)": "Situations as goals with a reply budget; the agent chooses tools (record, aerial vision, twin, phones, accountability) and ends in actions (assign with route, radio, EMS request, observations, record corrections); must search a ring or two candidates, never 'go to the phone'; re-called when geometry improves. Beacon turns use the labelled fallback policy until recorded.",
+    "Usefulness (25%)": "Incident commander and command post: who is inside, where, who is unaccounted for as an honest range, and a report at the end; prevention bureaus get a pre-plan draft for any commercial address.",
+    "Demo and polish (15%)": "One screen, two physical pucks and two iPhones, a printable report, a phone page for the rescue team that reads the feed; every uncertain thing drawn as uncertain."
   },
   "self_score": {
     "creativity": 4,
     "utility": 3,
     "charity": 5,
-    "avidity": 3,
+    "avidity": 4,
     "track_fit": 4,
     "demo_risk": 3
   },
@@ -90,7 +106,32 @@
     "command": "bash run_demo.sh --tailnet",
     "running": true
   },
-  "images": [],
+  "images": [
+    {
+      "path": "figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png",
+      "caption": "Two pucks, two phones: the twin rules out phone B1's mirror place (outside the building) so it becomes a point in Suite 310 beside the record's tenant; phone B2 stays 'cannot choose: 2 places'. Development sample (hand-made phones), labelled DEV SAMPLE on screen."
+    },
+    {
+      "path": "figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png",
+      "caption": "The same moment on the 2-D plan: rings from P1 and P2, the ruled-out mirror, B2's two weighted places. Development sample."
+    },
+    {
+      "path": "figures/ui_beacon_06b_crew_phone.png",
+      "caption": "The rescue team's phone page: the current order, the route through the twin, and the located people read from the GeoJSON feed. Simulated."
+    },
+    {
+      "path": "figures/report_screen_live.png",
+      "caption": "The reporting centre (/report.html) after a hands-free simulated run on the labelled sample feed: people found with times, accountability against the building record, plan, timeline, limits."
+    },
+    {
+      "path": "figures/puck_render.png",
+      "caption": "The Beacon puck enclosure for one DWM3001CDK and a cell: a self-righting ball, designed and checked in software, not printed."
+    },
+    {
+      "path": "figures/radar_ellipses.png",
+      "caption": "The owner's radar question: how 1, 2, 3 and 5 pucks constrain one target (geometry only). Scout mode is simulation only."
+    }
+  ],
   "tests": {
     "command": "bash run_tests.sh",
     "passed": 0,
@@ -98,8 +139,14 @@
     "last_run": ""
   },
   "limitations": [
-    "Sponsor layers run in fixture mode (no keys on this machine)",
-    "UWB positions are simulated"
+    "No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured",
+    "Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count, and devices are not people; the app must stay open with the screen on as built",
+    "Two pucks often leave two candidates; the twin removes one only when the geometry allows",
+    "All three sponsor layers are fixtures (real public data and NAIP imagery, synthetic interior); the live adapters were never called; the walls that prune a candidate are plausible walls, not surveyed ones",
+    "Expected head counts and life hazards are estimates and inferences from the record",
+    "Agent turns for the Beacon and Scout exercises fall back to a labelled deterministic policy until a real model run is recorded",
+    "Scout (radar) and Crews (tags) are simulation-only on these boards; the radar simulator was written alongside its detector",
+    "One floor modelled; feeds and the app link have no authentication; not a life-safety product"
   ],
   "team": {
     "lead_model": "claude-fable-5-2",
@@ -111,35 +158,63 @@
   },
   "owner_questions": [
     {
-      "q": "Is one UWB sensor enough to scan a room?",
+      "q": "[Phones] Can a UWB board range a victim's phone over UWB at all?",
+      "a": "Yes, with exactly your boards: a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware ranges an iPhone 11 or later through Apple's accessory protocol, once the person has opened our app. Both your iPhones give distance (about 60 readings a second); neither gives direction to an accessory. The app reads the distance and reports it; the board itself only logs it on its debug channel."
+    },
+    {
+      "q": "[Phones] Can it be done cold, to a phone whose owner installed nothing?",
+      "a": "No. An iPhone's UWB radio only answers a session started by an app with the user's permission. Cold, a radio can only count Bluetooth advertisements nearby: a rough band of devices by signal strength, no identity, and devices are not people. The stock puck firmware cannot even do that; the UNO Q's own radio can (written, never run)."
+    },
+    {
+      "q": "[Phones] One puck or two for angle?",
+      "a": "One puck gives a ring. Two give two candidate points, mirror images across the line between the pucks; the twin's walls often delete one. Three pucks not in a line give a position. The phone's own direction would turn one ring into a point, but an iPhone 14 or 15 does not report direction to an accessory without camera assistance (a moving phone that can see), so do not count on it. Simulated numbers follow when the evaluation finishes."
+    },
+    {
+      "q": "[Phones] Will the phone keep answering with the screen off?",
+      "a": "Not as built tonight: keep the app open (it keeps the screen awake). Two ways exist and are not built: a Bluetooth-paired background session in which only the puck gets the measurements, and, on iOS 18.4 or later, a Live Activity that lets the app keep ranging."
+    },
+    {
+      "q": "[Phones] Can we put both UWB boards on one device we throw in?",
+      "a": "It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow."
+    },
+    {
+      "q": "[Phones] Or one puck on the Android phone and one on the UNO Q, two separately powered pucks?",
+      "a": "Two separate pucks a few metres apart are far better than two boards on one device: tens of centimetres, with two candidates that the twin can often cut to one. The Android phone is only worth using as a power source: the stock firmware prints nothing a phone could read. Recommended for the live demo: three separate pucks on battery banks, 2 to 3 m apart, not in a line; the UNO Q can power one and run the server."
+    },
+    {
+      "q": "[Phones] What does a puck need?",
+      "a": "Power only (5 V on either micro-USB port). The range comes back through the iPhone app over Wi-Fi. Stand the board upright, at least 15 cm off the floor, component-free side toward the phone. Puck positions are measured with a tape and clicked onto the plan: the stock firmware cannot range board to board."
+    },
+    {
+      "q": "[Radar] Is one UWB sensor enough to scan a room?",
       "a": "No. A single DWM3001CDK board cannot hear its own echoes. Qorvo's own staff say the module cannot transmit and receive at the same time. The smallest radar is two boards: one transmits, the other records the echoes that arrive after the direct pulse."
     },
     {
-      "q": "Why not?",
+      "q": "[Radar] Why not?",
       "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 \u00b5s, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
     },
     {
-      "q": "How do multiple boards fix it?",
+      "q": "[Radar] How do multiple boards fix it?",
       "a": "One board transmits and the others listen. Each pair turns an echo's delay into an ellipse with the two boards as foci. More boards give more ellipses at different angles, and the target sits where they cross. The boards first range each other to learn their own positions, because every ellipse needs known foci."
     },
     {
-      "q": "How many are needed, and what does each added board buy?",
+      "q": "[Radar] How many are needed, and what does each added board buy?",
       "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m\u00b2 (two boards) to 0.40 m\u00b2 (three) and 0.15 m\u00b2 (five)."
     },
     {
-      "q": "What is the 'map', and what is it not?",
+      "q": "[Radar] What is the 'map', and what is it not?",
       "a": "It is a coarse echo map: a few strong reflectors, a rough outline, what moved, and where the room disagrees with the stored twin. It is not a LiDAR-grade model, because echoes about 0.3 to 0.6 m apart merge and walls reflect like mirrors. The twin is the map; the boards add people, breathing and changes."
     },
     {
-      "q": "Why does this beat cameras and LiDAR in smoke, and where does it not?",
+      "q": "[Radar] Why does this beat cameras and LiDAR in smoke, and where does it not?",
       "a": "Smoke particles (0.01 to 1 \u00b5m) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
     },
     {
-      "q": "What is the biggest open risk?",
+      "q": "[Radar] What is the biggest open risk?",
       "a": "Signal strength. The sample victim's echoes arrive 25 to 36 dB below the direct pulse. In real recorded data, the empty room's own multipath already flickers at about 22 dB below. Expect detection within a few metres of the pucks. A breathing person across a 9.5 m room is unproven until measured."
     },
     {
-      "q": "What is simulated today?",
+      "q": "[Radar] What is simulated today?",
       "a": "All of the radar. No board has run it, and the reused echo-reading firmware targets ESP32 boards, not the DWM3001CDK. Scout is a secondary, simulation-only mode of Sandtable Beacon. The timing and geometry arithmetic is exact; detection performance is not measured. On the one real recording available, the reused tracker followed clutter, not the person."
     }
   ]

@@ -411,3 +411,82 @@ def test_simulated_walkthrough_end_to_end(twin_raw, site_raw):
     assert "ring" in seen
     assert seen[-1] == "fix"
     assert seen.index("ring") < len(seen) - 1
+
+
+# ---------------------------------------------------------------------------- stated evidence (BEACON_FEED A8, beacon.prune)
+PAIR = [{"id": "P1", "x": 9.15, "y": 6.7}, {"id": "P2", "x": 9.15, "y": 2.7}]       # both along the door wall of r310
+
+
+def _two_cands_spatial(room_a="r310", room_b="rcW"):
+    return {"method": "uwb-twr", "geometry": "candidates", "x": None, "y": None, "sigma_m": None, "cov": None, "confidence": 0.9,
+            "room": None, "room_label": None, "room_prob": None, "node": None, "ring": None, "zone": None, "pruned": [],
+            "candidates": [{"x": 2.4, "y": 4.7, "sigma_m": 0.3, "weight": 0.5, "room": room_a, "room_label": "Suite 310"},
+                           {"x": 15.9, "y": 4.7, "sigma_m": 0.3, "weight": 0.5, "room": room_b, "room_label": "elsewhere"}]}
+
+
+class _FixedTrack:
+    """A tracker stub that returns a fixed locator result (to test what the session does with it)."""
+    result: dict = {}
+
+    def __init__(self, eid, georef_bearing_deg=None):
+        self.eid, self.report, self.last_seen, self.moving = eid, {}, None, False
+
+    def add(self, obs):
+        pass
+
+    def inputs(self, now):
+        return [], None
+
+    def estimate(self, ctx, pucks, now, noise=None):
+        return json.loads(json.dumps(self.result))
+
+
+def _stated(twin_raw, site_raw, report, result, search_room=None):
+    s, _ = _session(twin_raw, site_raw)
+    s._Track = _FixedTrack
+    _FixedTrack.result = result
+    s.set_pucks(PAIR, room="r310")
+    if search_room:
+        s.set_search_room(search_room)
+    s.ingest({"kind": "report", "t": T0, "eid": EID, "prev_eid": None, "report": report})
+    return s.step(T0 + 0.25)["phones"][0]
+
+
+def test_occupant_statement_dismisses_mirror_visibly(twin_raw, site_raw):
+    pytest.importorskip("beacon.prune")
+    p = _stated(twin_raw, site_raw, {"status": "trapped", "home_suite": "310"}, _two_cands_spatial())
+    assert p["geometry"] == "fix" and p["x"] == 2.4 and p["room"] == "r310"
+    assert p["assumptions"] and p["assumptions"][0]["kind"] == "occupant-statement"
+    assert any(q.get("by") == "occupant-statement" for q in p["pruned"])
+    assert p["text"].endswith("(mirror spot dismissed: the occupant says they are in Suite 310)")
+
+
+def test_search_room_assumption(twin_raw, site_raw):
+    pytest.importorskip("beacon.prune")
+    p = _stated(twin_raw, site_raw, {"status": "trapped"}, _two_cands_spatial(), search_room="r310")
+    assert p["geometry"] == "fix" and p["assumptions"][0]["kind"] == "search-room"
+    assert "command is searching Suite 310" in p["text"]
+
+
+def test_candidates_stay_when_nothing_decides(twin_raw, site_raw):
+    p = _stated(twin_raw, site_raw, {"status": "trapped", "home_suite": "310"}, _two_cands_spatial("r310", "r310"))
+    assert p["geometry"] == "candidates" and p["x"] is None and p["assumptions"] == []
+    assert "cannot choose between them" in p["text"] and "a third puck, or moving one puck to the wall, would decide" in p["text"]
+
+
+def test_safe_outside_statement_not_used(twin_raw, site_raw):
+    p = _stated(twin_raw, site_raw, {"status": "ok", "home_suite": "310", "safe_outside": True}, _two_cands_spatial())
+    assert p["geometry"] == "none" and p["assumptions"] == []
+
+
+def test_live_links_kept_25_s_and_stale_after_40(twin_raw, site_raw):
+    s, _ = _session(twin_raw, site_raw, source="live", locator="auto")
+    s.set_pucks([{"id": "P1", "x": 7.9, "y": 6.7, "accessory": "A#0001"}], room="r310")
+    _batch(s, T0, [("A#0001", 5.0)])
+    s.step(T0 + 0.1)
+    b = s.step(T0 + 18.0)                                                 # one turn of the stock firmware later
+    p = b["phones"][0]
+    assert p["stale"] is False and p["geometry"] == "ring"
+    assert s.ack(p)["heard_by"] == ["P1"]
+    assert s.step(T0 + 35.0)["phones"][0]["stale"] is False
+    assert s.step(T0 + 41.0)["phones"][0]["stale"] is True

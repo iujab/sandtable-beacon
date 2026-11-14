@@ -4,11 +4,11 @@
 
 When a commercial building is on fire, the incident commander's hardest question is who is still inside, and where. Sandtable Beacon is a command and reporting centre for that question. When the alarm comes in, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. A crew then places small pucks (Qorvo DWM3001CDK boards: Bluetooth and UWB) in the building. Occupants who opened the opt-in app are ranged through their phones, and each phone is drawn as what the measurement supports: a ring, two candidate points, or one point, in the right room and beside the tenant the building record expects there. Phones without the app are only a device count. The agent prioritises, routes a rescue crew through the twin, issues the radio order, re-plans and writes the report the command post keeps. Sponsor layers run as labelled fixtures; positions are simulated until the boards run.
 
-![The command board: phones drawn as what each measurement supports, in Suite 310 of the twin, beside the accountability panel](figures/ui_beacon_05_ring_to_fix.png)
+![Two pucks, two phones: the twin rules out one phone's mirror place, the other stays two places](figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png)
 
-*The board, running on the labelled sample feed (`SAMPLE PHONES` and `SIMULATED` badges): one phone as a point with its uncertainty, one as a ring around a puck, one as two weighted candidates, one as a room-level zone, and a device count marked "not people". Left: the accountability panel sets the building record's tenants against the phones. Crew positions are simulated; the footer says what is real.*
+*Two pucks placed by hand (P1, P2) in Suite 310 hear two phones. Phone B1's two candidate places are mirror images across the line between the pucks; one falls outside the building outline, so the twin rules it out (the red cross) and B1 becomes a point, ±0.3 m, beside the record's tenant (offices of dentists, patients may be sedated). Phone B2's two places are both inside the room: the board says "cannot choose: 2 places" with their weights. Made with the board's development sample (`DEV SAMPLE` badge: hand-made phones, not a measurement); crews simulated; the agent turns shown are the labelled fallback policy.*
 
-![The same incident on the 2-D plan, as the rescue team brings out the occupants of phone B1](figures/ui_beacon_07_plan_2d.png)
+![The same moment on the 2-D plan](figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png)
 
 Built for HackPrinceton Fall 2026. Main track: **Healthcare**. Special tracks: **CoStar "Inside and Out: AI for the Built World"** (primary), **Best Hardware Hack**, **Best Physical AI Hack**, **Amazon Best Practical AI Innovation**.
 
@@ -33,7 +33,7 @@ Healthcare, because the job is the first link of emergency care: finding trapped
 | Command | The agent prioritises, sends the rescue team by a route through the twin, radios the order with what the record says is in that room, re-routes when a phone's geometry improves, requests EMS with the occupants' reported condition. With a ring or two candidates the order is to search, never "go to the phone" | all |
 | Report and feeds | A printable report for the command post (`/report.html`): people found with times, the accountability table, a plan of the floor, crews, timeline, the agent's summary, limits. The same picture as GeoJSON and Cursor-on-Target | all |
 
-**The live demo** uses the owner's hardware: two pucks and two iPhones (an iPhone 14 and an iPhone 15), through lane L16's Beacon module. Each phone answers both pucks with two rings that cross at two candidate points. For one phone the twin's walls rule out the mirror candidate and it becomes a point in the room, beside who the record expects there. For the other both candidates are possible, and the board says so: two weighted places, and an order to search both. That is the moment the map does the work a third puck would otherwise do. Neither iPhone reports direction to these boards, so nothing here uses a bearing.
+**The live demo** is built for the owner's hardware: two pucks and two iPhones (an iPhone 14 and an iPhone 15), through lane L16's Beacon module. Each phone answers both pucks with two rings that cross at two candidate points. The phones are staged so that, for one phone, the twin's walls rule out the mirror candidate and it becomes a point in the room, beside who the record expects there. For the other both candidates are possible, and the board says so: two weighted places, and an order to search both. That is the moment the map does the work a third puck would otherwise do. Neither iPhone reports direction to these boards, so nothing here uses a bearing.
 
 ![The reporting centre: the incident report a command post keeps](figures/report_screen_live.png)
 
@@ -101,18 +101,28 @@ TODO(lead): after the first live run, replace this line with what ran on the own
 
 ## Run it
 
-Needs Python 3.10 or newer. Everything is wheels-only and pure Python, so the same commands work on Linux, macOS, Windows and Debian aarch64 (the UNO Q).
+A first run needs Python 3.10 or newer and an internet connection for the one-time install (wheels only, no compiler). Nothing else: no keys, no boards, no phones. Every dependency is pure Python or a wheel, so the same launcher runs on Windows, macOS, Linux and the Arduino UNO Q (Debian aarch64).
 
-```bash
-bash run_demo.sh --storyboard          # Linux/macOS: installs into .venv on first run, then plays the Beacon exercise hands-free
-```
+**Windows (PowerShell):**
 ```powershell
-py -m venv .venv                       # Windows
+py -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m sandtable.demo --storyboard
+.venv\Scripts\python -m sandtable.demo                 # add --storyboard to play the Beacon exercise hands-free
 ```
 
-Open <http://localhost:1810/>. The launcher also starts the vendored Beacon module on port 1885 (simulated phones) when nothing answers there. Without `--storyboard`, use the mode switch (**Beacon | Scout | Crews**), **Dispatch alarm**, **Throw pucks**, or the exercise menu. Reporting centre: `/report.html`. Rescue team's phone page: `/crew.html?unit=RIT`. Feeds: `/feed/scan.geojson`, `/feed/cot.xml`, `/feed/cot/stream`.
+**macOS and Linux:**
+```bash
+bash run_demo.sh                       # creates .venv and installs on the first run; add --storyboard for the hands-free exercise
+```
+
+**Arduino UNO Q (Debian aarch64), or any machine without bash:**
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m sandtable.demo --host 0.0.0.0       # reachable from a laptop or phone on the same network
+```
+
+Open <http://localhost:1810/>. The launcher also starts the vendored Beacon module on port 1885 (simulated phones) when nothing answers there. Without `--storyboard`, use the mode switch (**Beacon | Scout | Crews**), **Dispatch alarm**, **Place pucks** (click where each tape-measured puck stands, then send them to the Beacon module), **Throw pucks** (simulated), or the exercise button and its menu (Beacon, Scout and mayday exercises). Reporting centre: `/report.html`. Rescue team's phone page: `/crew.html?unit=RIT`. Feeds: `/feed/scan.geojson`, `/feed/cot.xml`, `/feed/cot/stream`.
 
 | Setting | Values | Default |
 |---|---|---|
@@ -165,6 +175,8 @@ No UWB board and no phone has been in the loop of any number below.
 
 ### Scout: the pucks as a radar (SIMULATED)
 
+Detection by number of pucks: the table in the radar section below, generated by `scripts/eval_scout.py` from `results/scout_ablation.json` and `results/scout_placement.json`. The rest of that file, in short:
+
 SIMULATED, from `results/scout_ablation.json` (`.venv/bin/python scripts/eval_scout.py`): 60 seeded throws per row into Suite 310, 12 s scans at 20 Hz, the full pipeline (self-location, registration into the twin, detection). Noise model: direct-path SNR 36 dB at 1 m, random carrier phase per frame, multipath flicker, person radar cross-section 0.4-0.9 per seed (m²). The simulator was written alongside the detector, so real boards will do worse.
 
 | Pucks | Links | Breathing person within 4.5 m of a puck: reported / within 0.6 m | Median error when reported | Breathing rate error, median | Person anywhere in the room: reported | Empty room: false alarms | Still, not breathing: reported |
@@ -213,8 +225,8 @@ From `results/replay_check_*.json` (`scripts/check_replay.py`, run against a liv
 | scout | | | not yet measured | | |
 
 Recorded agent responses: 23 files in `fixtures/llm_cache/`, model claude-sonnet-5-5, recorded through the Claude CLI between 2026-11-14T10:44 and 2026-11-14T10:49 (local time). The demo replays them; nothing in that folder is hand-written.
-Headless-browser walk of the board (`results/ui_walk.json`, `scripts/shots.cjs`): beacon 46.7 s, 16 screenshots, 0 console messages; mayday 77.1 s, 14 screenshots, 1 console messages; scout 65.8 s, 13 screenshots, 0 console messages.
-Tests (`bash run_tests.sh`, offline, replay-mode model): 146 passed, 1 failed in 65 s, last run 2026-11-14T12:33.
+Headless-browser walk of the board (`results/ui_walk.json`, `scripts/shots.cjs`): beacon 49.9 s, 16 screenshots, 0 console messages; mayday 80 s, 14 screenshots, 0 console messages; scout 65.8 s, 13 screenshots, 0 console messages.
+Tests (`bash run_tests.sh`, offline, replay-mode model): 148 passed, 0 failed in 85 s, last run 2026-11-14T12:40.
 
 ## Is one UWB board enough to scan a room? (the owner's question; Scout mode, simulation only)
 
@@ -232,20 +244,22 @@ Scout is a secondary, **simulation-only** mode of Sandtable Beacon. No board has
 
 **Biggest risk:** echo strength. Across this room a person's echo is 25 to 36 dB below the direct pulse, near the clutter level in real recorded data. On the one real recording available (ETH Zurich, DWM1000 modules), the reused tracker followed clutter, not the person.
 
-**Simulated detection by number of pucks** (full pipeline on this tree's simulator; real boards will do worse):
-
 <!-- scout-ablation:start (generated by scripts/make_results_md.py) -->
-SIMULATED, from `results/scout_ablation.json` (`.venv/bin/python scripts/eval_scout.py`): 60 seeded throws per row into Suite 310, 12 s scans at 20 Hz, the full pipeline (self-location, registration into the twin, detection). Noise model: direct-path SNR 36 dB at 1 m, random carrier phase per frame, multipath flicker, person radar cross-section 0.4-0.9 per seed (m²). The simulator was written alongside the detector, so real boards will do worse.
+**Simulated evidence: what N thrown pucks find.** SIMULATED, never measured: Suite 310, 60 seeds per row, a 12 s scan, lane L08's noise model, on a simulator written alongside the detector. Real boards will do worse. Errors are in the twin frame, so a wrong registration counts against the result.
 
-| Pucks | Links | Breathing person within 4.5 m of a puck: reported / within 0.6 m | Median error when reported | Breathing rate error, median | Person anywhere in the room: reported | Empty room: false alarms | Still, not breathing: reported |
-|---|---|---|---|---|---|---|---|
-| 1 | 0 | 0% / - | - | n/a | 0% | 0% | 0% |
-| 2 | 1 | 33% / presence and range only | no position | 4.8 /min | 27% | 27% | 27% |
-| 3 | 3 | 50% / 30% | 0.45 m | 0.9 /min | 35% | 3% | 8% |
-| 4 | 6 | 62% / 53% | 0.17 m | 0.5 /min | 43% | 0% | 2% |
-| 5 | 10 | 78% / 75% | 0.1 m | 0.4 /min | 65% | 2% | 0% |
+| Pucks | What it gives | Breathing victim reported (within 4.5 m of a puck) | Reported and within 1 m | Location error, median / 90th pct | Pucks placed in the twin: median error, wrong pose |
+|---|---|---|---|---|---|
+| 1 | nothing: a board cannot hear its own echo | 0/60 (0%) | 0/60 (0%) | n/a | n/a |
+| 2 | presence and an echo range, no position | 20/60 (33%), and 16/60 with nobody there | no position | n/a | 2.1 m, wrong in 220/240 |
+| 3 | a position with no redundancy | 30/60 (50%, 38-62%) | 21/60 (35%) | 0.45 / 6.22 m | 4.9 cm, wrong in 65/240 |
+| 4 | a position, one bad link can be outvoted | 37/60 (62%, 49-73%) | 36/60 (60%) | 0.17 / 0.64 m | 1.7 cm, wrong in 7/240 |
+| 5 | a position, ten links | 47/60 (78%, 66-87%) | 45/60 (75%) | 0.10 / 0.30 m | 1.2 cm, wrong in 4/240 |
 
-One puck reports nothing by construction (one puck cannot receive its own echo). Rates are over all scans; Wilson 95% intervals are in the file.
+**Natural placement** (the victim anywhere in the far part of the room, not kept within reach; the honest field number): 5 pucks report 39/60 (65%, 52-76%), 37/60 within 1 m; 4 pucks 26/60 (43%); 3 pucks 21/60 (35%). **False alarms in an empty room:** 2/60, 0/60 and 1/60 with 3, 4 and 5 pucks (2 pucks: 16/60). A victim who neither breathes nor moves was reported within 1 m of where they lay in 0 of 180 scans with 3 to 5 pucks. Debris was flagged within 0.8 m in 85% of 5-puck scans, with 1.7 other flags per scan, 50% of them on the victim or on furniture the twin does not show. In 46 of 60 5-puck seeds the natural draw already fell within 4.5 m of a puck, so the two placements share those scenes.
+
+![Detection and location error against the number of pucks, simulated](figures/scout_ablation.png)
+
+Data: `results/scout_ablation.json` and `results/scout_placement.json`, written by `.venv/bin/python scripts/eval_scout.py` (about 4 minutes on 4 cores). More detail, and why 1, 2 and 3 pucks fail: [docs/RADAR_FEASIBILITY.md, Simulated evidence](docs/RADAR_FEASIBILITY.md#simulated-evidence).
 
 <!-- scout-ablation:end -->
 

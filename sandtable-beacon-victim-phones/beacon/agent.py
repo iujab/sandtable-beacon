@@ -49,7 +49,7 @@ Rules
 - Facts come only from tool results and from the situation given to you. Never invent a fact, number, name or contact. If something is missing from the data, say that it is missing.
 - When a value is marked simulated, sample, estimate or fixture, carry that label with it.
 - Be brief and operational. Radio traffic is plain language with the call sign first, for example "RIT from Command: ...", at most 40 words per message. Say suite numbers, room and corridor names and stairs; never say an internal id (room, door or node ids) on the radio, in a summary or in a priority.
-- Only a phone whose owner installed the app and pressed SOS is identified (B1...). Its location is what its measurements support: a fix is a point with an uncertainty; candidates are separate spots, any of which may be right; a ring is a distance from one puck, not a place; a zone is a room. Call only a fix the phone's position. With candidates, a ring or a zone the order is to search: the spots, the arc or the room, never "go to the phone".
+- Only a phone whose owner installed the app and pressed SOS is identified (B1...). Its location is what its measurements support: a fix is a point with an uncertainty; candidates are separate spots, any of which may be right; a ring is a distance from one puck, not a place; a zone is a room. Call only a fix the phone's position. Two pucks give two candidate spots, mirror images of each other: that is never a position; send the crew to check both, or ask for a puck to be moved to decide. With candidates, a ring or a zone the order is to search: the spots, the arc or the room, never "go to the phone". A fix that rests on a statement (rests_on: the occupant's stated suite, or command's search room) is only as good as that statement: say so.
 - Devices heard without the app are a count of devices, not of people. The record's expected head counts are estimates from floor area and building-code load factors, so the number of people unaccounted for is a range, never one number.
 - The occupant's own report (trapped, injured, how many people, whether they can move) is what they typed or picked: pass it on as their report. An occupant who pressed "I am out" is accounted for, not searched for.
 - A suite the record lists as vacant where a phone, a device or a registered app user turns up is a disagreement to verify, not proof either way.
@@ -185,9 +185,11 @@ def _who(view: dict) -> str:
 def _where(view: dict) -> str:
     g = view.get("geometry")
     if g == "fix":
-        return f"Located {view.get('where')}"
+        rests = "; ".join(a.get("text") or "" for a in view.get("rests_on") or [] if a.get("text"))
+        return f"Located {view.get('where')}" + (f" (rests on a statement: {rests})" if rests else "")
     if g == "candidates":
-        return f"At one of {len(view.get('candidates') or [])} spots in {view.get('room_label') or 'the room'}: check them all"
+        n = len(view.get("candidates") or [])
+        return f"{'Two' if n == 2 else n} possible spots in {view.get('room_label') or 'the room'}, not a position: check {'both' if n == 2 else 'all'}"
     if g == "ring":
         top = ((view.get("ring") or {}).get("arc_crosses") or [{}])[0].get("room_label")
         return f"Range only, no position: search along the arc" + (f", mostly in {top}" if top else "")

@@ -745,6 +745,8 @@ def _tp_summary(rs: list[dict]) -> dict:
                         "wrong_fix_rate_of_trials": round(sum(bool(r["wrong_fix"]) for r in rs) / max(1, n), 3),
                         "fix_err_median_m": _q([r["fix_err_m"] for r in fx], 0.5), "fix_err_p90_m": _q([r["fix_err_m"] for r in fx], 0.9)}
     out["hpd_area_median_m2"] = _q([r["hpd_area_m2"] for r in rs], 0.5)
+    out["geometry_after_statement_share"] = {g: round(sum(r["geometry_after_statement"] == g for r in rs) / max(1, n), 3) for g in GEOMS}
+    out["uwb_pucks_heard_share"] = {str(k): round(sum(r["n_uwb_pucks"] == k for r in rs) / max(1, n), 3) for k in range(0, 4)}
     rooms: dict[str, int] = {}
     for r in rs:
         for q in r["dismissed_rooms"]:
@@ -944,8 +946,638 @@ def main(argv=None) -> int:
         _write(res_dir / "eval_beacon.json", {**beacon_json, "timings_s": timings})
         written.append("eval_beacon.json")
     timings["total_s"] = round(time.time() - t_start, 1)
-    print(json.dumps({"simulated": True, "timings_s": timings, "results": [str(res_dir / w_) for w_ in written]}))
+    def _rel(q: Path) -> str:
+        try:
+            return str(q.resolve().relative_to(ROOT))
+        except ValueError:
+            return q.name
+    print(json.dumps({"simulated": True, "timings_s": timings, "results": [_rel(res_dir / w_) for w_ in written]}))
     return 0
+
+
+# ---- figures (matplotlib, Agg; 1400 px wide; every title says SIMULATED) ----------------------------------------------
+
+INK, INK2, GRID, SURF = "#0b0b0b", "#52514e", "#e6e5e0", "#fcfcfb"
+MCOL = {"ble-rssi": "#eb6834", "uwb-twr": "#2a78d6", "uwb-twr+bearing": "#1baf7a"}
+GCOL = {"fix": "#2a78d6", "candidates": "#1baf7a", "ring": "#eda100", "zone": "#e87ba4", "none": "#d4d3cf"}
+NOTE = ("SIMULATED: beacon.sim world, noise model = models.DEFAULT_NOISE + beacon/sim.py (stated in the results JSON); "
+        "pipeline: PhoneTrack -> locate.estimate after 3 s of observations.")
+
+
+def _plt():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"font.size": 12, "axes.titlesize": 13, "axes.labelsize": 12, "figure.facecolor": SURF,
+                         "axes.facecolor": SURF, "axes.edgecolor": "#b9b8b2", "axes.labelcolor": INK, "xtick.color": INK2,
+                         "ytick.color": INK2, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.8,
+                         "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False,
+                         "font.family": "DejaVu Sans"})
+    return plt
+
+
+def _save(fig, path: Path, note: str = NOTE):
+    import textwrap
+    import matplotlib.pyplot as plt
+    fig.text(0.01, 0.006, textwrap.fill(note, 200), fontsize=9, color=INK2, ha="left", va="bottom", linespacing=1.3)
+    fig.savefig(path, dpi=100, facecolor=SURF)
+    plt.close(fig)
+
+
+def _series(arms, exp, m, field, twin=True, sub=None):
+    out = []
+    for n in range(1, 6):
+        a = _arm(arms, exp, m, n, twin)
+        v = None if a is None else (a[field] if sub is None else (a[field] or {}).get(sub))
+        out.append(np.nan if v is None else v)
+    return np.array(out, dtype=float)
+
+
+def main_figures(bj: dict, fig_dir: Path):
+    plt = _plt()
+    arms = bj["arms"]
+    x = np.arange(1, 6)
+    tc = bj["trial_counts"]
+    note = NOTE + f" {tc['main_trials']} trials per arm (mismatch {tc['mismatch_trials']}); pucks thrown from the door (scatter)."
+    # 1. error vs pucks + wrong fixes
+    fig, axs = plt.subplots(1, 2, figsize=(14, 6.0))
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.85, bottom=0.18, wspace=0.25)
+    ax = axs[0]
+    for m in METHODS:
+        med = _series(arms, "main", m, "fix_err_median_m")
+        p90 = _series(arms, "main", m, "fix_err_p90_m")
+        ax.plot(x, med, "-o", color=MCOL[m], lw=2, ms=8, label=f"{m}: median")
+        ax.plot(x, p90, "--", color=MCOL[m], lw=1.5, alpha=0.8)
+        nf = _series(arms, "main", m, "fix_n")
+        dy = {"ble-rssi": 8, "uwb-twr": 8, "uwb-twr+bearing": -16}[m]
+        for xi, yi, k in zip(x, med, nf):
+            if np.isfinite(yi):
+                ax.annotate(f"{int(k)}", (xi, yi), textcoords="offset points", xytext=(5, dy), fontsize=9, color=MCOL[m])
+    ax.plot([], [], "--", color=INK2, label="dashed: 90th percentile")
+    ax.set_xticks(x)
+    ax.set_xlabel("pucks thrown into the fire room")
+    ax.set_ylabel("error of the published fix (m)")
+    ax.set_title("Fix error (twin on); small numbers = fixes published")
+    ax.legend(fontsize=10, loc="upper right")
+    ax.set_ylim(bottom=0)
+    ax = axs[1]
+    for m in METHODS:
+        ax.plot(x, _series(arms, "main", m, "wrong_fix_rate_of_trials"), "-o", color=MCOL[m], lw=2, ms=8, label=f"{m}: model matched")
+        ax.plot(x, _series(arms, "mismatch", m, "wrong_fix_rate_of_trials"), ":s", color=MCOL[m], lw=2, ms=7,
+                label=f"{m}: world noise x{MISMATCH:g}")
+    ax.set_xticks(x)
+    ax.set_xlabel("pucks thrown into the fire room")
+    ax.set_ylabel("share of trials with a WRONG fix\n(truth outside 3 sigma)")
+    ax.set_title("Honesty: wrong fixes, matched model vs 1.5x mismatch")
+    ax.legend(fontsize=9, ncol=1, loc="upper left")
+    ax.set_ylim(bottom=0)
+    fig.suptitle("SIMULATED: where is the phone? Fix error and wrong-fix rate by method and number of pucks", fontsize=15, x=0.07, ha="left")
+    _save(fig, fig_dir / "eval_error_vs_pucks.png", note)
+
+    # 2. area vs pucks
+    fig, ax = plt.subplots(figsize=(14, 6.4))
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.9, bottom=0.27)
+    for m in METHODS:
+        on = _series(arms, "main", m, "hpd_area_median_m2")
+        off = _series(arms, "main", m, "hpd_area_median_m2", twin=False)
+        ax.plot(x, on, "-o", color=MCOL[m], lw=2, ms=8, label=f"{m}, twin on")
+        ax.plot(x, off, "--", color=MCOL[m], lw=1.5, marker="o", mfc=SURF, ms=7, label=f"{m}, twin off")
+    ax.set_yscale("log")
+    ax.set_xticks(x)
+    ax.set_xlabel("pucks thrown into the fire room")
+    ax.set_ylabel("area of the 90% region (m², log scale)")
+    ax.set_title("SIMULATED: how much floor the published answer still covers (median 90% HPD area, every geometry)", loc="left")
+    ax.legend(fontsize=10.5, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.13))
+    _save(fig, fig_dir / "eval_area_vs_pucks.png", note)
+
+    # 3. bearing
+    fig, axs = plt.subplots(1, 3, figsize=(14, 5.6))
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.82, bottom=0.2, wspace=0.3)
+    for m in ("uwb-twr", "uwb-twr+bearing"):
+        lab = "UWB ranges only" if m == "uwb-twr" else "UWB + the phone's bearing (pointed)"
+        axs[0].plot(x, _series(arms, "main", m, "geometry_share", sub="fix"), "-o", color=MCOL[m], lw=2, ms=8, label=lab)
+        axs[1].plot(x, _series(arms, "main", m, "fix_err_median_m"), "-o", color=MCOL[m], lw=2, ms=8, label=lab)
+        axs[2].plot(x, _series(arms, "main", m, "hpd_area_median_m2"), "-o", color=MCOL[m], lw=2, ms=8, label=lab)
+    axs[0].set_ylabel("share of trials published as a fix")
+    axs[0].set_ylim(0, 1.02)
+    axs[1].set_ylabel("median fix error (m)")
+    axs[1].set_ylim(bottom=0)
+    axs[2].set_ylabel("median 90% area (m², log)")
+    axs[2].set_yscale("log")
+    for ax, t in zip(axs, ("Fix share", "Fix error", "Uncertainty area")):
+        ax.set_xticks(x)
+        ax.set_xlabel("pucks")
+        ax.set_title(t)
+    axs[0].legend(fontsize=10, loc="lower right")
+    fig.suptitle("SIMULATED: what the phone's own bearing adds (twin on; phones in neighbouring rooms have no wall-free bearing)",
+                 fontsize=14, x=0.06, ha="left")
+    _save(fig, fig_dir / "eval_bearing.png", note)
+
+    # 4. twin pruning
+    fig, axs = plt.subplots(1, 3, figsize=(14, 6.0))
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.82, bottom=0.27, wspace=0.32)
+    ax = axs[0]
+    w = 0.38
+    for k, twin in enumerate((False, True)):
+        bottom = np.zeros(5)
+        for g in GEOMS:
+            v = np.nan_to_num(_series(arms, "main", "uwb-twr", "geometry_share", twin=twin, sub=g))
+            ax.bar(x + (k - 0.5) * w, v, w * 0.92, bottom=bottom, color=GCOL[g], edgecolor=SURF, lw=1.5,
+                   hatch="//" if g == "none" else None, label=g if k == 0 else None)
+            bottom += v
+        for xi in x:
+            ax.text(xi + (k - 0.5) * w, 1.02, "on" if twin else "off", ha="center", fontsize=9, color=INK2)
+    ax.set_xticks(x)
+    ax.set_xlabel("pucks (uwb-twr; left bar twin off, right bar twin on)")
+    ax.set_ylabel("share of trials")
+    ax.set_ylim(0, 1.1)
+    ax.set_title("Published geometry")
+    ax.legend(fontsize=9.5, ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.17), handlelength=1.2, columnspacing=0.8)
+    for m in METHODS:
+        axs[1].plot(x, _series(arms, "main", m, "hpd_area_median_m2", twin=False), "--o", mfc=SURF, color=MCOL[m], lw=1.5)
+        axs[1].plot(x, _series(arms, "main", m, "hpd_area_median_m2", twin=True), "-o", color=MCOL[m], lw=2, label=m)
+        axs[2].plot(x, _series(arms, "main", m, "truth_inside_3sigma", twin=False), "--o", mfc=SURF, color=MCOL[m], lw=1.5)
+        axs[2].plot(x, _series(arms, "main", m, "truth_inside_3sigma", twin=True), "-o", color=MCOL[m], lw=2, label=m)
+    axs[1].plot([], [], "--o", mfc=SURF, color=INK2, label="dashed: twin off")
+    axs[1].set_yscale("log")
+    axs[1].set_ylabel("median 90% area (m², log)")
+    axs[1].set_title("Uncertainty area")
+    axs[1].legend(fontsize=9)
+    axs[2].set_ylabel("truth inside the published geometry")
+    axs[2].set_ylim(0, 1.02)
+    axs[2].set_title("Honesty (3 sigma)")
+    for ax in axs[1:]:
+        ax.set_xticks(x)
+        ax.set_xlabel("pucks")
+    fig.suptitle("SIMULATED: what the twin's walls and outline prune (same observations, locator with and without the twin)",
+                 fontsize=14, x=0.06, ha="left")
+    _save(fig, fig_dir / "eval_twin_pruning.png", note)
+
+    # 5. geometry share, small multiples
+    fig, axs = plt.subplots(1, 3, figsize=(14, 6.0), sharey=True)
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.80, bottom=0.25, wspace=0.08)
+    for ax, m in zip(axs, METHODS):
+        bottom = np.zeros(5)
+        for g in GEOMS:
+            v = np.nan_to_num(_series(arms, "main", m, "geometry_share", sub=g))
+            ax.bar(x, v, 0.7, bottom=bottom, color=GCOL[g], edgecolor=SURF, lw=1.5, hatch="//" if g == "none" else None,
+                   label=g if m == METHODS[0] else None)
+            bottom += v
+        ins = _series(arms, "main", m, "truth_inside_3sigma")
+        for xi, v in zip(x, ins):
+            if np.isfinite(v):
+                ax.text(xi, 1.03, f"{100 * v:.0f}%", ha="center", fontsize=10, color=INK)
+        ax.set_title(m, pad=22)
+        ax.set_xticks(x)
+        ax.set_xlabel("pucks")
+        ax.set_ylim(0, 1.12)
+        ax.grid(axis="x", visible=False)
+    axs[0].set_ylabel("share of trials (twin on)")
+    axs[0].legend(fontsize=10.5, ncol=5, loc="upper center", bbox_to_anchor=(1.58, -0.13))
+    fig.suptitle("SIMULATED: what the locator publishes (a ring stays a ring). Numbers above bars: truth inside the published geometry",
+                 fontsize=14, x=0.06, ha="left")
+    _save(fig, fig_dir / "eval_geometry_share.png", note)
+
+
+# ---- plan drawing -------------------------------------------------------------------------------------------------------
+
+def _wall_pieces(tw: Twin, floor: str):
+    pieces = []
+    doors = [d for d in tw.data["doors"] if d["floor"] == floor]
+    for wl in tw.data["walls"]:
+        if wl["floor"] != floor:
+            continue
+        a, b = np.array(wl["a"], float), np.array(wl["b"], float)
+        L = float(np.linalg.norm(b - a))
+        if L < 1e-9:
+            continue
+        u = (b - a) / L
+        cuts = []
+        for d in doors:
+            c = np.array(d["at"], float)
+            t = float(np.dot(c - a, u))
+            if -0.01 <= t <= L + 0.01 and float(np.linalg.norm(a + t * u - c)) < 0.05:
+                cuts.append((t - d.get("width_m", 0.9) / 2, t + d.get("width_m", 0.9) / 2))
+        segs, s0 = [], 0.0
+        for c0, c1 in sorted(cuts):
+            if c0 > s0:
+                segs.append((s0, c0))
+            s0 = max(s0, c1)
+        if s0 < L:
+            segs.append((s0, L))
+        pieces += [(a + t0 * u, a + t1 * u) for t0, t1 in segs]
+    return pieces
+
+
+def _draw_plan(ax, tw: Twin, view, fire_room: str | None = None, labels=True):
+    floor = tw.exercise_floor
+    for r in tw.rooms():
+        if r["floor"] != floor:
+            continue
+        poly = np.array(r["polygon"])
+        if r["id"] == fire_room:
+            ax.fill(poly[:, 0], poly[:, 1], color="#fbe9e1", zorder=0)
+        c = poly.mean(axis=0)
+        if labels and view[0] + 0.5 < c[0] < view[1] - 0.5 and view[2] + 0.5 < c[1] < view[3] - 0.5:
+            ax.text(c[0], c[1], r["label"], ha="center", va="center", fontsize=10, color="#8a8985", zorder=1)
+    for a, b in _wall_pieces(tw, floor):
+        ax.plot([a[0], b[0]], [a[1], b[1]], color="#3d3c39", lw=2.4, solid_capstyle="butt", zorder=3)
+    ax.set_xlim(view[0], view[1])
+    ax.set_ylim(view[2], view[3])
+    ax.set_aspect("equal")
+    ax.grid(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
+
+def _draw_heat(ax, heat):
+    if not heat:
+        return
+    v = np.array(heat["values"], float).reshape(heat["ny"], heat["nx"])
+    v = np.ma.masked_less(v, 0.02)
+    x0, y0 = heat["origin"]
+    c = heat["cell_m"]
+    ax.imshow(v, origin="lower", extent=(x0, x0 + c * heat["nx"], y0, y0 + c * heat["ny"]), cmap="Blues", vmin=0, vmax=1.2,
+              alpha=0.85, zorder=2, interpolation="nearest")
+
+
+def _draw_estimate(ax, e, truth, pucks, used_ids):
+    import textwrap
+    from matplotlib.patches import Ellipse, Wedge
+    g = e["geometry"]
+    if g == "ring":
+        r = e["ring"]
+        th = np.linspace(0, 2 * np.pi, 361)
+        ax.plot(r["cx"] + r["r_m"] * np.cos(th), r["cy"] + r["r_m"] * np.sin(th), ":", color=GCOL["ring"], lw=1.2, zorder=4)
+        for a0, a1 in r["arcs"]:
+            ax.add_patch(Wedge((r["cx"], r["cy"]), r["r_m"] + 2 * r["sigma_m"], a0, a1, width=4 * r["sigma_m"],
+                               facecolor=GCOL["ring"], alpha=0.75, edgecolor="#8a6100", lw=0.8, zorder=5))
+    if g == "candidates":
+        for k, c in enumerate(e["candidates"]):
+            ax.add_patch(Ellipse((c["x"], c["y"]), 4 * c["sigma_m"], 4 * c["sigma_m"], facecolor="none", edgecolor=GCOL["candidates"], lw=2, zorder=6))
+            ax.plot(c["x"], c["y"], "o", color=GCOL["candidates"], ms=9, mec=SURF, mew=1.5, zorder=7)
+            ax.annotate(f"candidate {k + 1}\nweight {c['weight']:.2f}", (c["x"], c["y"]), xytext=(10, 6), textcoords="offset points",
+                        fontsize=9.5, color=INK, zorder=8)
+    if g == "fix":
+        cv = e["cov"]
+        C = np.array([[cv[0], cv[1]], [cv[1], cv[2]]])
+        vals, vecs = np.linalg.eigh(C)
+        ang = math.degrees(math.atan2(vecs[1, 1], vecs[0, 1]))
+        ax.add_patch(Ellipse((e["x"], e["y"]), 4 * math.sqrt(max(vals[1], 1e-6)), 4 * math.sqrt(max(vals[0], 1e-6)), angle=ang,
+                             facecolor=GCOL["fix"], alpha=0.3, edgecolor=GCOL["fix"], lw=2, zorder=6))
+        ax.plot(e["x"], e["y"], "o", color=GCOL["fix"], ms=9, mec=SURF, mew=1.5, zorder=7)
+        ax.annotate(f"fix, sigma {e['sigma_m']:.2f} m", (e["x"], e["y"]), xytext=(10, 8), textcoords="offset points", fontsize=10, color=INK, zorder=8)
+    for q in e.get("pruned") or []:
+        ax.plot(q["x"], q["y"], "x", color="#6b6a66", ms=13, mew=3, zorder=7)
+        reason = textwrap.shorten("pruned: " + (q.get("reason") or ""), 90, placeholder="...")
+        ax.annotate(textwrap.fill(reason, 34), (q["x"], q["y"]), xytext=(8, -10), textcoords="offset points", fontsize=9,
+                    color=INK2, va="top", zorder=8)
+    for p in pucks:
+        on = p["id"] in used_ids
+        ax.plot(p["x"], p["y"], "s", color="#3d3c39" if on else "#c9c8c2", ms=9, zorder=9)
+        if on:
+            ax.annotate(p["id"], (p["x"], p["y"]), xytext=(6, 5), textcoords="offset points", fontsize=10, weight="bold", color=INK, zorder=9)
+    ax.plot(truth[0], truth[1], "*", color=INK, ms=15, mec=SURF, mew=1, zorder=10)
+    ax.annotate("truth", truth, xytext=(-14, -16), textcoords="offset points", fontsize=10, color=INK, zorder=10)
+
+
+def _collect(w: World, seconds: float = OBS_S, t0: float = 1_800_000_000.0):
+    obs = []
+    for k in range(1, int(round(seconds * SIM_HZ)) + 1):
+        obs.extend(o for o in w.step(t0 + k / SIM_HZ) if o["kind"] != "cold")
+    return obs, t0 + seconds
+
+
+def _track_estimate(obs, pucks, ctx, t_end, noise=None):
+    tr = PhoneTrack("x") if PhoneTrack else _DirectTrack("x")
+    ids = {p["id"] for p in pucks}
+    for o in obs:
+        if o.get("puck") is None or o["puck"] in ids:
+            tr.add(o)
+    e = None
+    for k in range(3, -1, -1):
+        if PhoneTrack:
+            e = tr.estimate(ctx, pucks, t_end - k / EST_HZ, noise=noise, want_heat=(k == 0))
+        else:
+            e = tr.estimate(ctx, pucks, t_end - k / EST_HZ, noise=noise)
+    return e
+
+
+def fig_storyboard(tw: Twin, room: str, fig_dir: Path) -> dict:
+    plt = _plt()
+    st = _state()
+    sc = load_scenario_file(SCENARIO)
+    trapped = next(p for p in sc["phones"] if p.get("opt_in", True) and (p.get("report") or {}).get("status") == "trapped")
+    ph = (float(trapped["x"]), float(trapped["y"]))
+    chosen, tried, fallback = None, 0, None
+    for seed in range(BASE_SEED, BASE_SEED + 400):
+        tried += 1
+        w = World(tw, seed=seed, eid_rotate_s=1e9)
+        w.throw_pucks(room, n=3, seed=seed, strategy="scatter")
+        w.upsert_phone("phone", *ph, uwb=True, chip="U1", report=trapped.get("report"))
+        obs, t_end = _collect(w)
+        P = w.pucks
+        e1 = _track_estimate(obs, P[:1], st["ctx"][True], t_end)
+        if fallback is None:
+            fallback = (seed, P, e1, _track_estimate(obs, P[:2], st["ctx"][False], t_end),
+                        _track_estimate(obs, P[:2], st["ctx"][True], t_end), _track_estimate(obs, P, st["ctx"][True], t_end))
+        if e1["geometry"] != "ring" or e1["ring"]["arcs"] == [[0.0, 360.0]] or not locate.inside(e1, *ph):
+            continue
+        e2off = _track_estimate(obs, P[:2], st["ctx"][False], t_end)
+        if e2off["geometry"] != "candidates" or len(e2off["candidates"]) != 2 or not locate.inside(e2off, *ph):
+            continue
+        e2on = _track_estimate(obs, P[:2], st["ctx"][True], t_end)
+        if not e2on["pruned"] or e2on["geometry"] not in ("fix", "candidates") or not locate.inside(e2on, *ph):
+            continue
+        e3 = _track_estimate(obs, P, st["ctx"][True], t_end)
+        if e3["geometry"] != "fix" or not locate.inside(e3, *ph):
+            continue
+        chosen = (seed, P, e1, e2off, e2on, e3)
+        break
+    found = chosen is not None
+    seed, P, e1, e2off, e2on, e3 = chosen if found else fallback
+    poly = np.array(tw.room(room)["polygon"])
+    xs = list(poly[:, 0]) + [c["x"] for e in (e2off, e2on) for c in e["candidates"]] + [q["x"] for q in e2on["pruned"]]
+    ys = list(poly[:, 1]) + [c["y"] for e in (e2off, e2on) for c in e["candidates"]] + [q["y"] for q in e2on["pruned"]]
+    r1 = e1.get("ring")
+    if r1:
+        xs += [r1["cx"] - r1["r_m"], r1["cx"] + r1["r_m"]]
+        ys += [r1["cy"] - r1["r_m"], r1["cy"] + r1["r_m"]]
+    view = [min(xs) - 1.2, max(xs) + 2.5, min(ys) - 1.2, max(ys) + 1.2]
+    if view[1] - view[0] < 1.45 * (view[3] - view[2]):          # keep the panels landscape
+        view[1] = view[0] + 1.45 * (view[3] - view[2])
+    fig, axs = plt.subplots(2, 2, figsize=(14, 10.6))
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.9, bottom=0.06, wspace=0.03, hspace=0.14)
+    axs = axs.ravel()
+    e3txt = (f"(error {math.hypot(e3['x'] - ph[0], e3['y'] - ph[1]):.2f} m, sigma {e3['sigma_m']:.2f} m)"
+             if e3["geometry"] == "fix" else "")
+    titles = [f"1. One puck: {e1['geometry']} (only the arcs the twin leaves possible are drawn solid)",
+              f"2. Two pucks, twin off: {e2off['geometry']}",
+              f"3. Two pucks, twin on: the twin prunes -> {e2on['geometry']}",
+              f"4. Three pucks: {e3['geometry']} {e3txt}"]
+    for ax, e, used, t in zip(axs, (e1, e2off, e2on, e3), (P[:1], P[:2], P[:2], P), titles):
+        _draw_plan(ax, tw, view, room, labels=True)
+        _draw_heat(ax, e.get("heat"))
+        _draw_estimate(ax, e, ph, P, {p["id"] for p in used})
+        ax.set_title(t, fontsize=13, loc="left")
+    fig.suptitle("SIMULATED storyboard: one trapped phone in Suite 310, real locator output as pucks land (blue = posterior)",
+                 fontsize=14.5, x=0.01, ha="left")
+    sel = (f"the first seed from {BASE_SEED} where all four stages show (seed {seed}, {tried} tried)" if found else
+           f"NO seed of {tried} showed all four stages; this is the first seed ({seed}) as it came")
+    _save(fig, fig_dir / "eval_storyboard.png", NOTE + f" Pucks thrown (scatter). Illustrative throw: {sel}; statistics are in the other figures.")
+    return {"made": True, "all_four_stages_found": found, "seed": seed, "seeds_tried": tried, "phone": list(ph), "pucks_believed": P,
+            "geometries": [e1["geometry"], e2off["geometry"], e2on["geometry"], e3["geometry"]],
+            "fix_err_m": round(math.hypot(e3["x"] - ph[0], e3["y"] - ph[1]), 3) if e3["geometry"] == "fix" else None,
+            "fix_sigma_m": e3["sigma_m"], "pruned": e2on["pruned"],
+            "note": "illustrative selection (first seed showing all four stages); not a statistic"}
+
+
+# ---- layout figures -----------------------------------------------------------------------------------------------------
+
+def layout_figures(lj: dict, fig_dir: Path, tw: Twin, room: str):
+    plt = _plt()
+    rows = lj["rows"]
+    order = [("one-device", s) for s in SPACINGS] + [("two-pucks", s) for s in SEPARATIONS]
+    xl = [f"1 device\n{s:.1f} m" for s in SPACINGS] + [f"2 pucks\n{s:.0f} m" for s in SEPARATIONS]
+    xi = np.arange(len(order))
+
+    def row(lay, size, noise, bearing=False, twin=True):
+        return next((r for r in rows if r["layout"] == lay and r["size_m"] == size and r["noise"] == noise
+                     and r["bearing"] == bearing and r["twin"] == twin), None)
+
+    def noise_label(wsd, bsd):
+        return f"white {wsd:.2f} m, link bias {bsd:.2f} m, no body block"
+
+    series = [(0.10, 0.0, "#2a78d6"), (0.10, 0.05, "#1baf7a"), (0.10, 0.10, "#eb6834")]
+    default = "default (models.DEFAULT_NOISE)"
+    fig, axs = plt.subplots(2, 2, figsize=(14, 11))
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.9, bottom=0.1, hspace=0.36, wspace=0.22)
+    ax = axs[0, 0]
+    for wsd, bsd, col in series:
+        sim = [((row(l, s, noise_label(wsd, bsd)) or {}).get("bearing_err_median_deg")) for l, s in order]
+        pred = [(((row(l, s, noise_label(wsd, bsd)) or {}).get("closed_form") or {}).get("predicted_median_abs_err_deg")) for l, s in order]
+        ax.plot(xi, np.array(sim, dtype=float), "-o", color=col, lw=2, ms=8, label=f"bias {bsd:.2f} m (white {wsd:.2f} m)")
+        ax.plot(xi, np.array(pred, dtype=float), "_", color=col, ms=22, mew=2.5)
+    d = [((row(l, s, default) or {}).get("bearing_err_median_deg")) for l, s in order]
+    ax.plot(xi, np.array(d, dtype=float), "--s", color=INK, lw=1.5, ms=7, label="default noise model")
+    u = [((row(l, s, default) or {}).get("uninformed_bearing_err_median_deg")) for l, s in order]
+    ax.plot(xi, np.array(u, dtype=float), ":", color="#8a8985", lw=2.5, label="no information ('straight out' guess)")
+    ax.plot([], [], "_", color=INK2, ms=22, mew=2.5, label="closed form sqrt(2) sigma / (b |sin theta|)")
+    ax.set_yscale("log")
+    ax.set_xticks(xi)
+    ax.set_xticklabels(xl, fontsize=10.5)
+    ax.set_ylabel("median bearing error (deg, log)")
+    ax.set_title("Bearing from the device to the phone\n(after picking the nearer mirror)")
+    ax.legend(fontsize=9.5, loc="upper right")
+    ax = axs[0, 1]
+    for wsd, bsd, col in series:
+        v = [((row(l, s, noise_label(wsd, bsd)) or {}).get("cross_range_median_m")) for l, s in order]
+        ax.plot(xi, np.array(v, dtype=float), "-o", color=col, lw=2, ms=8, label=f"bias {bsd:.2f} m")
+    d = [((row(l, s, default) or {}).get("cross_range_median_m")) for l, s in order]
+    ax.plot(xi, np.array(d, dtype=float), "--s", color=INK, lw=1.5, ms=7, label="default noise model")
+    ax.set_yscale("log")
+    ax.set_xticks(xi)
+    ax.set_xticklabels(xl, fontsize=10.5)
+    ax.set_ylabel("median cross-range error (m, log)")
+    ax.set_title("Sideways error at the phone's distance (2 to 8 m)")
+    ax.legend(fontsize=9.5, loc="upper right")
+    ax = axs[1, 0]
+    full = order + [("three-pucks", None), ("one-puck-bearing", None)]
+    fl = xl + ["3\npucks", "1 puck\n+bearing"]
+    fx = np.arange(len(full))
+    bottom = np.zeros(len(full))
+    for g in GEOMS:
+        v = np.array([((row(l, s, default, bearing=(l == "one-puck-bearing")) or {}).get("geometry_share") or {}).get(g, 0.0)
+                      for l, s in full], dtype=float)
+        ax.bar(fx, v, 0.7, bottom=bottom, color=GCOL[g], edgecolor=SURF, lw=1.5, hatch="//" if g == "none" else None, label=g)
+        bottom += v
+    ax.set_xticks(fx)
+    ax.set_xticklabels(fl, fontsize=10)
+    ax.set_ylim(0, 1.18)
+    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_ylabel("share of trials (default noise, twin on)")
+    ax.set_title("What the locator publishes")
+    ax.legend(fontsize=9.5, ncol=5, loc="upper center", handlelength=1.2, columnspacing=0.8)
+    ax.grid(axis="x", visible=False)
+    ax = axs[1, 1]
+    w = 0.38
+    for k, twin in enumerate((False, True)):
+        v = np.array([((row(l, s, default, bearing=(l == "one-puck-bearing"), twin=twin) or {}).get("hpd_area_median_m2"))
+                      for l, s in full], dtype=float)
+        ax.bar(fx + (k - 0.5) * w, v, w * 0.92, color="#9fc3ee" if not twin else "#2a78d6", edgecolor=SURF,
+               label="twin off" if not twin else "twin on")
+    ax.set_yscale("log")
+    for j, (l, s) in enumerate(full):
+        r = row(l, s, default, bearing=(l == "one-puck-bearing"))
+        if r and r.get("point_err_median_m") is not None and r.get("hpd_area_median_m2"):
+            ax.annotate(f"{r['point_err_median_m']:.1f} m", (j + 0.5 * w, r["hpd_area_median_m2"]), xytext=(0, 4),
+                        textcoords="offset points", ha="center", fontsize=9, color=INK)
+    ax.set_xticks(fx)
+    ax.set_xticklabels(fl, fontsize=10)
+    ax.set_ylabel("median 90% area (m², log)")
+    ax.set_title("Uncertainty area, twin off vs on (default noise)\nlabels: median error of the published point, twin on")
+    ax.legend(fontsize=10)
+    ax.grid(axis="x", visible=False)
+    tr = lj["trials_per_arm"]
+    fig.suptitle("SIMULATED: two UWB boards on one thrown device vs separate pucks (phone 2 to 8 m away in the fire room)",
+                 fontsize=15, x=0.07, ha="left")
+    _save(fig, fig_dir / "eval_layouts.png",
+          NOTE + f" {tr['no_bearing']} trials per arm; white range noise and static link bias swept; matched locator.")
+    _layouts_diagram(fig_dir, tw, room)
+
+
+def _layouts_diagram(fig_dir: Path, tw: Twin, room: str):
+    plt = _plt()
+    st = _state()
+    poly = np.array(tw.room(room)["polygon"])
+    view = (poly[:, 0].min() - 0.8, poly[:, 0].max() + 0.8, poly[:, 1].min() - 0.8, poly[:, 1].max() + 0.8)
+    door = next(d["at"] for d in tw.data["doors"] if room in d["rooms"])
+    sc = load_scenario_file(SCENARIO)
+    trapped = next(p for p in sc["phones"] if p.get("opt_in", True) and (p.get("report") or {}).get("status") == "trapped")
+    ph = (float(trapped["x"]), float(trapped["y"]))
+    c = np.array(door, float) + np.array([-2.2, -0.9])
+    u = (ph[0] - c[0], ph[1] - c[1])
+    ang = math.atan2(u[1], u[0]) + math.pi / 2 + 0.35                       # baseline roughly across the line of sight
+    configs = [("Two boards on one device, 0.3 m apart", 0.3), ("Two separate pucks, 3 m apart", 3.0)]
+    fig, axs = plt.subplots(1, 2, figsize=(14, 7.0))
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.84, bottom=0.12, wspace=0.05)
+    for ax, (title, b) in zip(axs, configs):
+        pts = [{"id": "P1", "x": c[0] - b / 2 * math.cos(ang), "y": c[1] - b / 2 * math.sin(ang)},
+               {"id": "P2", "x": c[0] + b / 2 * math.cos(ang), "y": c[1] + b / 2 * math.sin(ang)}]
+        w = World(tw, seed=BASE_SEED + 3, eid_rotate_s=1e9)
+        w.set_pucks(pts, exact=True)
+        w.upsert_phone("phone", *ph, uwb=True, chip="U1")
+        obs, t_end = _collect(w)
+        bel = [dict(p, sigma_m=models.DEFAULT_NOISE["puck"]["position_sigma_m"]) for p in pts]
+        e = _track_estimate(obs, bel, st["ctx"][True], t_end)
+        _draw_plan(ax, tw, view, room, labels=False)
+        _draw_heat(ax, e.get("heat"))
+        _draw_estimate(ax, e, ph, bel, {"P1", "P2"})
+        dbg = e.get("debug") or {}
+        if dbg.get("pair_bearing_deg") is not None:
+            for key, ls in (("pair_bearing_deg", "-"), ("pair_bearing_alt_deg", ":")):
+                a = math.radians(dbg[key])
+                ax.plot([c[0], c[0] + 9 * math.cos(a)], [c[1], c[1] + 9 * math.sin(a)], ls, color="#6250d6", lw=1.6, zorder=4)
+        ax.set_title(f"{title}\npublished: {e['geometry']}, 90% area {e['hpd_area_m2']:.1f} m²", fontsize=12.5)
+    axs[0].plot([], [], "-", color="#6250d6", label="pair bearing (solid) and its mirror (dotted)")
+    axs[0].legend(loc="upper center", bbox_to_anchor=(0.5, -0.01), fontsize=10)
+    fig.suptitle("SIMULATED example: the same phone (star) ranged from two layouts in Suite 310 (blue = locator posterior)",
+                 fontsize=14.5, x=0.01, ha="left")
+    _save(fig, fig_dir / "eval_layouts_diagram.png", NOTE + " One illustrative draw per layout, default noise; statistics in eval_layouts.png.")
+
+
+# ---- two-puck figures -------------------------------------------------------------------------------------------------
+
+OCOL = {"twin_fix": "#2a78d6", "statement_fix": "#1baf7a", "cannot_choose": "#eda100", "ring_or_other": "#d4d3cf"}
+OLAB = {"twin_fix": "fix by the twin alone", "statement_fix": "fix after the occupant's statement",
+        "cannot_choose": "two candidates left (cannot choose)", "ring_or_other": "ring or other"}
+TPLAB = {"door-wall": "door wall\n(demo)", "exterior-wall": "outside wall", "careless": "mid-room\n(careless)", TP_REF: "3 pucks\n(reference)"}
+
+
+def two_puck_figures(tj: dict, recs: list[dict], fig_dir: Path, tw: Twin, room: str):
+    plt = _plt()
+    lays = [l for l in TP_LAYOUTS + [TP_REF] if l in tj["layouts"]]
+    x = np.arange(len(lays))
+    fig, axs = plt.subplots(1, 3, figsize=(14, 6.8))
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.82, bottom=0.31, wspace=0.34)
+    ax = axs[0]
+    bottom = np.zeros(len(lays))
+    for o in OCOL:
+        v = np.array([tj["layouts"][l]["outcome_share"][o] for l in lays])
+        ax.bar(x, v, 0.68, bottom=bottom, color=OCOL[o], edgecolor=SURF, lw=1.5, hatch="//" if o == "ring_or_other" else None, label=OLAB[o])
+        for xi, b, vi in zip(x, bottom, v):
+            if vi >= 0.07:
+                ax.text(xi, b + vi / 2, f"{100 * vi:.0f}%", ha="center", va="center", fontsize=10, color=INK)
+        bottom += v
+    ax.set_xticks(x)
+    ax.set_xticklabels([TPLAB[l] for l in lays], fontsize=10.5)
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("share of phone positions x noise draws")
+    ax.set_title("Phone in the fire room, says so: what is published")
+    ax.grid(axis="x", visible=False)
+    ax.legend(fontsize=10, loc="upper left", bbox_to_anchor=(0.0, -0.15), ncol=1)
+    ax = axs[1]
+    w = 0.26
+    ser = [("twin fixes, true statement (of these fixes)", "#2a78d6", lambda l: (tj["layouts"][l]["twin_fix"] or {}).get("wrong_fix_rate_of_these")),
+           ("statement fixes, true statement (of these fixes)", "#1baf7a", lambda l: (tj["layouts"][l]["statement_fix"] or {}).get("wrong_fix_rate_of_these")),
+           ("phone next door, FALSE statement:\nwrong fix, share of trials", "#eb6834",
+            lambda l: (tj["false_statement"].get(l) or {}).get("statement_produced_wrong_fix_rate_of_trials"))]
+    for k, (lab, col, f) in enumerate(ser):
+        v = np.array([np.nan if f(l) is None else f(l) for l in lays], dtype=float)
+        ax.bar(x + (k - 1) * w, np.nan_to_num(v), w * 0.92, color=col, edgecolor=SURF, label=lab)
+        for xi, vi in zip(x + (k - 1) * w, v):
+            ax.text(xi, (0 if np.isnan(vi) else vi) + 0.01, "n/a" if np.isnan(vi) else f"{100 * vi:.0f}%", ha="center", fontsize=9, color=INK)
+    ax.set_xticks(x)
+    ax.set_xticklabels([TPLAB[l] for l in lays], fontsize=10.5)
+    ax.set_ylabel("wrong-fix rate")
+    ax.set_title(f"Wrong fixes (> 3 sigma or > {WRONG_FIX_M:g} m)")
+    ax.set_ylim(0, max(0.25, ax.get_ylim()[1]))
+    ax.grid(axis="x", visible=False)
+    ax.legend(fontsize=9.5, loc="upper left", bbox_to_anchor=(0.0, -0.15))
+    ax = axs[2]
+    med = np.array([tj["layouts"][l]["all_fixes"]["fix_err_median_m"] or np.nan for l in lays], dtype=float)
+    p90 = np.array([tj["layouts"][l]["all_fixes"]["fix_err_p90_m"] or np.nan for l in lays], dtype=float)
+    ax.bar(x, med, 0.55, color="#2a78d6", edgecolor=SURF, label="median")
+    ax.plot(x, p90, "_", color=INK, ms=30, mew=2.5, label="90th percentile")
+    for xi, m_, p_ in zip(x, med, p90):
+        if np.isfinite(m_):
+            ax.text(xi, m_ / 2, f"{m_:.2f} m", ha="center", va="center", fontsize=10, color=SURF)
+            ax.text(xi, p_ + 0.03, f"{p_:.2f}", ha="center", fontsize=9, color=INK)
+    ax.set_xticks(x)
+    ax.set_xticklabels([TPLAB[l] for l in lays], fontsize=10.5)
+    ax.set_ylabel("error of the published fix (m)")
+    ax.set_title("Fix error (all fixes, true statement)")
+    ax.grid(axis="x", visible=False)
+    ax.legend(fontsize=10, loc="upper left", bbox_to_anchor=(0.0, -0.15))
+    fig.suptitle("SIMULATED: the owner's two-puck demo (UWB ranges only, no direction, still phone, 3 s): one answer, and how often it is wrong",
+                 fontsize=14, x=0.06, ha="left")
+    c = tj["trial_counts"]
+    _save(fig, fig_dir / "eval_two_puck.png", NOTE + f" Live-like observations (no los). {c['tp_positions']} positions x {c['tp_draws']} draws per "
+          f"layout; false statement {c['tp_false_positions']} positions x {c['tp_draws']} draws.")
+
+    # map: one panel per layout, phone positions coloured by outcome (first draw); wrong fixes crossed
+    poly = np.array(tw.room(room)["polygon"])
+    view = (poly[:, 0].min() - 1.0, poly[:, 0].max() + TP_FALSE_REACH_M + 0.6, poly[:, 1].min() - 1.0, poly[:, 1].max() + TP_FALSE_REACH_M - 1.5)
+    fig, axs = plt.subplots(2, 2, figsize=(14, 12.2))
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.91, bottom=0.1, wspace=0.03, hspace=0.12)
+    for ax, l in zip(axs.ravel(), lays):
+        _draw_plan(ax, tw, view, room, labels=True)
+        rs = [r for r in recs if r["layout"] == l and r["draw"] == 0]
+        for o in OCOL:
+            pts = np.array([r["phone"] for r in rs if r["outcome"] == o and not r["false_statement"]]).reshape(-1, 2)
+            ax.scatter(pts[:, 0], pts[:, 1], s=26, color=OCOL[o], edgecolors="#6b6a66" if o == "ring_or_other" else SURF, lw=0.5, zorder=5)
+            pf = np.array([r["phone"] for r in rs if r["outcome"] == o and r["false_statement"]]).reshape(-1, 2)
+            ax.scatter(pf[:, 0], pf[:, 1], s=26, marker="D", color=OCOL[o], edgecolors=INK, lw=0.6, zorder=5)
+        wr = np.array([r["phone"] for r in rs if r["wrong_fix"]]).reshape(-1, 2)
+        ax.scatter(wr[:, 0], wr[:, 1], s=70, marker="x", color=INK, lw=2.0, zorder=6)
+        pk = tj["layouts"][l]["pucks"]["pucks"]
+        for q in pk:
+            ax.plot(q["x"], q["y"], "s", color="#3d3c39", ms=11, mec=SURF, zorder=7)
+            ax.annotate(q["id"], (q["x"], q["y"]), xytext=(7, 5), textcoords="offset points", fontsize=11, weight="bold", zorder=8)
+        if len(pk) == 2:
+            (ax_, ay_), (bx_, by_) = (pk[0]["x"], pk[0]["y"]), (pk[1]["x"], pk[1]["y"])
+            dx, dy = bx_ - ax_, by_ - ay_
+            L = math.hypot(dx, dy)
+            ax.plot([ax_ - 40 * dx / L, ax_ + 40 * dx / L], [ay_ - 40 * dy / L, ay_ + 40 * dy / L], "--", color="#6250d6", lw=1.4, zorder=4)
+        sm = tj["layouts"][l]
+        fs = tj["false_statement"].get(l)
+        sub = (f"fix {100 * (sm['outcome_share']['twin_fix'] + sm['outcome_share']['statement_fix']):.0f}% "
+               f"(twin {100 * sm['outcome_share']['twin_fix']:.0f}%, statement {100 * sm['outcome_share']['statement_fix']:.0f}%), "
+               f"wrong {100 * sm['all_fixes']['wrong_fix_rate_of_trials']:.0f}% of trials")
+        if fs:
+            sub += f"\nfalse statement: wrong fix in {100 * fs['statement_produced_wrong_fix_rate_of_trials']:.0f}% of trials (diamonds)"
+        ax.set_title(f"{TPLAB[l].replace(chr(10), ' ')}: {sub}", fontsize=11.5, loc="left")
+    for o in OCOL:
+        axs[0, 0].scatter([], [], s=40, color=OCOL[o], label=OLAB[o])
+    axs[0, 0].scatter([], [], s=40, marker="D", color="#ffffff", edgecolors=INK, label="phone really next door, says the fire room")
+    axs[0, 0].scatter([], [], s=70, marker="x", color=INK, lw=2, label=f"wrong fix (> 3 sigma or > {WRONG_FIX_M:g} m)")
+    axs[0, 0].plot([], [], "--", color="#6250d6", label="line through the two pucks (the mirror axis)")
+    fig.legend(*axs[0, 0].get_legend_handles_labels(), loc="lower center", ncol=3, fontsize=10.5, bbox_to_anchor=(0.5, 0.035))
+    fig.suptitle("SIMULATED: where in Suite 310 two pucks give one answer (one noise draw per phone position, live-like UWB only)",
+                 fontsize=14.5, x=0.01, ha="left")
+    _save(fig, fig_dir / "eval_two_puck_map.png", NOTE + " Colour = outcome for a phone at that spot that says it is in the fire room.")
 
 
 def _write(path: Path, obj: dict):

@@ -13,6 +13,7 @@ Run in a throwaway environment (do not add pbxproj to the project's requirements
 from __future__ import annotations
 
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from pbxproj import XcodeProject
@@ -102,15 +103,66 @@ def main() -> int:
     if "Info.plist" in resources:
         errors.append("Info.plist must not be in Copy Bundle Resources")
 
+    # Every file in SandtableBeacon/ must have a file reference (nothing on disk forgotten).
+    ref_paths = {refs[r].path for r in in_group if r in refs}
+    for path in sorted(SOURCES.iterdir()):
+        if path.name.startswith("."):
+            continue
+        if path.name not in ref_paths:
+            errors.append(f"{path.name} is on disk but has no file reference")
+
+    # The target's build settings the owner relies on.
+    expected = {
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "SandtableBeacon/Info.plist",
+        "CODE_SIGN_STYLE": "Automatic",
+        "DEVELOPMENT_TEAM": "",
+        "TARGETED_DEVICE_FAMILY": "1",
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SWIFT_VERSION": "5.0",
+    }
+    target_configs = 0
     for cfg in section(project, "XCBuildConfiguration"):
         bs = cfg.buildSettings
-        if "INFOPLIST_FILE" in bs.get_keys():
-            plist = IOS / str(bs["INFOPLIST_FILE"])
-            if not plist.exists():
-                errors.append(f"INFOPLIST_FILE {plist} missing")
-            print(f"  target config {cfg.name}: bundle id {bs['PRODUCT_BUNDLE_IDENTIFIER']}, "
-                  f"iOS {bs['IPHONEOS_DEPLOYMENT_TARGET']}, Swift {bs['SWIFT_VERSION']}, "
-                  f"device family {bs['TARGETED_DEVICE_FAMILY']}")
+        if "INFOPLIST_FILE" not in bs.get_keys():
+            continue
+        target_configs += 1
+        for key, want in expected.items():
+            got = str(bs[key]) if key in bs.get_keys() else None
+            if got != want:
+                errors.append(f"target {cfg.name}: {key} = {got!r}, expected {want!r}")
+        if "ASSETCATALOG_COMPILER_APPICON_NAME" in bs.get_keys():
+            errors.append(f"target {cfg.name}: names an app icon but the project has no asset catalog")
+        plist = IOS / str(bs["INFOPLIST_FILE"])
+        if not plist.exists():
+            errors.append(f"INFOPLIST_FILE {plist.name} missing")
+        print(f"  target config {cfg.name}: bundle id {bs['PRODUCT_BUNDLE_IDENTIFIER']}, "
+              f"iOS {bs['IPHONEOS_DEPLOYMENT_TARGET']}, Swift {bs['SWIFT_VERSION']}, "
+              f"device family {bs['TARGETED_DEVICE_FAMILY']}, Info.plist generated: {bs['GENERATE_INFOPLIST_FILE']}")
+    if target_configs != 2:
+        errors.append(f"expected 2 target build configurations, found {target_configs}")
+
+    # Shared scheme and workspace data: valid XML, pointing at the native target.
+    targets = section(project, "PBXNativeTarget")
+    target_id = targets[0].get_id() if targets else None
+    scheme = PROJECT.parent / "xcshareddata" / "xcschemes" / "SandtableBeacon.xcscheme"
+    workspace = PROJECT.parent / "project.xcworkspace" / "contents.xcworkspacedata"
+    try:
+        root_el = ET.parse(scheme).getroot()
+        blueprints = {el.get("BlueprintIdentifier") for el in root_el.iter("BuildableReference")}
+        names = {el.get("BuildableName") for el in root_el.iter("BuildableReference")}
+        if blueprints != {target_id}:
+            errors.append(f"scheme BlueprintIdentifier {blueprints} does not match target {target_id}")
+        if names != {"SandtableBeacon.app"}:
+            errors.append(f"scheme BuildableName {names} is not SandtableBeacon.app")
+        print(f"  shared scheme: {scheme.name} -> target {target_id}")
+    except (OSError, ET.ParseError) as exc:
+        errors.append(f"shared scheme unreadable: {exc}")
+    try:
+        ET.parse(workspace)
+        print(f"  workspace data: {workspace.name} parses")
+    except (OSError, ET.ParseError) as exc:
+        errors.append(f"workspace data unreadable: {exc}")
 
     for e in errors:
         print("ERROR:", e)

@@ -22,14 +22,6 @@ if str(ROOT) not in sys.path:
 from beacon import config, layout          # noqa: E402
 from beacon.twin import Twin                 # noqa: E402
 
-MAX_WALLS = 1   # beacon.models.DEFAULT_NOISE["uwb"]["max_walls"] at the time of writing; read live below when possible
-try:
-    from beacon.models import DEFAULT_NOISE  # noqa: E402
-    MAX_WALLS = int(DEFAULT_NOISE["uwb"].get("max_walls", MAX_WALLS))
-except Exception:                            # noqa: BLE001
-    pass
-
-
 def mirror(p, a, b):
     """Reflect point p across the line through a and b."""
     ax, ay = a
@@ -45,19 +37,33 @@ def bbox(poly):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def mirror_fate(twin, floor, pucks, phone):
+def _where(label: str | None) -> str:
+    if not label:
+        return "outside the building"
+    return label if label.lower().startswith("suite") else "the " + label
+
+
+def mirror_fate(twin, ctx, room_id, pucks, phone):
+    """What the real locator (beacon.locate) and the statement rule (beacon.prune) do with the mirror image, on EXACT
+    ranges (no noise: an illustration of the geometry, not a measurement)."""
+    from beacon import locate, prune
+    room = twin.room(room_id)
+    pk = [{"id": f"P{i + 1}", "x": x, "y": y} for i, (x, y) in enumerate(pucks)]
+    rs = [{"puck": q["id"], "kind": "uwb", "d_m": math.dist((q["x"], q["y"]), phone), "n": 5} for q in pk]
+    est = locate.estimate(ctx, pk, rs)
     m = mirror(phone, pucks[0], pucks[1])
-    loc = twin.locate(m[0], m[1], floor)
-    walls = max(twin.walls_crossed(p, m, floor) for p in pucks)
-    inside = loc.get("off_map_m", 0.0) <= 0.01 and loc.get("room")
-    where = loc.get("room_label") or "outside the building"
-    if not inside:
-        fate = "outside the building: the twin removes it"
-    elif walls > MAX_WALLS:
-        fate = f"in the {where}, {walls} walls from a puck: the twin removes it (no UWB link through {walls} walls in the model)"
-    else:
-        fate = f"in the {where}: dismissed on the occupant's stated suite, shown as dismissed"
-    return m, where, walls, fate
+    where = _where(twin.locate(m[0], m[1], room.get("floor")).get("room_label"))
+    if est.get("geometry") == "fix":
+        reasons = [q.get("reason") for q in est.get("pruned") or [] if q.get("reason")]
+        if not reasons:
+            return m, "open", "too close to the phone to separate: one blurred fix (the phone is near the line through the pucks: the worst geometry)"
+        return m, "removed", f"in {where}: the twin removes it ({reasons[0]})"
+    if est.get("geometry") == "candidates":
+        stated = prune.apply_statement(est, room_id, room.get("label"), f"the occupant says they are in {room.get('label')}")
+        if stated.get("geometry") == "fix":
+            return m, "dismissed", f"in {where}: possible in the twin, dismissed on the occupant's stated suite (shown as dismissed)"
+        return m, "open", f"also inside {room.get('label')}: two candidates, nothing can decide"
+    return m, "open", f"locator geometry '{est.get('geometry')}'"
 
 
 def table(twin, room_id: str, scale: float) -> str:
@@ -100,6 +106,8 @@ def svg(twin, room_id: str) -> str:
     rec = layout.recommend(twin, room_id, strategy="door-wall")
     care = layout.recommend(twin, room_id, strategy="careless")
     door = next((d for d in twin.data.get("doors", []) if room_id in (d.get("rooms") or [])), None)
+    from beacon import locate
+    ctx = locate.Context(twin, floor=floor, cell_m=0.25, use_twin=True)
     # view: the room plus a strip beyond the door wall
     vx0, vy0, vx1, vy1 = rx0 - 0.6, ry0 - 0.6, rx1 + 6.5, ry1 + 1.0
     S = 34.0                                 # px per metre
@@ -128,7 +136,7 @@ def svg(twin, room_id: str) -> str:
            f'<text x="{LEFT}" y="30" font-size="18" font-weight="bold" fill="#111">Two pucks, two phones: where to put the pucks</text>',
            f'<text x="{LEFT}" y="52" fill="#555">Two rings cross twice: the phone and its mirror image across the line through the pucks. '
            f'Building twin, {room.get("label")}; positions from beacon/layout.py.</text>',
-           f'<text x="{LEFT}" y="70" fill="#555">Example phones are illustrations, not measurements. Drawn by hardware/layout_table.py.</text>']
+           f'<text x="{LEFT}" y="70" fill="#555">Example phones are illustrations; outcomes from beacon/locate.py and beacon/prune.py on exact (noise-free) ranges. Drawn by hardware/layout_table.py.</text>']
 
     def panel(ox, cid, pucks, phones, title, sub):
         o = [f'<text x="{ox}" y="{TOP - 22}" font-size="15" font-weight="bold" fill="#111">{title}</text>',
@@ -166,7 +174,7 @@ def svg(twin, room_id: str) -> str:
         notes = []
         for k, ph in enumerate(phones):
             col = colours[k % 2]
-            m, where, walls, fate = mirror_fate(twin, floor, pucks, ph)
+            m, kind, fate = mirror_fate(twin, ctx, room_id, pucks, ph)
             for pk in pucks:
                 c = P(pk[0], pk[1], ox)
                 r = math.dist(pk, ph) * S
@@ -175,16 +183,14 @@ def svg(twin, room_id: str) -> str:
             o.append(f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="7" fill="{col}"/>')
             o.append(f'<text x="{p[0] + 10:.1f}" y="{p[1] - 8:.1f}" fill="{col}" font-weight="bold">V{k + 1}</text>')
             q = P(m[0], m[1], ox)
-            inside_room = twin.locate(m[0], m[1], floor).get("room") == room_id
-            if inside_room:
+            if kind == "open":
                 o.append(f'<circle cx="{q[0]:.1f}" cy="{q[1]:.1f}" r="7" fill="#e08a00"/>')
                 o.append(f'<text x="{q[0] + 10:.1f}" y="{q[1] - 8:.1f}" fill="#b36b00" font-weight="bold">V{k + 1}?</text>')
-                notes.append((col, f"V{k + 1}: its mirror image is also inside {room.get('label')}: two candidates, nothing can decide"))
             else:
                 o.append(f'<circle cx="{q[0]:.1f}" cy="{q[1]:.1f}" r="7" fill="none" stroke="#c0392b" stroke-width="2"/>')
                 o.append(f'<line x1="{q[0] - 6:.1f}" y1="{q[1] - 6:.1f}" x2="{q[0] + 6:.1f}" y2="{q[1] + 6:.1f}" stroke="#c0392b" stroke-width="2"/>')
                 o.append(f'<line x1="{q[0] - 6:.1f}" y1="{q[1] + 6:.1f}" x2="{q[0] + 6:.1f}" y2="{q[1] - 6:.1f}" stroke="#c0392b" stroke-width="2"/>')
-                notes.append((col, f"V{k + 1}: mirror image {fate}"))
+            notes.append((col, f"V{k + 1}: mirror image {fate}"))
         for i, pk in enumerate(pucks):
             c = P(pk[0], pk[1], ox)
             o.append(f'<rect x="{c[0] - 7:.1f}" y="{c[1] - 7:.1f}" width="14" height="14" fill="#2f7d3a" stroke="#123" stroke-width="1.5"/>')
@@ -193,7 +199,7 @@ def svg(twin, room_id: str) -> str:
         o.append(f'<rect x="{ox}" y="{TOP}" width="{PW:.1f}" height="{PH:.1f}" fill="none" stroke="#bbb"/>')
         y = TOP + PH + 24
         for col, text in notes:
-            for chunk in _wrap(text, 74):
+            for chunk in _wrap(text, 80):
                 o.append(f'<text x="{ox}" y="{y}" fill="{col}">{chunk}</text>')
                 y += 17
         return o
@@ -204,7 +210,8 @@ def svg(twin, room_id: str) -> str:
     phones = [(rx0 + 0.42 * (rx1 - rx0), ry0 + 0.52 * (ry1 - ry0)), (rx0 + 0.72 * (rx1 - rx0), ry0 + 0.86 * (ry1 - ry0))]
     out += panel(LEFT, "cl0", good_pucks, phones, "A. Recommended: both pucks just inside the door wall",
                  f"{layout.INSET_M:.2f} m inside, {rec['spacing_m']:.1f} m apart: every mirror image lands beyond that wall")
-    out += panel(LEFT + PW + GAP, "cl1", bad_pucks, phones[:1], "B. Careless: both pucks mid-room",
+    careless_phone = [(rx0 + 0.26 * (rx1 - rx0), ry0 + 0.75 * (ry1 - ry0))]      # well off the line through the mid-room pucks
+    out += panel(LEFT + PW + GAP, "cl1", bad_pucks, careless_phone, "B. Careless: both pucks mid-room",
                  "the mirror image stays inside the room: two candidates")
     out.append(f'<text x="{LEFT}" y="{H - 14}" fill="#555">Green squares: pucks. Filled dots: the phone. Red cross: the mirror candidate the board dismisses (and shows as dismissed). '
                f'Orange: a mirror candidate nothing can dismiss.</text>')

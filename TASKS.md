@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 12:39 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 12:48 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,8 +8,8 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 68% | Beacon runs end to end on the board against the vendored Beacon module (live, simulated): phones resolve zone -> ring -> fix, the agent routes the rescue team, report written. Now: two-puck setup (click-to-place pucks, two rings -> two candidates, the twin deletes the mirror), replay determinism for recordings, write-ups, radar ablation, then recordings and an independent judge. |
-| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 32% | re-planned for the owner's two-puck live demo: layout that makes two rings give one answer, turn-taking for two iPhones, hotspot networking with a QR code; all builders updated |
+| Command board | `sandtable-live-fireground-twin/` | building | 72% | Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging. |
+| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 32% | building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
 
@@ -52,6 +52,7 @@ These need hands, hardware or accounts, so only you can do them. Each links to t
 - [What phone ranging can and cannot do](sandtable-beacon-victim-phones/docs/PHONE_FEASIBILITY.md)
 - [Privacy](sandtable-beacon-victim-phones/docs/PRIVACY.md)
 - [The feed the phones part publishes](sandtable-beacon-victim-phones/docs/BEACON_FEED.md)
+- [Write-up for this part](sandtable-beacon-victim-phones/README.md)
 - [Write-up for the command board](sandtable-live-fireground-twin/README.md)
 - [The 2-minute demo script](sandtable-live-fireground-twin/PITCH.md)
 - [Devpost draft](sandtable-live-fireground-twin/DEVPOST.md)
@@ -66,24 +67,33 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Beacon runs end to end on the board against the vendored Beacon module (live, simulated): phones resolve zone -> ring -> fix, the agent routes the rescue team, report written. Now: two-puck setup (click-to-place pucks, two rings -> two candidates, the twin deletes the mirror), replay determinism for recordings, write-ups, radar ablation, then recordings and an independent judge.
+**Being worked on now:** Beacon board works end to end in simulation against the vendored Beacon module. In progress: the owner's exact setup (two pucks clicked onto the plan, two rings -> two candidates, the twin deletes the mirror, honest 'cannot choose'), replay-deterministic script, board polish, write-ups. Then: record the agent with a real model, replay checks, independent judge, final packaging.
 
 **Left to build (agents):**
 
-- Beacon link consuming lane L16 feed (sample first, live when its server is up)
-- Phones layer, accountability panel, mode switch, reporting page
-- Agent situations and tools for located phones; new recordings
-- Scout radar engine landing as a simulated mode; ablation for the feasibility answer
-- Re-cut README, DEVPOST, PITCH; vendor L16 module; independent judge
+- Two-puck scene on the board: click-to-place pucks, two rings per phone, pruned mirror candidate, 'cannot choose' state (board builder, in progress)
+- Hands-free beacon script on a frozen two-puck Beacon run so recorded agent turns replay exactly (server builder, in progress)
+- Record the agent's turns for the beacon, scout and mayday scripts with a real model: bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py
+- README, DEVPOST, PITCH re-cut around Beacon (write-ups builder, in progress)
+- Independent skeptical-judge review and fixes
+- Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py
 
 **Left to do with real hardware (you):**
 
-1. Beacon hardware bring-up is in lane L16 (DWM3001CDK pucks, iPhone app); this board only needs the Beacon server URL
+1. 1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow sandtable-beacon-victim-phones/hardware (vendored here under vendor/beacon/hardware). Works when http://localhost:1885/healthz answers with source 'pucks'.
+2. 2. Start this board next to it (about 2 min): python -m sandtable.demo --beacon-url http://localhost:1885 (Windows: .venv\Scripts\python -m sandtable.demo --beacon-url http://localhost:1885). Works when the board at http://localhost:1810/ shows the Beacon badge as connected and not SIM.
+3. 3. Tape-measure the two pucks from two walls of the demo room, click 'Place pucks' and click them onto the room plan (fine-tune the metres in the dialog). Works when P1 and P2 show on the plan as 'placed by hand'.
+4. 4. Open the occupant app on the two iPhones. Works when each phone appears as two rings crossing at two points; where the twin's walls remove the mirror point it becomes a fix, otherwise the board says it cannot choose.
+5. 5. Click 'Dispatch alarm' before step 4 so the agent has the pre-plan; with ANTHROPIC_API_KEY set and LLM_BACKEND=anthropic the agent decides live, otherwise the labelled fallback policy routes the crew.
+6. 6. Optional: the crew phone page http://localhost:1810/crew.html?unit=RIT on the Android phone (adb reverse tcp:1810 tcp:1810).
+7. 7. No hardware for Scout (radar) or Crews (tags): both run simulated only on these boards.
 
 **Needed from you:**
 
-- CoStar toolkit and keys (COSTAR_API_KEY, Matterport token id/secret, VEXCEL_API_KEY)
-- ANTHROPIC_API_KEY for live model decisions outside the recorded script
+- CoStar toolkit and keys (COSTAR_API_KEY, COSTAR_BASE_URL, COSTAR_PROPERTY_ID; MATTERPORT_TOKEN_ID/SECRET/MODEL_ID; VEXCEL_API_KEY): see docs/TOOLKIT_SWAP.md
+- ANTHROPIC_API_KEY for live agent decisions with real phones (the recorded turns only cover the scripted simulator scene)
+- Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for
+- Confirmation of the sponsors' terms before any live sponsor response is committed (keep them under fixtures/live/ or data/ until then)
 
 **Finished:**
 
@@ -97,46 +107,72 @@ Taken from each part's `project.json` at sync time.
 
 **Known limitations:**
 
-- Sponsor layers run in fixture mode (no keys on this machine)
-- UWB positions are simulated
+- No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured
+- Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count, and devices are not people; the app must stay open with the screen on as built
+- Two pucks often leave two candidates; the twin removes one only when the geometry allows
+- All three sponsor layers are fixtures (real public data and NAIP imagery, synthetic interior); the live adapters were never called; the walls that prune a candidate are plausible walls, not surveyed ones
+- Expected head counts and life hazards are estimates and inferences from the record
+- Agent turns for the Beacon and Scout exercises fall back to a labelled deterministic policy until a real model run is recorded
+- Scout (radar) and Crews (tags) are simulation-only on these boards; the radar simulator was written alongside its detector
+- One floor modelled; feeds and the app link have no authentication; not a life-safety product
 
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)
 
-**Being worked on now:** re-planned for the owner's two-puck live demo: layout that makes two rings give one answer, turn-taking for two iPhones, hotspot networking with a QR code; all builders updated
+**Being worked on now:** building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now
 
 **Left to build (agents):**
 
-- locator, simulator, server, board (building)
-- iOS occupant app (uncompiled Swift, close to Apple's and Qorvo's samples)
-- UNO Q puck host
-- tenant roster accountability and command-agent hand-off
-- evaluation incl. the owner's two-boards-on-one-device question
-- feasibility write-up, privacy, tests, review, README, PITCH
+- Server: simulated flow and live mode (POST /api/ingest from the iPhone app), then a clean-clone check of `bash run_demo.sh --source live --lan`
+- iOS occupant app in apps/ios (Swift, uncompiled): finish, syntax-check, independent API review; expect compiler errors on first build and paste them back
+- Board on port 1885: two-puck walk-through, 'cannot choose' state, puck placement, QR code for the app
+- Evaluation: two-puck layouts (how often two pucks give one answer), two boards on one device, error against number of pucks
+- Puck host for the UNO Q (heartbeat, experimental debug-channel reader, optional cold Bluetooth count)
+- Command agent turn (tenant roster against phones: priorities, radio orders, next puck) and the incident report page
+- README, PITCH, DEVPOST, tests, independent skeptical review
 
 **Left to do with real hardware (you):**
 
-1. to be written: flash stock Qorvo firmware, build the iOS app in Xcode, place pucks, first range
+1. 1. (5 min) Power one DWM3001CDK from USB. Install Qorvo's free 'Qorvo Nearby Interaction' app from the App Store on the iPhone 14 and see whether the board already shows up and ranges. If it does, that board needs no flashing.
+2. 2. (15 to 30 min, once) Get the firmware: Qorvo 'Nearby Interaction' package for the DWM3001CDK (file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex inside the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582. It is an email form; a work or school address works better than Gmail. Keep the .hex outside the repository folder.
+3. 3. (10 min per board) Flash through the on-board J-Link: micro-USB DATA cable into port J9, SEGGER J-Flash Lite (free, segger.com), device NRF52833_XXAA, erase, program, reset. Guide: hardware/FLASH.md (being written).
+4. 4. (5 min per board) Prove each board with Qorvo's app: distance on the phone, check it against a tape measure at 1 m and 3 m.
+5. 5. (20 to 40 min) Build our app: open apps/ios/SandtableBeacon.xcodeproj in Xcode, choose your team, run on the iPhone 14, then the iPhone 15. Guide: docs/IOS_BUILD.md (being written). If it does not compile, paste the errors back.
+6. 6. (10 min) Network: open a hotspot on the Android phone; join it with the laptop and both iPhones. On the laptop: `bash run_demo.sh --source live --lan` (Windows: see README). Open the board, scan its QR code with each iPhone's camera to fill in the server address.
+7. 7. (10 min) Pucks: puck A on a battery bank beside the UNO Q, puck B on the Android phone through a USB-OTG adapter into the board's J-Link port (J9). Stand both upright, 15 cm or more off the floor, component-free side toward the room. Both just inside the 'door wall' of your taped room, about 4 m apart in building metres (hardware/BRINGUP.md gives the taped-rectangle distances).
+8. 8. (5 min) On the board, click each puck onto the plan where it stands and set the exercise scale. Press a status button in the app on the iPhone 14: a ring, then a position.
+9. 9. (15 min) Second victim: iPhone 15. Switch 'Take turns' on in the app on both phones (the stock firmware serves one phone per board), or power two more boards so each puck position has one board per phone.
+10. 10. (10 min) Rehearse the two-minute run-through and the fallback ladder in hardware/BRINGUP.md.
 
 **Needed from you:**
 
-- Qorvo Nearby Interaction firmware for the DWM3001CDK: file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex (or the QANI hex inside the DW3_QM33 SDK), from qorvo.com/products/d/da008212 or da008582: an email form, a work or school address works better than Gmail. First test whether the boards already range with Qorvo's free App Store app 'Qorvo Nearby Interaction'
-- SEGGER J-Link software (J-Flash Lite) on the Mac, free from segger.com
-- Xcode on the Mac with an Apple ID for signing; Developer Mode switched on on both iPhones
-- one USB battery bank (or wall adapter) and a micro-USB DATA cable per puck
+- Qorvo Nearby Interaction firmware for the DWM3001CDK (step 2 above): only you can submit Qorvo's download form
+- SEGGER J-Link software on the Mac or laptop (free download, no account)
+- Xcode with your Apple ID; Developer Mode on both iPhones (Settings > Privacy & Security > Developer Mode)
+- A USB-C OTG adapter for the Android phone, two micro-USB DATA cables, one battery bank (a second as the fallback for puck B), tape and a tape measure
+- Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)
+- CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then
 
 **Finished:**
 
-- docs/BEACON_FEED.md v1 frozen plus additions for the live iPhone path
-- docs/CONTRACTS.md
-- research notes with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md
-- beacon/roster.py: tenant roster against phones (accountability table, priorities, next puck), smoke-tested
-- locator and tracker (grid Bayes over the twin's floor; ring / candidates / fix / zone with honest geometry), 37 tests
+- Feed contract for the command board: docs/BEACON_FEED.md (v1 frozen, additions A1 to A8 for the live iPhone path and the two-puck demo)
+- Research with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md; summary and decisions in docs/PHONE_FEASIBILITY.md
+- Locator and tracker (ring, two candidates, position; never a dot where the geometry only supports a ring): 37 tests pass
+- Two-puck layout recommendation (beacon/layout.py) and visible dismissal of a mirror spot on stated evidence (beacon/prune.py)
+- Tenant roster against phones: accountability table, priorities, where the next puck goes (beacon/roster.py)
+- Privacy design: docs/PRIVACY.md
 
 **Known limitations:**
 
-- Nothing has run on hardware; all results are simulated.
-- The iOS app is uncompiled source (no Mac on the build machine).
+- Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.
+- The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.
+- Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.
+- Bring-up guides are written from documentation and forum reports, not from a board.
+- With Qorvo's stock firmware one board serves one phone at a time, and the range is read by the phone app, not by the puck: the phone needs a network path to the server and the app must stay open.
+- An iPhone 14 or 15 reports distance but no direction to an accessory.
+- A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.
+- The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.
+- Not a life-safety product.
 
 
 ## Your questions, answered by the teams
@@ -151,7 +187,7 @@ No. An iPhone's UWB radio only answers a session started by an app with the user
 
 **One puck or two for angle?**
 
-Two pucks, as you chose, can give one answer if you place them right. One puck gives a ring; two give two mirror points across the line between the pucks. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart): the mirror point then falls outside the room, and the board dismisses it, by the twin's walls when it is two walls away, otherwise on the occupant's stated suite, shown as dismissed. Pucks mid-room leave two points nothing can decide, and the board says so. Better if you have it: a third puck gives a position with no assumption. An iPhone 14 or 15 does not report direction to an accessory, so do not count on the phone's bearing. Simulated success rates follow when the evaluation finishes.
+Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room: one position in 77% of cases (48% by the twin's walls alone, 29% after the occupant's stated suite, shown as dismissed), median error 0.26 m, a wrong position in 1.1%; the rest stay a ring because only one puck reached the phone. Pucks dropped mid-room: one position in only 18%, and the board says 'cannot choose' in 57%. Better if you have it: a third puck gives one position in 88% with 0.20 m median error and no assumption. An iPhone 14 or 15 reports no direction to an accessory, so do not count on the phone's bearing.
 
 **Will the phone keep answering with the screen off?**
 
@@ -159,7 +195,7 @@ Not as built tonight: keep the app open (it keeps the screen awake). Two ways ex
 
 **Can we put both UWB boards on one device we throw in?**
 
-It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow.
+It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the bearing error is 22, 17 and 14 degrees (median), the sideways error 1.7, 1.3 and 1.3 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 5 degrees and 0.38 m sideways.
 
 **Two pucks: one on a battery bank with the UNO Q, one powered by the Android phone?**
 
@@ -177,35 +213,63 @@ One iPhone can range both pucks at once. One board, on Qorvo's stock firmware, s
 
 On the laptop, with the laptop and both iPhones joined to a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic); the Android phone powering puck B can be that hotspot. The board shows a QR code; scanning it with the iPhone camera opens our app with the server address filled in. Fallbacks: the server on the UNO Q on the same hotspot, or this machine over the tailnet if the iPhones run the tailnet client.
 
-**Is one UWB sensor enough to scan a room?**
+**[Phones] Can a UWB board range a victim's phone over UWB at all?**
+
+Yes, with exactly your boards: a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware ranges an iPhone 11 or later through Apple's accessory protocol, once the person has opened our app. Both your iPhones give distance (about 60 readings a second); neither gives direction to an accessory. The app reads the distance and reports it; the board itself only logs it on its debug channel.
+
+**[Phones] Can it be done cold, to a phone whose owner installed nothing?**
+
+No. An iPhone's UWB radio only answers a session started by an app with the user's permission. Cold, a radio can only count Bluetooth advertisements nearby: a rough band of devices by signal strength, no identity, and devices are not people. The stock puck firmware cannot even do that; the UNO Q's own radio can (written, never run).
+
+**[Phones] One puck or two for angle?**
+
+One puck gives a ring. Two give two candidate points, mirror images across the line between the pucks; the twin's walls often delete one. Three pucks not in a line give a position. The phone's own direction would turn one ring into a point, but an iPhone 14 or 15 does not report direction to an accessory without camera assistance (a moving phone that can see), so do not count on it. Simulated numbers follow when the evaluation finishes.
+
+**[Phones] Will the phone keep answering with the screen off?**
+
+Not as built tonight: keep the app open (it keeps the screen awake). Two ways exist and are not built: a Bluetooth-paired background session in which only the puck gets the measurements, and, on iOS 18.4 or later, a Live Activity that lets the app keep ranging.
+
+**[Phones] Can we put both UWB boards on one device we throw in?**
+
+It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow.
+
+**[Phones] Or one puck on the Android phone and one on the UNO Q, two separately powered pucks?**
+
+Two separate pucks a few metres apart are far better than two boards on one device: tens of centimetres, with two candidates that the twin can often cut to one. The Android phone is only worth using as a power source: the stock firmware prints nothing a phone could read. Recommended for the live demo: three separate pucks on battery banks, 2 to 3 m apart, not in a line; the UNO Q can power one and run the server.
+
+**[Phones] What does a puck need?**
+
+Power only (5 V on either micro-USB port). The range comes back through the iPhone app over Wi-Fi. Stand the board upright, at least 15 cm off the floor, component-free side toward the phone. Puck positions are measured with a tape and clicked onto the plan: the stock firmware cannot range board to board.
+
+**[Radar] Is one UWB sensor enough to scan a room?**
 
 No. A single DWM3001CDK board cannot hear its own echoes. Qorvo's own staff say the module cannot transmit and receive at the same time. The smallest radar is two boards: one transmits, the other records the echoes that arrive after the direct pulse.
 
-**Why not?**
+**[Radar] Why not?**
 
 Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 µs, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed.
 
-**How do multiple boards fix it?**
+**[Radar] How do multiple boards fix it?**
 
 One board transmits and the others listen. Each pair turns an echo's delay into an ellipse with the two boards as foci. More boards give more ellipses at different angles, and the target sits where they cross. The boards first range each other to learn their own positions, because every ellipse needs known foci.
 
-**How many are needed, and what does each added board buy?**
+**[Radar] How many are needed, and what does each added board buy?**
 
 Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m² (two boards) to 0.40 m² (three) and 0.15 m² (five).
 
-**What is the 'map', and what is it not?**
+**[Radar] What is the 'map', and what is it not?**
 
 It is a coarse echo map: a few strong reflectors, a rough outline, what moved, and where the room disagrees with the stored twin. It is not a LiDAR-grade model, because echoes about 0.3 to 0.6 m apart merge and walls reflect like mirrors. The twin is the map; the boards add people, breathing and changes.
 
-**Why does this beat cameras and LiDAR in smoke, and where does it not?**
+**[Radar] Why does this beat cameras and LiDAR in smoke, and where does it not?**
 
 Smoke particles (0.01 to 1 µm) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible.
 
-**What is the biggest open risk?**
+**[Radar] What is the biggest open risk?**
 
 Signal strength. The sample victim's echoes arrive 25 to 36 dB below the direct pulse. In real recorded data, the empty room's own multipath already flickers at about 22 dB below. Expect detection within a few metres of the pucks. A breathing person across a 9.5 m room is unproven until measured.
 
-**What is simulated today?**
+**[Radar] What is simulated today?**
 
 All of the radar. No board has run it, and the reused echo-reading firmware targets ESP32 boards, not the DWM3001CDK. Scout is a secondary, simulation-only mode of Sandtable Beacon. The timing and geometry arithmetic is exact; detection performance is not measured. On the one real recording available, the reused tracker followed clutter, not the person.
 

@@ -160,7 +160,9 @@
      "half_angle_deg"
     ],
     "collinear_ratio": 0.18,
-    "credit": "throw model copied from Sandtable's Scout (scout/scene.py)"
+    "credit": "throw model copied from Sandtable's Scout (scout/scene.py)",
+    "layout_truth_sd_m": 0.03,
+    "two_puck_default": "n == 2: beacon.layout.recommend(strategy='door-wall'); truth = recommended spot + N(0, 0.03 m)"
    },
    "chips": {
     "U1": {
@@ -183,6 +185,7 @@
  "obs_s": 3.0,
  "sim_hz": 10.0,
  "estimate_hz": 4.0,
+ "estimate_last_s": 1.0,
  "base_seed": 20261114,
  "fire_room": "r310",
  "neighbours": [
@@ -195,7 +198,12 @@
   "cold_trials": 200,
   "layout_trials": 50,
   "layout_bearing_trials": 60,
-  "cadence_check": 60
+  "cadence_check": 60,
+  "tp_positions": 400,
+  "tp_draws": 2,
+  "tp_false_positions": 150,
+  "tp_ref_draws": 1,
+  "tp_cadence_check": 40
  },
  "quick": false,
  "locator_rules": {
@@ -233,6 +241,7 @@
   "wrong_fix": "a published fix whose error exceeds 3 sigma_m",
   "room_accuracy": "published room == true room, over trials that publish a room",
   "pruned_near_truth_share": "share of trials where a candidate the twin removed was within 1 m of the truth",
+  "pucks": "thrown from the door (Scout's scatter model, strategy 'scatter') for every puck count, so the counts are comparable; the owner's hand-placed two-puck layouts are in results/eval_two_puck.json",
   "phone positions": "60 % in the fire room, 40 % in a neighbour (r309, r311), >= 0.3 m from walls",
   "mismatch": "the world's noise = scaled_noise(DEFAULT_NOISE, 1.5) (every sigma, bias, loss and outlier/dropout/body-block probability x1.5); the locator assumes DEFAULT_NOISE; twin on"
  },
@@ -278,7 +287,7 @@
    "room_accuracy": 0.417,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 12.12,
+   "est_ms_median": 17.035,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -316,7 +325,7 @@
     "room_accuracy": 0.4,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 13.0
+    "est_ms_median": 17.06
    }
   },
   {
@@ -360,7 +369,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 12.12,
+   "est_ms_median": 17.035,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -398,7 +407,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 13.0
+    "est_ms_median": 17.06
    }
   },
   {
@@ -442,7 +451,7 @@
    "room_accuracy": 0.429,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 14.845,
+   "est_ms_median": 23.285,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -480,7 +489,7 @@
     "room_accuracy": 0.286,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 15.82
+    "est_ms_median": 24.87
    }
   },
   {
@@ -524,7 +533,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 14.845,
+   "est_ms_median": 23.285,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -562,7 +571,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 15.82
+    "est_ms_median": 24.87
    }
   },
   {
@@ -606,7 +615,7 @@
    "room_accuracy": 0.605,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 18.74,
+   "est_ms_median": 25.53,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -644,7 +653,7 @@
     "room_accuracy": 0.632,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 19.03
+    "est_ms_median": 25.58
    }
   },
   {
@@ -688,7 +697,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 18.74,
+   "est_ms_median": 25.53,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -726,7 +735,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 19.03
+    "est_ms_median": 25.58
    }
   },
   {
@@ -770,7 +779,7 @@
    "room_accuracy": 0.789,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 19.77,
+   "est_ms_median": 24.63,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -808,7 +817,7 @@
     "room_accuracy": 0.882,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 20.99
+    "est_ms_median": 24.02
    }
   },
   {
@@ -852,7 +861,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 19.77,
+   "est_ms_median": 24.63,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -890,7 +899,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 20.99
+    "est_ms_median": 24.02
    }
   },
   {
@@ -934,7 +943,7 @@
    "room_accuracy": 0.674,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 21.395,
+   "est_ms_median": 31.995,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -972,7 +981,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 21.92
+    "est_ms_median": 33.77
    }
   },
   {
@@ -1016,7 +1025,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 21.395,
+   "est_ms_median": 31.995,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -1054,7 +1063,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 21.92
+    "est_ms_median": 33.77
    }
   },
   {
@@ -1098,7 +1107,7 @@
    "room_accuracy": 0.077,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.705,
+   "est_ms_median": 3.75,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -1136,7 +1145,7 @@
     "room_accuracy": 0.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.82
+    "est_ms_median": 2.65
    }
   },
   {
@@ -1180,7 +1189,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.705,
+   "est_ms_median": 3.75,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -1218,7 +1227,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.82
+    "est_ms_median": 2.65
    }
   },
   {
@@ -1262,7 +1271,7 @@
    "room_accuracy": 0.898,
    "pruned_any_share": 0.167,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.87,
+   "est_ms_median": 2.79,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -1300,7 +1309,7 @@
     "room_accuracy": 0.975,
     "pruned_any_share": 0.255,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.64
+    "est_ms_median": 2.47
    }
   },
   {
@@ -1344,7 +1353,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.87,
+   "est_ms_median": 2.79,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -1382,7 +1391,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.64
+    "est_ms_median": 2.47
    }
   },
   {
@@ -1426,7 +1435,7 @@
    "room_accuracy": 0.929,
    "pruned_any_share": 0.044,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.045,
+   "est_ms_median": 2.615,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -1464,7 +1473,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.075,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.48
+    "est_ms_median": 2.1
    }
   },
   {
@@ -1508,7 +1517,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.045,
+   "est_ms_median": 2.615,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -1546,7 +1555,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.48
+    "est_ms_median": 2.1
    }
   },
   {
@@ -1590,7 +1599,7 @@
    "room_accuracy": 0.957,
    "pruned_any_share": 0.056,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.8,
+   "est_ms_median": 2.28,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -1628,7 +1637,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.073,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.55
+    "est_ms_median": 1.99
    }
   },
   {
@@ -1672,7 +1681,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.8,
+   "est_ms_median": 2.28,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -1710,7 +1719,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.55
+    "est_ms_median": 1.99
    }
   },
   {
@@ -1754,7 +1763,7 @@
    "room_accuracy": 0.951,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.2,
+   "est_ms_median": 3.07,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -1792,7 +1801,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.56
+    "est_ms_median": 2.39
    }
   },
   {
@@ -1836,7 +1845,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.2,
+   "est_ms_median": 3.07,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -1874,7 +1883,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.56
+    "est_ms_median": 2.39
    }
   },
   {
@@ -1918,7 +1927,7 @@
    "room_accuracy": 0.827,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.865,
+   "est_ms_median": 2.635,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -1956,7 +1965,7 @@
     "room_accuracy": 0.952,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.68
+    "est_ms_median": 2.17
    }
   },
   {
@@ -2000,7 +2009,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.865,
+   "est_ms_median": 2.635,
    "fire_room_only": {
     "n": 51,
     "geometry_share": {
@@ -2038,7 +2047,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.68
+    "est_ms_median": 2.17
    }
   },
   {
@@ -2082,7 +2091,7 @@
    "room_accuracy": 0.912,
    "pruned_any_share": 0.333,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.845,
+   "est_ms_median": 2.735,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -2120,7 +2129,7 @@
     "room_accuracy": 0.981,
     "pruned_any_share": 0.545,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.64
+    "est_ms_median": 2.31
    }
   },
   {
@@ -2164,7 +2173,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.333,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.845,
+   "est_ms_median": 2.735,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -2202,7 +2211,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.545,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.64
+    "est_ms_median": 2.31
    }
   },
   {
@@ -2246,7 +2255,7 @@
    "room_accuracy": 0.968,
    "pruned_any_share": 0.1,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.05,
+   "est_ms_median": 2.85,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -2284,7 +2293,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.151,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.58
+    "est_ms_median": 2.29
    }
   },
   {
@@ -2328,7 +2337,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.089,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.05,
+   "est_ms_median": 2.85,
    "fire_room_only": {
     "n": 53,
     "geometry_share": {
@@ -2366,7 +2375,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.151,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.58
+    "est_ms_median": 2.29
    }
   },
   {
@@ -2410,7 +2419,7 @@
    "room_accuracy": 0.97,
    "pruned_any_share": 0.022,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.865,
+   "est_ms_median": 2.305,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -2448,7 +2457,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.036,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.63
+    "est_ms_median": 2.04
    }
   },
   {
@@ -2492,7 +2501,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.011,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.865,
+   "est_ms_median": 2.305,
    "fire_room_only": {
     "n": 55,
     "geometry_share": {
@@ -2530,7 +2539,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.018,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.63
+    "est_ms_median": 2.04
    }
   },
   {
@@ -2574,7 +2583,7 @@
    "room_accuracy": 0.952,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.405,
+   "est_ms_median": 3.555,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -2612,7 +2621,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.57
+    "est_ms_median": 2.36
    }
   },
   {
@@ -2656,7 +2665,7 @@
    "room_accuracy": null,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.405,
+   "est_ms_median": 3.555,
    "fire_room_only": {
     "n": 47,
     "geometry_share": {
@@ -2694,7 +2703,7 @@
     "room_accuracy": null,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.57
+    "est_ms_median": 2.36
    }
   },
   {
@@ -2738,7 +2747,7 @@
    "room_accuracy": 0.455,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 6.02,
+   "est_ms_median": 8.59,
    "fire_room_only": {
     "n": 38,
     "geometry_share": {
@@ -2776,7 +2785,7 @@
     "room_accuracy": 0.389,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 6.1
+    "est_ms_median": 8.96
    }
   },
   {
@@ -2820,7 +2829,7 @@
    "room_accuracy": 0.353,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 11.07,
+   "est_ms_median": 17.62,
    "fire_room_only": {
     "n": 31,
     "geometry_share": {
@@ -2858,7 +2867,7 @@
     "room_accuracy": 0.429,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 15.11
+    "est_ms_median": 22.77
    }
   },
   {
@@ -2902,7 +2911,7 @@
    "room_accuracy": 0.435,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 12.82,
+   "est_ms_median": 12.76,
    "fire_room_only": {
     "n": 36,
     "geometry_share": {
@@ -2940,7 +2949,7 @@
     "room_accuracy": 0.571,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 13.125
+    "est_ms_median": 13.195
    }
   },
   {
@@ -2984,7 +2993,7 @@
    "room_accuracy": 0.636,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 11.74,
+   "est_ms_median": 18.805,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3022,7 +3031,7 @@
     "room_accuracy": 0.8,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 12.67
+    "est_ms_median": 21.58
    }
   },
   {
@@ -3066,7 +3075,7 @@
    "room_accuracy": 0.625,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 13.645,
+   "est_ms_median": 21.325,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3104,7 +3113,7 @@
     "room_accuracy": 0.857,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 22.74
+    "est_ms_median": 32.92
    }
   },
   {
@@ -3148,7 +3157,7 @@
    "room_accuracy": 0.125,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.555,
+   "est_ms_median": 2.035,
    "fire_room_only": {
     "n": 38,
     "geometry_share": {
@@ -3186,7 +3195,7 @@
     "room_accuracy": 0.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.585
+    "est_ms_median": 2.12
    }
   },
   {
@@ -3230,7 +3239,7 @@
    "room_accuracy": 0.9,
    "pruned_any_share": 0.2,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.165,
+   "est_ms_median": 3.19,
    "fire_room_only": {
     "n": 31,
     "geometry_share": {
@@ -3268,7 +3277,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.323,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 2.07
+    "est_ms_median": 3.16
    }
   },
   {
@@ -3312,7 +3321,7 @@
    "room_accuracy": 0.933,
    "pruned_any_share": 0.06,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.32,
+   "est_ms_median": 2.24,
    "fire_room_only": {
     "n": 36,
     "geometry_share": {
@@ -3350,7 +3359,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.083,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.915
+    "est_ms_median": 1.735
    }
   },
   {
@@ -3394,7 +3403,7 @@
    "room_accuracy": 0.857,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.835,
+   "est_ms_median": 2.66,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3432,7 +3441,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.38
+    "est_ms_median": 2.1
    }
   },
   {
@@ -3476,7 +3485,7 @@
    "room_accuracy": 0.903,
    "pruned_any_share": 0.06,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.995,
+   "est_ms_median": 4.0,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3514,7 +3523,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.111,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 2.12
+    "est_ms_median": 2.75
    }
   },
   {
@@ -3558,7 +3567,7 @@
    "room_accuracy": 0.0,
    "pruned_any_share": 0.0,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 1.7,
+   "est_ms_median": 2.595,
    "fire_room_only": {
     "n": 38,
     "geometry_share": {
@@ -3596,7 +3605,7 @@
     "room_accuracy": 0.0,
     "pruned_any_share": 0.0,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.715
+    "est_ms_median": 2.63
    }
   },
   {
@@ -3640,7 +3649,7 @@
    "room_accuracy": 0.735,
    "pruned_any_share": 0.2,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.49,
+   "est_ms_median": 3.6,
    "fire_room_only": {
     "n": 31,
     "geometry_share": {
@@ -3678,7 +3687,7 @@
     "room_accuracy": 0.917,
     "pruned_any_share": 0.323,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 2.3
+    "est_ms_median": 3.2
    }
   },
   {
@@ -3722,7 +3731,7 @@
    "room_accuracy": 0.943,
    "pruned_any_share": 0.1,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.27,
+   "est_ms_median": 2.335,
    "fire_room_only": {
     "n": 36,
     "geometry_share": {
@@ -3760,7 +3769,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.139,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.735
+    "est_ms_median": 1.675
    }
   },
   {
@@ -3804,7 +3813,7 @@
    "room_accuracy": 0.882,
    "pruned_any_share": 0.12,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 2.48,
+   "est_ms_median": 3.79,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3842,7 +3851,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.222,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 1.83
+    "est_ms_median": 2.51
    }
   },
   {
@@ -3886,7 +3895,7 @@
    "room_accuracy": 0.886,
    "pruned_any_share": 0.04,
    "pruned_near_truth_share": 0.0,
-   "est_ms_median": 3.735,
+   "est_ms_median": 5.41,
    "fire_room_only": {
     "n": 27,
     "geometry_share": {
@@ -3924,7 +3933,7 @@
     "room_accuracy": 1.0,
     "pruned_any_share": 0.074,
     "pruned_near_truth_share": 0.0,
-    "est_ms_median": 2.05
+    "est_ms_median": 3.05
    }
   }
  ],
@@ -4372,14 +4381,6 @@
   "records": 120,
   "identical_geometry_and_fix": 120
  },
- "timings_s": {
-  "main_s": 20.4,
-  "cadence_check_s": 1.7,
-  "cold_s": 0.2,
-  "layouts_s": 18.7,
-  "figures_s": 2.3,
-  "total_s": 43.5
- },
  "storyboard": {
   "made": true,
   "all_four_stages_found": true,
@@ -4446,5 +4447,17 @@
    }
   ],
   "note": "illustrative selection (first seed showing all four stages); not a statistic"
+ },
+ "timings_s": {
+  "main_s": 29.1,
+  "cadence_check_s": 2.5,
+  "cold_s": 0.3,
+  "layouts_s": 23.8,
+  "two_puck_s": 10.8,
+  "two_puck_cadence_check_s": 0.2,
+  "layout_figures_s": 1.4,
+  "two_puck_figures_s": 0.9,
+  "main_figures_s": 2.0,
+  "total_s": 71.5
  }
 }

@@ -102,13 +102,34 @@ def brief_of(source) -> dict:
     if isinstance(source, dict):
         if str(source.get("schema", "")).startswith("sandtable.beacons.brief"):
             return source
-        return brief_from_beacons(source)
+        return with_stated_evidence(brief_from_beacons(source), source)
     if source is not None and callable(getattr(source, "brief", None)):
         try:
-            return source.brief()
+            return with_stated_evidence(source.brief(), beacons_of(source))
         except Exception:
             pass
-    return brief_from_beacons(beacons_of(source))
+    b = beacons_of(source)
+    return with_stated_evidence(brief_from_beacons(b), b)
+
+
+def with_stated_evidence(brief: dict, beacons: dict | None) -> dict:
+    """Adds what docs/BEACON_FEED.md A8 publishes and the brief may lack: a phone's `assumptions` (a mirror candidate
+    dismissed on the occupant's stated suite or on command's search room: kind, room, text) and `conflict`, and the
+    Beacons object's `search_room`. Only when present, so a situation without them gives the same prompt as before."""
+    if not isinstance(brief, dict) or not isinstance(beacons, dict):
+        return brief
+    by_id = {p.get("id"): p for p in beacons.get("phones") or [] if isinstance(p, dict)}
+    for ph in brief.get("phones") or []:
+        src = by_id.get(ph.get("id")) or {}
+        if src.get("assumptions") and not ph.get("assumptions"):
+            ph["assumptions"] = [{"kind": a.get("kind"), "room": a.get("room"), "text": a.get("text")}
+                                 for a in src["assumptions"] if isinstance(a, dict)]
+        if src.get("conflict") and not ph.get("conflict"):
+            ph["conflict"] = src["conflict"] if isinstance(src["conflict"], str) else (src["conflict"] or {}).get("text")
+    if beacons.get("search_room") and not brief.get("search_room"):
+        sr = beacons["search_room"]
+        brief["search_room"] = {"room": sr.get("room"), "room_label": sr.get("room_label")} if isinstance(sr, dict) else sr
+    return brief
 
 
 def brief_from_beacons(b: dict) -> dict:
@@ -352,6 +373,10 @@ class ToolBox:
             return view
         view["report"] = report
         view["how_sure"] = confidence_band(p.get("confidence"))
+        if p.get("assumptions"):                       # A8: a position that rests on a statement, not on the measurements alone
+            view["rests_on"] = [{"kind": a.get("kind"), "room_label": self._label(a.get("room")), "text": a.get("text")} for a in p["assumptions"]]
+        if p.get("conflict"):
+            view["conflict"] = str(p["conflict"])[:300]
         if geom == "fix":
             room = p.get("room") or self.twin.locate(p["x"], p["y"], self.brief.get("floor"))["room"]
             view["room_label"] = self._label(room) or p.get("room_label")
@@ -366,7 +391,8 @@ class ToolBox:
                 room = c.get("room") or self.twin.locate(c["x"], c["y"], self.brief.get("floor"))["room"]
                 view["candidates"].append({"rank": i, "weight": tenth(c.get("weight")), "room_label": self._label(room),
                                            "where": wall_words(self.twin, room, c.get("x"), c.get("y"))})
-            view["where"] = f"one of {len(cands)} separate spots: search them all"
+            view["where"] = (f"{'two' if len(cands) == 2 else len(cands)} possible spots, not a position: send a crew to check "
+                             f"{'both' if len(cands) == 2 else 'all of them'}, or move a puck to the wall to decide")
         elif geom == "ring":
             view["ring"] = self._ring_view(p.get("ring") or {})
             view["where"] = f"somewhere on a ring of about {view['ring']['radius_m']} m around puck {view['ring']['puck']}: range only, no position"
@@ -404,6 +430,8 @@ class ToolBox:
         cannot.append(self._data_label())
         out = {**self._flags(), "data": self._data_label(), "floor": self._floor_label(),
                "fire_room": self.brief.get("room_label"),
+               **({"search_room": (self.brief["search_room"] or {}).get("room_label") if isinstance(self.brief["search_room"], dict) else self.brief["search_room"]}
+                  if self.brief.get("search_room") else {}),
                "pucks": [{"id": p["id"], "in": self._label(p.get("room"))} for p in self.brief.get("pucks") or []],
                "phones": phones, "devices_without_app": devices, "geometry_means": GEOMETRY_MEANS, "cannot_tell": cannot}
         if not phones:
@@ -472,7 +500,9 @@ class ToolBox:
                            "expected_people": t.get("expected_people"), "expected_high": t.get("expected_high"),
                            "phones_inside": t.get("phones_opt_in"), "people_reported": t.get("people_reported"), "located": t.get("located"),
                            "safe_outside": t.get("safe_outside"), "occupied_suites_unscanned": t.get("suites_unscanned"),
-                           "unaccounted": [t.get("unaccounted_low"), t.get("unaccounted_high")]},
+                           "unaccounted": [t.get("unaccounted_low"), t.get("unaccounted_high")],
+                           "unaccounted_means": "the record's expected people minus everyone accounted for (reported inside by an opt-in phone, or safe outside); "
+                                                "people already reported by phone are not part of this range"},
                 "estimate_basis": {"load_factors_sf_per_person": factors, "share_present": util,
                                    "note": "expected people are estimates from floor area and building-code load factors unless the record carries a head count"},
                 "roll_call": {"property_manager": prop.get("property_manager"),

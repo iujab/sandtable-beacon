@@ -68,7 +68,21 @@ Closed form first. Two boards a distance b apart see a range difference of b cos
 
 At 5 m, 20 degrees of bearing error is 1.8 m sideways, and the mirror ambiguity is still there. Two separate pucks 3 m apart with the phone 5 m out give about 2.5 times the range error along the line between them and 0.7 times across it: tens of centimetres, plus the same mirror ambiguity, which the twin can often remove.
 
-<!-- LAYOUT_NUMBERS: filled from results/eval_layouts.json -->
+<!-- LAYOUT_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_layouts.json`; 50 trials per row, phone 2 to 8 m away in the fire room, pucks thrown not placed; noise model with sources in `beacon/models.py`). Bearing error is measured after choosing the nearer of the two mirror solutions, so the mirror ambiguity is on top of it:
+
+| Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
+|---|---|---|---|---|---|---|
+| Two boards on one device, 0.1 m apart | 22 degrees | 1.71 m | 100% | 0% | n/a | 5.8 m2 |
+| Two boards on one device, 0.3 m apart | 17 degrees | 1.34 m | 100% | 0% | n/a | 4.8 m2 |
+| Two boards on one device, 0.5 m apart | 14 degrees | 1.29 m | 98% | 0% | n/a | 4.2 m2 |
+| Two separate pucks 2 m apart | 8 degrees | 0.64 m | 72% | 28% | 0.77 m | 2.0 m2 |
+| Two separate pucks 3 m apart | 5 degrees | 0.38 m | 60% | 40% | 0.36 m | 1.4 m2 |
+| Two separate pucks 4 m apart | 5 degrees | 0.36 m | 42% | 58% | 0.43 m | 1.2 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 80% | 0.22 m | 0.8 m2 |
+
+Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
+<!-- LAYOUT_NUMBERS:END -->
 
 **Decision (the owner, 12:35): two separately powered pucks.** Puck A on a battery bank beside the UNO Q, puck B on the Android phone over USB-OTG. Do not mount two boards on one device.
 
@@ -78,7 +92,20 @@ At 5 m, 20 degrees of bearing error is 1.8 m sideways, and the mirror ambiguity 
 - for a phone within about 2.75 m of that wall it falls in the corridor, where the crew is standing. The twin does not forbid it, so the board dismisses it only on something that was said: the occupant's own suite in the app, or command's "we are searching this room" switch. It is shown as dismissed, with the reason;
 - a careless layout (pucks mid-room) leaves two candidates inside the room that nothing can decide, and the board says "cannot choose".
 
-<!-- TWO_PUCK_NUMBERS: filled from results/eval_two_puck.json -->
+<!-- TWO_PUCK_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_two_puck.json`; 800 phone positions per layout over the fire room; what a real iPhone would deliver: UWB distances only, no line-of-sight flag; noise model with sources in `beacon/models.py`):
+
+| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position, share of all trials | Position error, median / 90th percentile |
+|---|---|---|---|---|---|---|---|
+| Both pucks just inside the wall the door is in (recommended) | 77% | 48% | 29% | 0% | 23% | 1.1% | 0.26 m / 0.76 m |
+| Both pucks along the outside wall | 83% | 78% | 5% | 0% | 17% | 1.8% | 0.26 m / 0.76 m |
+| Both pucks mid-room (careless) | 18% | 17% | 0% | 57% | 25% | 0.0% | 0.50 m / 0.96 m |
+| Three pucks: the door-wall pair plus one in the far corner | 88% | 84% | 5% | 3% | 9% | 1.0% | 0.20 m / 0.61 m |
+
+"Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
+
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): the statement produces a wrong position in 4.3% of trials with the door-wall layout, and in 13.8% for the suite that shares that wall. That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+<!-- TWO_PUCK_NUMBERS:END -->
 
 **Better if you have it:** a third puck, not in line with the other two, gives a position with no assumption at all.
 

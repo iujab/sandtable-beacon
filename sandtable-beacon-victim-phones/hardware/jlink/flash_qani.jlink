@@ -6,9 +6,9 @@
 //   Windows:        & "C:\Program Files\SEGGER\JLink\JLink.exe" -device NRF52833_XXAA -if SWD -speed 4000 -autoconnect 1 -CommanderScript hardware\jlink\flash_qani.jlink
 // (Older J-Link versions: -CommandFile instead of -CommanderScript.)
 //
-// THE ONE THING TO EDIT: the path on the loadfile line. Either copy Qorvo's hex to hardware/jlink/qani.hex
-// (git-ignored here: Qorvo's licence was not found, never commit the hex), or put the full path of the hex
-// on the loadfile line, with no spaces in the path.
+// THE ONE THING TO EDIT: the path on the loadfile line. Either copy Qorvo's hex to data/qani.hex in the project
+// folder (data/ is git-ignored: Qorvo's licence was not found, never commit the hex), or put the full path of the
+// hex (kept outside the repository folder) on the loadfile line, with no spaces in the path.
 //
 // erase      "Erases all flash sectors" (SEGGER), i.e. a full chip erase, including the flash storage pages
 //            that an "fds_init() returned 0x860A" / NRF_ERROR_STORAGE_FULL boot error complains about
@@ -16,7 +16,7 @@
 // r, g       reset the CPU and let it run
 // exit       closes the connection and J-Link Commander
 erase
-loadfile hardware/jlink/qani.hex
+loadfile data/qani.hex
 r
 g
 exit

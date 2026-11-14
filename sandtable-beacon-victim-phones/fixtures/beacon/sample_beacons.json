@@ -185,7 +185,9 @@
     "speed": 0.0
    },
    "stale": false,
-   "text": "Phone B1: 2 people, cannot move, trapped. UWB fix in Suite 310, 2 m from the south wall and 2.5 m from the west wall, within 0.5 m"
+   "text": "Phone B1: 2 people, cannot move, trapped. UWB fix in Suite 310, 2 m from the south wall and 2.5 m from the west wall, within 0.5 m",
+   "assumptions": [],
+   "conflict": null
   },
   {
    "id": "B2",
@@ -267,7 +269,9 @@
     "speed": 0.0
    },
    "stale": false,
-   "text": "Phone B2: 1 person, cannot move, injured. UWB range only: 5 m from puck P1, on the part of that circle the twin leaves possible; no position yet"
+   "text": "Phone B2: 1 person, cannot move, injured. UWB range only: 5 m from puck P1, on the part of that circle the twin leaves possible; no position yet",
+   "assumptions": [],
+   "conflict": null
   },
   {
    "id": "B3",
@@ -365,7 +369,9 @@
     "speed": 0.1
    },
    "stale": false,
-   "text": "Phone B3: 1 person, trapped. Two possible spots: in Suite 310, 2.5 m from the west wall and 2.5 m from the north wall; or in Suite 310, 2 m from the south wall and 4.5 m from the west wall"
+   "text": "Phone B3: 1 person, trapped. Two possible spots in Suite 310, cannot choose between them (in Suite 310, 2.5 m from the west wall and 2.5 m from the north wall; or in Suite 310, 2 m from the south wall and 4.5 m from the west wall); a third puck, or moving one puck to the wall, would decide",
+   "assumptions": [],
+   "conflict": null
   },
   {
    "id": "B4",
@@ -468,7 +474,9 @@
     "speed": 0.0
    },
    "stale": false,
-   "text": "Phone B4: 1 person, can move, sheltering. Bluetooth only: in Suite 310 (probability 0.7), 2 to 6 m from puck P1"
+   "text": "Phone B4: 1 person, can move, sheltering. Bluetooth only: in Suite 310 (probability 0.7), 2 to 6 m from puck P1",
+   "assumptions": [],
+   "conflict": null
   },
   {
    "id": "B5",
@@ -523,7 +531,9 @@
     "speed": 0.0
    },
    "stale": false,
-   "text": "Phone B5: says safe outside (I am out). Accounted for, not a victim"
+   "text": "Phone B5: says safe outside (I am out). Accounted for, not a victim",
+   "assumptions": [],
+   "conflict": null
   }
  ],
  "presence": [
@@ -1242,5 +1252,6 @@
   "cold_identities_kept": false,
   "retention_s": 900.0,
   "text": "Only phones whose owners installed the app and started sharing are identified, by a rotating id that is not a name, a number or a hardware address. Devices with no app are counted per signal-strength band and never identified or stored. A phone that stops sharing is forgotten at once; everything else is deleted 15 minutes after the phone was last heard."
- }
+ },
+ "search_room": null
 }

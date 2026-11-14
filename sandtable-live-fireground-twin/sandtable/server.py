@@ -170,52 +170,126 @@ class AppState:
             self.emit(acc)
 
     def report(self) -> dict:
-        """sandtable.report/1: what a command post keeps."""
+        """sandtable.report/1: what a command post keeps. A saved report stands alone: every person carries its drawable geometry."""
         inc, prov = self.incident, self.provider
         now = inc.clock()
         rel = (lambda t: round(t - inc.started_t, 1) if (t and inc.started_t) else None)
         prop = prov.site()["property"]
         missing = [k for k in ("sprinklers", "elevators", "owner", "property_manager", "stories", "year_built", "construction") if prop.get(k) in (None, "", {})]
         labels = prov.labels()
-        b = self.beacon.beacons or {}
+        b = inc.beacons or self.beacon.beacons or {}
+        raw_phones = {p["id"]: p for p in b.get("phones") or []}
+        progress = {"located": "located", "assigned": "assigned", "reached": "reached", "evacuating": "reached", "out": "out"}
+
+        def phone_geometry(p: dict | None) -> dict | None:
+            if not p:
+                return None
+            g = p.get("geometry")
+            out = {"kind": g, "pruned": [{k: q.get(k) for k in ("x", "y", "reason")} for q in p.get("pruned") or []]}
+            if g == "fix":
+                out.update({"x": p.get("x"), "y": p.get("y"), "sigma_m": p.get("sigma_m")})
+            elif g == "ring" and p.get("ring"):
+                rg = p["ring"]
+                out.update({"puck": rg.get("puck"), "cx": rg.get("cx"), "cy": rg.get("cy"), "r_m": rg.get("r_m"), "sigma_m": rg.get("sigma_m"), "arcs": rg.get("arcs")})
+            elif g == "candidates":
+                out["candidates"] = [{k: c.get(k) for k in ("x", "y", "sigma_m", "weight", "room", "room_label")} for c in p.get("candidates") or []]
+            elif g == "zone" and p.get("zone"):
+                out.update({k: p["zone"].get(k) for k in ("room", "room_label", "band", "prob")})
+            return out
         people = []
         for e in sorted(inc.phones.values(), key=lambda q: q["id"]):
-            people.append({"id": e["id"], "source": "phone", "status": e["status"], "people": e.get("people"), "where": e.get("label"),
-                           "room": e.get("room"), "room_label": e.get("room_label"), "geometry": e.get("geometry"), "state": e.get("report_status"),
-                           "text": e.get("text"), "located_t_rel": rel(e.get("located_t")), "assigned": e.get("rescuer"),
+            rp = (raw_phones.get(e["id"]) or {}).get("report") or {}
+            people.append({"id": e["id"], "source": "phone", "status": e["status"], "state": progress.get(e["status"], e["status"]), "people": e.get("people"),
+                           "report": {"status": e.get("report_status"), "people": e.get("people"), "can_move": e.get("can_move"), "text": rp.get("text")},
+                           "where": e.get("label"), "room": e.get("room"), "room_label": e.get("room_label"), "geometry": e.get("geometry"),
+                           "geometry_detail": phone_geometry(raw_phones.get(e["id"])), "text": e.get("text"),
+                           "located_t_rel": rel(e.get("located_t")), "assigned": e.get("rescuer"), "assigned_t_rel": rel(e.get("assigned_t")),
                            "reached_t_rel": rel(e.get("reached_t")), "out_t_rel": rel(e.get("out_t")), "simulated": e.get("simulated", True), "sample": e.get("sample", False)})
+        scan_v = {v["id"]: v for v in (inc.scan or {}).get("victims") or []}
         for v in sorted(inc.victims.values(), key=lambda q: q["id"]):
-            people.append({"id": v["id"], "source": "radar", "status": v["status"], "people": 1, "where": v.get("label"), "room": v.get("room"),
-                           "room_label": v.get("room_label"), "geometry": "fix", "state": v.get("state"), "text": v.get("what"),
-                           "located_t_rel": rel(v.get("located_t")), "assigned": v.get("rescuer"), "reached_t_rel": rel(v.get("reached_t")),
-                           "out_t_rel": rel(v.get("out_t")), "simulated": bool((inc.scan or {}).get("simulated", True)), "sample": bool((inc.scan or {}).get("sample"))})
-        if inc.mayday or getattr(inc, "_last_mayday", None):
-            md = inc.mayday or inc._last_mayday
-            people.append({"id": md["unit"], "source": "crew", "status": inc.units[md["unit"]]["status"], "people": 1, "where": md.get("room_label"),
-                           "room": md.get("room"), "room_label": md.get("room_label"), "geometry": "fix", "state": "mayday", "text": f"mayday ({md.get('reason')})",
-                           "located_t_rel": rel(md.get("t")), "assigned": None, "reached_t_rel": None, "out_t_rel": rel(md.get("resolved_t")), "simulated": inc.simulated})
-        crews = [{k: u.get(k) for k in ("id", "label", "kind", "physical", "status", "room_label", "time_in_s", "air_pct")} | {"assignment": u.get("assignment")}
-                 for u in inc.units.values()]
+            sv = scan_v.get(v["id"]) or {}
+            people.append({"id": v["id"], "source": "radar", "status": v["status"], "state": progress.get(v["status"], v["status"]), "people": 1,
+                           "report": {"status": None, "people": None, "can_move": None, "text": None},
+                           "where": v.get("label"), "room": v.get("room"), "room_label": v.get("room_label"), "geometry": "fix",
+                           "geometry_detail": {"kind": "fix", "x": sv.get("x"), "y": sv.get("y"), "sigma_m": sv.get("sigma_m"), "pruned": []},
+                           "radar": {"state": v.get("state"), "breathing_bpm": sv.get("breathing_bpm"), "confidence": sv.get("confidence")}, "text": sv.get("text") or v.get("what"),
+                           "located_t_rel": rel(v.get("located_t")), "assigned": v.get("rescuer"), "assigned_t_rel": rel(v.get("assigned_t")),
+                           "reached_t_rel": rel(v.get("reached_t")), "out_t_rel": rel(v.get("out_t")),
+                           "simulated": bool((inc.scan or {}).get("simulated", True)), "sample": bool((inc.scan or {}).get("sample"))})
+        md = inc.mayday or getattr(inc, "_last_mayday", None)
+        if md:
+            u = inc.units[md["unit"]]
+            people.append({"id": md["unit"], "source": "crew", "status": u["status"], "state": "out" if u["status"] == "out" else "reached" if inc.contact_done else "located",
+                           "people": 1, "report": {"status": "mayday", "people": 1, "can_move": None, "text": f"mayday ({md.get('reason')})"},
+                           "where": md.get("room_label"), "room": md.get("room"), "room_label": md.get("room_label"), "geometry": "fix",
+                           "geometry_detail": {"kind": "fix", "x": u.get("x"), "y": u.get("y"), "sigma_m": u.get("sigma_m"), "pruned": []}, "text": f"mayday ({md.get('reason')})",
+                           "located_t_rel": rel(md.get("t")), "assigned": None, "assigned_t_rel": None, "reached_t_rel": None, "out_t_rel": rel(md.get("resolved_t")),
+                           "simulated": inc.simulated, "sample": False})
+        crews = [{**{k: u.get(k) for k in ("id", "label", "kind", "physical", "status", "room", "room_label", "time_in_s", "air_pct", "x", "y", "sigma_m")},
+                  "assignment": u.get("assignment"), "path": list(u.get("_trail") or [])} for u in inc.units.values()]
+        pucks = [{**{k: p.get(k) for k in ("id", "x", "y", "sigma_m", "room", "placed")}, "source": "beacon"} for p in b.get("pucks") or []]
+        pucks += [{**{k: p.get(k) for k in ("id", "x", "y", "sigma_m")}, "source": "scout", "placed": "self-located"} for p in (inc.scan or {}).get("pucks") or []]
+        acc = self.accountability()
+        ended = next((e["t"] for e in reversed(inc.timeline) if e["kind"] == "par"), None) if inc.phase == "terminated" else None
+        elapsed = round((ended or now) - inc.started_t, 1) if inc.started_t else 0.0
+        differences = [{"id": m.get("id"), "kind": "twin", "text": m.get("text"), "source": "scout radar (" + ("sample" if (inc.scan or {}).get("sample") else "simulated") + ")",
+                        "at": (m.get("where") or {}).get("at"), "room": (inc.scan or {}).get("room")} for m in (inc.scan or {}).get("mismatches") or []]
+        differences += [{"id": c.get("id"), "kind": "record", "text": c.get("text"), "source": "cross-check of " + " and ".join(c.get("layers") or []),
+                         "room": next((r["id"] for r in self.twin.rooms("suite") if c.get("suite") and r.get("suite") == c.get("suite")), None)}
+                        for c in prov.site().get("cross_checks") or []]
+        word = {"fixture": "fixture", "live": "real"}
+        bsrc = self.beacon.source
+        beacon_word = "sample" if bsrc == "sample" else "replay" if bsrc == "replay" else ("simulated" if b.get("simulated", True) else "real") if b else "none"
+        scout_word = None if not inc.scan else "sample" if inc.scan.get("sample") else "simulated"
+        aar_backend = (self.aar or {}).get("backend")
+        pre_backend = (self.preplan or {}).get("backend")
+
+        def agent_label(backend):
+            return {"replay": "replay of a recorded real model run", "reflex-fallback": "deterministic fallback policy (no model)",
+                    "anthropic": "live model (Anthropic API)", "claude-cli": "live model (Claude CLI)"}.get(backend, backend)
+        out_people = [p for p in people if p["state"] == "out"]
+        left = [p for p in people if p["state"] != "out" and p["source"] != "crew"]
+        rows = acc["rows"]
+        summary = (f"{'Simulated exercise' if inc.simulated else 'Incident'} at {prop.get('address')}, {prop.get('city')}: phase {inc.phase}, {elapsed:.0f} s. "
+                   f"{len([p for p in people if p['source'] != 'crew'])} located ({', '.join(p['id'] for p in people if p['source'] != 'crew') or 'none'}); "
+                   f"{len(out_people)} brought out ({', '.join(p['id'] for p in out_people) or 'none'}); "
+                   f"{len(left)} still inside or not reached ({', '.join(p['id'] for p in left) or 'none'}). "
+                   f"Unaccounted on the floor: {acc['totals'].get('unaccounted_low')} to {acc['totals'].get('unaccounted_high')} people (estimate). "
+                   f"Sources: Beacon {beacon_word}, UWB {'simulated' if inc.simulated else 'real'}" + (f", scout radar {scout_word}" if scout_word else "") + ".")
         return {"type": "report", "schema": "sandtable.report/1", "generated_t": round(time.time(), 2),
                 "simulated": bool(inc.simulated) or bool(b.get("simulated", True)),
-                "incident": {"address": f"{prop.get('address')}, {prop.get('city')}", "phase": inc.phase,
-                             "elapsed_s": round(now - inc.started_t, 1) if inc.started_t else 0.0, "storyboard": self.director.status()},
+                "summary": summary,
+                "incident": {"id": f"inc-{int(inc.started_t)}" if inc.started_t else None, "address": f"{prop.get('address')}, {prop.get('city')}",
+                             "started_t": round(inc.started_t, 2) if inc.started_t else None, "ended_t": round(ended, 2) if ended else None,
+                             "floor": self.twin.exercise_floor, "floor_label": self.twin.floor()["label"], "phase": inc.phase,
+                             "elapsed_s": elapsed, "storyboard": self.director.status()},
                 "building": {"address": prop.get("address"), "city": prop.get("city"), "property_type": prop.get("property_type"), "stories": prop.get("stories"),
                              "year_built": prop.get("year_built"), "construction": prop.get("construction"), "rba_sf": prop.get("rba_sf"), "missing": missing,
                              "life_hazards": [{"suite": t["suite"], "text": t["life_hazard"]} for t in prov.costar.list_tenants(int(self.twin.floor()["label"])) if t.get("life_hazard")]},
-                "provenance": {"costar": labels.get("costar"), "matterport": labels.get("matterport"), "vexcel": labels.get("vexcel"),
-                               "uwb": {"simulated": inc.simulated, "source": inc.hub.get("source")},
-                               "beacon": {**self.beacon.link_info(), "simulated": bool(b.get("simulated", True)), "sample": bool(b.get("sample"))},
-                               "scout": {"engine": self.scout.engine, "simulated": True, "sample": bool((inc.scan or {}).get("sample"))} if inc.scan else None,
-                               "agent": {"backend": self.agent.backend}},
-                "people": people, "accountability": self.accountability(), "crews": crews,
+                "provenance": {"costar": {**(labels.get("costar") or {}), "word": word.get(prov.modes.get("costar"), prov.modes.get("costar"))},
+                               "matterport": {**(labels.get("matterport") or {}), "word": word.get(prov.modes.get("matterport"), prov.modes.get("matterport"))},
+                               "vexcel": {**(labels.get("vexcel") or {}), "word": word.get(prov.modes.get("vexcel"), prov.modes.get("vexcel"))},
+                               "uwb": {"word": "simulated" if inc.simulated else "real", "source": inc.hub.get("source"),
+                                       "text": "Crew positions from the uwb-kit simulator (no board attached)" if inc.simulated else "Crew positions from real UWB boards"},
+                               "beacon": {**self.beacon.link_info(), "word": beacon_word, "simulated": bool(b.get("simulated", True)), "sample": bool(b.get("sample")),
+                                          "text": {"sample": "Phones: hand-made sample, not a result", "replay": "Phones: replay of a recorded run of the simulated Beacon module",
+                                                   "simulated": "Phones: the Beacon module's simulator", "real": "Phones: the Beacon module on real pucks",
+                                                   "none": "Phones: no Beacon data"}.get(beacon_word)},
+                               "scout": {"word": scout_word, "engine": self.scout.engine,
+                                         "text": "Radar: hand-made sample scan, not a result" if scout_word == "sample" else "Radar: simulated pucks (no hardware)"} if inc.scan else None,
+                               "agent": {"word": "recorded" if pre_backend == "replay" else "fallback" if pre_backend == "reflex-fallback" else "live" if pre_backend else None,
+                                         "backend": self.agent.backend, "preplan": agent_label(pre_backend), "aar": agent_label(aar_backend)}},
+                "people": people, "accountability": acc, "crews": crews, "pucks": pucks,
                 "hazards": [{k: h[k] for k in ("id", "ref", "kind", "label", "note")} for h in inc.hazards],
+                "differences": differences,
                 "timeline": [{"t_rel": e["t_rel"], "kind": e["kind"], "text": e["text"]} for e in inc.timeline if e["kind"] != "unit"],
-                "agent": {"preplan_summary": (self.preplan or {}).get("summary"), "aar": {k: (self.aar or {}).get(k) for k in ("summary", "went_well", "improve", "follow_up", "backend")} if self.aar else None},
+                "agent": {"preplan_summary": (self.preplan or {}).get("summary"), "preplan_source": agent_label(pre_backend),
+                          "aar": {k: (self.aar or {}).get(k) for k in ("summary", "went_well", "improve", "follow_up", "backend")} if self.aar else None,
+                          "aar_source": agent_label(aar_backend)},
                 "limits": ["Exercise in simulation: no puck, phone or tag hardware was in the loop" if inc.simulated else "Positions from real UWB boards",
                            "Phones: a ring is a range, two candidates are two candidates; only opt-in phones are identified; devices are not people",
                            "Expected head counts are estimates; unaccounted is a range",
-                           "Building record, twin and aerial are fixtures unless the provenance says live"]}
+                           "Building record, twin and aerial are fixtures unless the provenance says real"]}
 
     # ---- outside feeds (GeoJSON, Cursor-on-Target)
     def feed_units(self) -> list[dict]:
@@ -483,7 +557,7 @@ def report_markdown(r: dict) -> str:
     def esc(v):
         return "" if v is None else str(v).replace("|", "/").replace("\n", " ")
     inc, bld, prov = r["incident"], r["building"], r["provenance"]
-    lines = [f"# Incident report: {inc['address']}", "",
+    lines = [f"# Incident report: {inc['address']}", "", r.get("summary") or "", "",
              f"*{'SIMULATED exercise' if r['simulated'] else 'Live incident'}. Phase: {inc['phase']}. Elapsed: {inc['elapsed_s']} s. "
              f"Generated {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(r['generated_t']))}.*", "",
              "## Data provenance", ""]
@@ -493,22 +567,28 @@ def report_markdown(r: dict) -> str:
     bl = prov.get("beacon") or {}
     lines.append(f"- beacon: {'connected to ' + bl.get('url', '') if bl.get('connected') else 'not connected'}; source {bl.get('source')}"
                  + ("; SAMPLE (hand-made, not a result)" if bl.get("sample") else "; simulated" if bl.get("simulated") else ""))
-    lines.append(f"- uwb: {'simulated' if prov['uwb']['simulated'] else 'real boards'} ({prov['uwb'].get('source')}); agent backend: {prov['agent']['backend']}")
+    lines.append(f"- uwb: {prov['uwb']['word']} ({prov['uwb'].get('source')}); agent: pre-plan {prov['agent'].get('preplan')}, after-action {prov['agent'].get('aar')}")
+    if prov.get("scout"):
+        lines.append(f"- scout radar: {prov['scout']['word']}: {prov['scout']['text']}")
     lines += ["", "## Building", "", f"{esc(bld.get('property_type'))}, {esc(bld.get('stories'))} floors, built {esc(bld.get('year_built'))}, {esc(bld.get('construction'))}.",
               f"Not in the record: {', '.join(bld.get('missing') or []) or 'nothing listed'}.", ""]
-    lines += ["## People", "", "| Id | Source | People | Where | Geometry | Report | Status | Crew | Located (s) | Reached (s) | Out (s) |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines += ["## People", "", "| Id | Source | People | Report | Where | Geometry | How found | State | Crew | Located (s) | Assigned (s) | Reached (s) | Out (s) |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for p in r["people"]:
-        lines.append(f"| {p['id']} | {p['source']}{' (sample)' if p.get('sample') else ''} | {esc(p.get('people'))} | {esc(p.get('where'))} | {esc(p.get('geometry'))} | "
-                     f"{esc(p.get('state'))} | {p['status']} | {esc(p.get('assigned'))} | {esc(p.get('located_t_rel'))} | {esc(p.get('reached_t_rel'))} | {esc(p.get('out_t_rel'))} |")
+        rep = p.get("report") or {}
+        lines.append(f"| {p['id']} | {p['source']}{' (sample)' if p.get('sample') else ''} | {esc(p.get('people'))} | {esc(rep.get('status'))} | {esc(p.get('where'))} | "
+                     f"{esc(p.get('geometry'))} | {esc(p.get('how_found'))} | {p['state']} | {esc(p.get('assigned'))} | {esc(p.get('located_t_rel'))} | "
+                     f"{esc(p.get('assigned_t_rel'))} | {esc(p.get('reached_t_rel'))} | {esc(p.get('out_t_rel'))} |")
     acc = r["accountability"]
     lines += ["", "## Accountability", "", "| Suite | Tenant | Life hazard | Expected | Phones | Reported | Located | Devices | Unaccounted | State | Crew | Reached |",
               "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for row in acc["rows"]:
-        exp, un = row.get("expected") or {}, row.get("unaccounted") or {}
+        exp, un = row.get("expected") or {}, row.get("unaccounted") if isinstance(row.get("unaccounted"), dict) else {}
         lines.append(f"| {esc(row.get('suite'))} | {esc(row.get('tenant'))} | {esc(row.get('life_hazard'))} | "
                      f"{esc(exp.get('people'))} ({esc(exp.get('low'))}-{esc(exp.get('high'))}) | {esc(row.get('phones_opt_in'))} | {esc(row.get('people_reported'))} | "
                      f"{esc(row.get('located'))} | {esc(row.get('cold_devices'))} | {esc(un.get('low'))}-{esc(un.get('high'))} | {esc(row.get('state'))} | "
                      f"{esc(row.get('assigned'))} | {'yes' if row.get('reached') else ''} |")
+    lines += ["", "## Differences found", ""] + ([f"- {d['kind']} {esc(d.get('id'))}: {esc(d.get('text'))} ({esc(d.get('source'))})" for d in r.get("differences") or []] or ["- none"])
     lines += ["", "## Crews", ""] + [f"- {c['label']}: {c['status']}, {esc(c.get('room_label'))}, air {esc(c.get('air_pct'))}%" for c in r["crews"]]
     lines += ["", "## Hazards", ""] + ([f"- {h['label']}: {h['kind']} {esc(h.get('note'))}" for h in r["hazards"]] or ["- none"])
     lines += ["", "## Timeline", ""] + [f"- {e['t_rel']:>6} s  {e['kind']}: {esc(e['text'])}" for e in r["timeline"]]

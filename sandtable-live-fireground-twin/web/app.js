@@ -92,7 +92,7 @@ function renderBadges() {
   b.push(`<span class="badge" title="Sponsor layers: fixture = labelled stand-in data (see the footer), live = sponsor API">${allFx ? "Sponsor data: fixture" : esc(lay.map((k) => `${nm[k]} ${h.modes[k]}`).join(" · "))}</span>`);
   b.push(`<span class="badge" title="A crew that does not move for this long raises a mayday. Real PASS devices alarm at about 30 s; exercises compress it.">No-motion ${h.no_motion_s}s</span>`);
   const bl = S.state?.beacon || beacon?.link;
-  if (beacon) b.unshift(beacon.dev ? `<span class="badge dev">Beacon: dev sample</span>` : bl?.connected ? `<span class="badge ${bl.simulated !== false ? "sim" : "live"}" title="Beacon module: ${esc(bl.source || "")}">Beacon ${bl.simulated !== false ? "SIM" : "live"}${bl.sample ? " · sample" : ""}</span>` : `<span class="badge off" title="No phone data reaches this board">Beacon not connected</span>`);
+  if (beacon) b.unshift(beacon.dev ? `<span class="badge dev">Beacon: dev sample</span>` : bl?.connected ? `<span class="badge ${bl.simulated !== false ? "sim" : "live"}" title="Beacon module: ${esc(bl.source || "")}">Beacon ${bl.simulated !== false ? "SIM" : "live"}${bl.sample ? " · sample" : ""}</span>` : bl?.source === "replay" ? `<span class="badge sim" title="The Beacon module is not connected live; phones come from a replayed, simulated Beacon feed">Beacon replay · SIM</span>` : `<span class="badge off" title="No phone data reaches this board">Beacon not connected</span>`);
   $("badges").innerHTML = b.join("");
   $("modes-note").title = $("modes-note").textContent = `${MODES[S.mode]?.word}: ${MODES[S.mode]?.line} ` + (!hubOk ? "No crew position stream." : h.simulated ? "Crew positions are simulated (uwb-kit simulator)." : "Crew positions come from real UWB boards.");
   $("btn-story").title = h.drivable ? "SIM: plays the two-minute exercise hands-free (shift-click: guided, you move Engine 1)" : "Guided exercise: you move the Engine 1 token, the agent and the script do the rest";
@@ -324,7 +324,7 @@ function onInsetRect(r) {
   if (!r || S.view !== "3d") { el.hidden = true; return; }
   el.hidden = false;
   Object.assign(el.style, { left: r.x + "px", bottom: r.y + "px", width: r.w + "px", height: r.h + "px" });
-  Object.assign($("smoke-claim").style, { left: r.x + "px", bottom: r.y + r.h + 6 + "px", width: r.w + "px" });
+  Object.assign($("smoke-claim").style, { left: "10px", top: "10px", bottom: "auto", width: Math.min(380, Math.round(r.W * 0.5)) + "px" });
 }
 function applyFocus() {
   const view = S.mode === "scout" ? scout.view() : null, bbox = S.mode === "beacon" && beacon ? beaconBox() : null;
@@ -542,8 +542,9 @@ function renderBeaconHead() {
   const marks = [b.simulated ? `<span class="badge sim" title="Simulated phones and pucks (${esc(b.source)})">Simulated</span>` : `<span class="badge live">Real pucks</span>`];
   if (beacon.dev) marks.push(`<span class="badge dev" title="Hand-made sample story built on the board with ?devbeacons=1">DEV SAMPLE</span>`);
   else if (beacon.sample) marks.push(`<span class="badge dev" title="The server replays a hand-made sample Beacons object">Sample phones</span>`);
-  if (!beacon.dev && !beacon.link?.connected) marks.push(`<span class="badge off" title="The Beacon server does not answer; what is shown is the labelled sample">Beacon module not connected</span>`);
-  const summary = `${ph.filter((p) => !p.report?.safe_outside).length} phones with the app, ${ppl} people reported, ${ph.filter((p) => p.geometry === "fix").length} located to a point${dev ? `; ${dev} devices heard (devices, not people)` : ""}`;
+  if (!beacon.dev && !beacon.link?.connected) marks.push(beacon.link?.source === "replay" ? `<span class="badge off" title="The Beacon module is not connected live; these phones come from a replayed Beacon feed">Replay, module not live</span>` : `<span class="badge off" title="The Beacon server does not answer; what is shown is the labelled sample">Beacon module not connected</span>`);
+  const nIn = ph.filter((p) => !p.report?.safe_outside).length, nFix = ph.filter((p) => p.geometry === "fix").length;
+  const summary = `${nIn} phone${nIn === 1 ? "" : "s"} with the app inside, ${ppl} ${ppl === 1 ? "person" : "people"} reported, ${nFix} located to a point${dev ? `; ${dev} device${dev === 1 ? "" : "s"} heard (devices, not people)` : ""}`;
   const lim = b.limits || [];
   el.innerHTML = `<div class="st1"><span class="sh-phase done">Phones</span><b>${b.room_label ? `Pucks in ${esc(b.room_label)}` : "No pucks thrown yet"}</b>${marks.join("")}<span class="sh-text" title="${esc(summary)}">${esc(summary)}</span></div>` +
     (lim.length ? `<div class="st2" title="${esc(lim.join("; "))}"><b>Cannot tell:</b> ${lim.map(esc).join("; ")}</div>` : "");
@@ -558,13 +559,13 @@ function renderAcc() {
   const rw = beacon.b ? `<div class="acc-rungs" title="What the current Beacon source can deliver">${[["cold", "device count"], ["ble", "Bluetooth"], ["uwb", "UWB"], ["bearing", "bearing"]].map(([k, w]) => `<span class="rung ${rungs[k] ? "on" : "off"}">${w}</span>`).join("")}</div>` : "";
   const order = rows.slice().sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9) || String(a.suite).localeCompare(String(b.suite)));
   const range = (r) => (r ? (r.low === r.high ? `${r.low}` : `${r.low}–${r.high}`) : "?");
-  el.innerHTML = rw + (tot ? `<div class="acc-tot"><div><b>${tot.people_reported ?? 0}</b> reported by <b>${tot.phones_opt_in ?? 0}</b> phones, <b>${tot.located ?? 0}</b> located</div><div>about ${tot.expected_people ?? "?"} expected on the floor (an estimate from the record)${tot.cold_devices ? `; ${tot.cold_devices} devices heard (not people)` : ""}${tot.suites_unscanned ? `; ${tot.suites_unscanned} suites not scanned` : ""}</div></div>` : "") +
+  el.innerHTML = rw + (tot ? `<div class="acc-tot"><div><b>${tot.people_reported ?? 0}</b> ${tot.people_reported === 1 ? "person" : "people"} reported by <b>${tot.phones_opt_in ?? 0}</b> phone${tot.phones_opt_in === 1 ? "" : "s"}, <b>${tot.located ?? 0}</b> located to a point</div><div>${tot.expected_people != null ? `about ${tot.expected_people} expected on the floor (an estimate from the record)` : "no occupancy estimate without the Beacon module"}${tot.cold_devices ? `; ${tot.cold_devices} devices heard (not people)` : ""}${tot.suites_unscanned ? `; ${tot.suites_unscanned} suites not scanned` : ""}</div></div>` : "") +
     `<div class="acc-rows">` + order.map((r) => {
       const crew = r.reached ? `${esc(r.assigned || (r.crews || [])[0] || "crew")} reached` : r.assigned ? `${esc(r.assigned)} sent` : (r.crews || []).length ? `${esc(r.crews.join(", "))} inside` : "";
       return `<div class="acc-row st-${esc(r.state)}${r.out ? " out" : ""}" data-suite="${esc(r.suite)}" title="${esc(r.expected?.basis ? `Expected: ${r.expected.basis}` : "")}${r.why ? `\n${esc(r.why)}` : ""}">` +
         `<div class="su">${esc(r.suite)}${r.priority != null && r.priority <= 2 ? `<span class="prio">P${r.priority}</span>` : ""}</div>` +
         `<div class="mid"><div class="tn">${esc(r.tenant || r.industry || (r.vacant ? "vacant on record" : "no tenant on record"))}</div>${r.life_hazard ? `<div class="hz">${esc(r.life_hazard)}</div>` : ""}` +
-        `<div class="nn"><span>expects ${range(r.expected)}</span>${r.phones_opt_in ? `<span class="ph">${r.phones_opt_in} phone${r.phones_opt_in > 1 ? "s" : ""}, ${r.people_reported} reported${r.located ? `, ${r.located} located` : ""}</span>` : ""}${r.cold_devices ? `<span>${r.cold_devices} devices</span>` : ""}</div></div>` +
+        `<div class="nn">${r.expected ? `<span>expects ${range(r.expected)}</span>` : ""}${r.phones_opt_in ? `<span class="ph">${r.phones_opt_in} phone${r.phones_opt_in > 1 ? "s" : ""}, ${r.people_reported} reported${r.located ? `, ${r.located} located` : ""}</span>` : ""}${r.cold_devices ? `<span>${r.cold_devices} devices</span>` : ""}</div></div>` +
         `<div class="rt"><div class="un">${range(r.unaccounted)}</div><div class="ul">unaccounted</div><div class="stw">${esc(STATE_WORD[r.state] || r.state || "")}</div>${crew ? `<div class="crew">${crew}${r.out ? ", out" : ""}</div>` : ""}</div></div>`;
     }).join("") + `</div>` + ((beacon.acc?.limits || beacon.b?.limits || []).length ? `<div class="acc-lim">${(beacon.acc?.limits || []).concat(["Unaccounted is a range: the record's expected occupancy is an estimate"]).slice(0, 3).map(esc).join(". ")}.</div>` : "");
   for (const row of el.querySelectorAll(".acc-row")) {

@@ -330,7 +330,9 @@ class ScoutSession:
             await self._hold(t0, show / steps)
         vic = await work
         timing["find_victims_s"] = round(time.perf_counter() - c0, 2)
-        mm = await asyncio.to_thread(m["mismatch"].find_mismatches, pucks_xy, echoes, poly)
+        known = [{"at": [float(v["x"]), float(v["y"])]} for v in vic.get("victims") or [] if v.get("x") is not None]   # a located person is not debris
+        mm = await asyncio.to_thread(lambda: m["mismatch"].find_mismatches(pucks_xy, echoes, poly, door=door["at"] if door else None,
+                                                                            height_m=sc.get("height_m"), known=known))
         outline = {"polygon": poly, "source": "twin", "confidence": round(max(0.0, 1.0 - float(reg.get("ambiguity") or 0.0)), 2) if reg.get("ok") else 0.3}
         if not poly:
             box = m["register"].fit_box(loc["pucks_rel"], echoes)
@@ -371,14 +373,14 @@ class ScoutSession:
             limits.append("Two pucks give presence and range only, not a position")
         if not reg.get("ok"):
             limits.append("Registration into the twin failed: positions are in the pucks' own frame")
-        elif float(reg.get("ambiguity") or 0.0) >= 0.6:
+        elif not reg.get("confident", float(reg.get("ambiguity") or 0.0) < 0.6):
             limits.append("Registration is ambiguous (another pose fits almost as well): check the puck positions against the door")
         tap = meta.get("tap_ns")
         scan = {
             "type": "scan", "schema": "sandtable.scan/1", "id": f"scan-{self._n}", "t": round(self.clock(), 2),
             "floor": r.get("floor") or twin.exercise_floor, "room": room, "room_label": r["label"], "simulated": True, "engine": "sim",
             "rung": "cir-radar", "n_pucks": len(pucks), "pucks": pucks, "links": links,
-            "registration": {"ok": bool(reg.get("ok")), "method": reg.get("method"), "residual_m": _r(reg.get("residual_m")),
+            "registration": {"ok": bool(reg.get("ok")), "confident": reg.get("confident"), "method": reg.get("method"), "residual_m": _r(reg.get("residual_m")),
                              "ambiguity": _r(reg.get("ambiguity")), "scale": 1.0, "text": reg.get("text"), "transform": _jsonable(reg.get("transform") or {})},
             "victims": victims, "echo_map": _jsonable(vic.get("echo_map") or {}), "outline": _jsonable(outline),
             "mismatches": _jsonable(mm or []),

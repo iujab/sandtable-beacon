@@ -341,7 +341,7 @@ export class Twin3D {
   }
   _insetRect() {
     const W = this.el.clientWidth || 800, H = this.el.clientHeight || 600;
-    const w = Math.round(Math.max(170, Math.min(300, W * 0.3))), h = Math.round(w * 0.6);
+    const w = Math.round(Math.max(160, Math.min(250, W * 0.26))), h = Math.round(w * 0.6);
     return { x: 10, y: 10, w, h, W, H };
   }
   _pickSetup() {

@@ -5,16 +5,16 @@
 # library: UWB_DW1000_DW3000                                1.0.1     -         user     -
 # command: nice arduino-cli compile --fqbn esp32:esp32:esp32 --jobs 4 --build-path data/fw_build/uwbkit_tagless --output-dir hardware/firmware/bin/uwbkit_tagless --warnings default hardware/firmware/uwbkit_tagless
 
-In file included from sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:43:
+In file included from ~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:43:
 ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:20:9: warning: "_BV" redefined
    20 | #define _BV(n) (1 << n) // sets 1 at position of BIT "n"
       |         ^~~
-In file included from sandtable-live-fireground-twin/data/fw_build/uwbkit_tagless/sketch/uwbkit_tagless.ino.cpp:1:
+In file included from ~/dev/princetonhackathonbench/sandtable-live-fireground-twin/data/fw_build/uwbkit_tagless/sketch/uwbkit_tagless.ino.cpp:1:
 ~/.arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Arduino.h:113:9: note: this is the location of the previous definition
   113 | #define _BV(b) (1UL << (b))
       |         ^~~
 In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000Ng.hpp:19,
-                 from sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:44:
+                 from ~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:44:
 ~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:20:9: warning: "FCS_LEN" redefined
    20 | #define FCS_LEN 2
       |         ^~~~~~~

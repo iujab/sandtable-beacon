@@ -297,3 +297,54 @@ def test_agent_routes_answer(make_client):
     assert r.status_code in (200, 409, 503)
     if r.status_code == 200:
         assert "busy" in r.json()
+
+
+# ---------------------------------------------------------------------------- two-puck additions (BEACON_FEED A8)
+def test_search_room_routes(make_client):
+    c = make_client("live")
+    assert c.get("/api/search_room").json() == {"search_room": None}
+    r = c.post("/api/search_room", json={"room": "r310"})
+    assert r.status_code == 200 and r.json()["search_room"] == {"room": "r310", "room_label": "Suite 310"}
+    assert c.post("/api/search_room", json={"room": "nowhere"}).status_code == 400
+    b = _wait(lambda: (lambda b: b if b.get("search_room") else None)(c.get("/api/beacons").json()), 3.0)
+    assert b["search_room"]["room"] == "r310"
+    with c.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["search_room"] == {"room": "r310", "room_label": "Suite 310"}
+    assert c.post("/api/search_room", json={"room": None}).json()["search_room"] is None
+
+
+def test_layout_route(make_client):
+    pytest.importorskip("beacon.layout")
+    c = make_client("fake")
+    r = c.get("/api/layout?room=r310&n=2&strategy=door-wall")
+    assert r.status_code == 200
+    lay = r.json()
+    assert len(lay["pucks"]) == 2 and {"wall", "why", "mirror_falls"} <= set(lay)
+    assert c.get("/api/layout").status_code == 200                      # default room
+    assert c.get("/api/layout?room=nowhere").status_code == 400
+    assert c.get("/api/layout?strategy=wild").status_code == 400
+
+
+@needs_sim
+def test_two_pucks_placed_by_layout(make_client):
+    pytest.importorskip("beacon.layout")
+    c = make_client("sim")
+    r = c.post("/api/pucks", json={"n": 2, "room": "r310"})
+    assert r.status_code == 200 and r.json()["strategy"] == "door-wall" and len(r.json()["pucks"]) == 2
+    lay = c.get("/api/layout?room=r310").json()
+    for got, want in zip(r.json()["pucks"], lay["pucks"]):
+        assert abs(got["x"] - want["x"]) < 0.5 and abs(got["y"] - want["y"]) < 0.5      # believed = true + position noise
+    assert c.post("/api/pucks", json={"n": 3, "strategy": "door-wall"}).status_code == 400
+
+
+def test_app_link(make_client):
+    c = make_client("fake")
+    j = c.get("/api/app_link?url=http://192.0.2.10:1885").json()
+    assert j == {"link": "sandtablebeacon://server?url=http%3A%2F%2F192.0.2.10%3A1885", "server": "http://192.0.2.10:1885"}
+    own = c.get("/api/app_link").json()
+    assert own["server"].startswith("http://") and own["link"].startswith("sandtablebeacon://server?url=")
+    svg = c.get("/api/app_link.svg?url=http://192.0.2.10:1885")
+    if svg.status_code == 501:
+        pytest.skip("segno not installed")
+    assert svg.status_code == 200 and svg.headers["content-type"].startswith("image/svg+xml") and "<svg" in svg.text
+    assert c.get("/api/app_link?url=javascript:alert(1)").status_code == 400

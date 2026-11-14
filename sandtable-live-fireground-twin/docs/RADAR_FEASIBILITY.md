@@ -314,7 +314,7 @@ This section was added by the evaluation script `scripts/eval_scout.py` and is r
 - For N = 1 to 5 pucks and 60 seeds each (1000-1059, disjoint from the seeds the engine was developed on), four scenes: a breathing victim kept within 4.5 m of the nearest puck (the scene's default), a breathing victim anywhere in the far part of the room (natural placement), an empty room, and a victim who neither breathes nor moves. Every scene also holds a debris pile that the twin does not show and five weak furniture reflectors along the walls.
 - Each scan runs the pipeline of the live session: simulate the frames and ranges, self-locate the pucks from their ranges, extract the static echoes, register the pucks into the twin, look for a breathing or moving person inside the room polygon, and flag where the echoes disagree with the twin. The link-shadow fallback (`shadow.locate`) runs on the same ranges.
 - Scan: 12 s at 20 frames per second. Noise model (L08's): direct-path SNR 36 dB at 1 m, static-path flicker 0.4 RMS with a 0.5 s time constant (fitted in L08 to a real DW1000 recording), ranges with 3 cm noise, breathing seen as 3 mm of torso motion. The full model is in the result file.
-- Command: `.venv/bin/python scripts/eval_scout.py`, about 3 minutes on 4 cores. Intervals are Wilson 95% intervals. Location errors are measured in the twin frame, so a wrong registration counts against the result.
+- Command: `.venv/bin/python scripts/eval_scout.py`, about 4 minutes on 4 cores. Intervals are Wilson 95% intervals. Location errors are measured in the twin frame, so a wrong registration counts against the result.
 
 ### Finding the person
 

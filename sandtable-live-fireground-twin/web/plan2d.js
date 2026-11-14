@@ -449,7 +449,7 @@ export class Plan {
     const p = this.P([q.x, q.y]), d = 0.34;
     const x = el("g", { class: `ghost${strike ? " strike" : ""}` });
     x.append(el("circle", { cx: p[0], cy: p[1], r: 0.38 }), el("line", { x1: p[0] - d, y1: p[1] - d, x2: p[0] + d, y2: p[1] + d }), el("line", { x1: p[0] - d, y1: p[1] + d, x2: p[0] + d, y2: p[1] - d }),
-      el("text", { x: p[0], y: p[1] + 0.95, class: "why" }, `ruled out: ${q.reason}`), el("title", {}, `Ruled out: ${q.reason}`));
+      el("text", { x: p[0], y: p[1] + 0.95, class: "why" }, `ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`), el("title", {}, `Ruled out: ${q.reason}`));
     if (strike) {
       // the resolution moment: the twin deletes the mirror place
       const big = el("g", { class: "strike-x" });

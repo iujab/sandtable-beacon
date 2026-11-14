@@ -64,6 +64,7 @@ class Incident:
         self.phones: dict[str, dict] = {}
         self.beacons: dict | None = None                    # the latest Beacons object, once pucks are in for this incident
         self.script_hold = False                            # the exercise script holds agent-ordered crews while a recorded picture forms
+        self.held_units: set[str] = set()                   # the exercise script holds these crews whatever ordered them (one crew in the room at a time)
 
     def _make_units(self, tags: list[str]) -> None:
         self._tags = tags
@@ -95,6 +96,7 @@ class Incident:
             u["assignment"], u["route"], u["_follow"], u["_logical"], u["status"] = None, None, None, None, "staged"
             u["_still_ref"], u["_still_since"], u["_entered_t"], u["_was_interior"] = None, None, None, False
             u["still_s"], u["time_in_s"], u["air_pct"] = 0.0, 0.0, 100.0
+            u["_trail"] = []
             if not u["physical"]:
                 self._set_position(u, at[0], at[1], self.clock(), None, None)
             elif self.drivable and self.registration and self.teleport:
@@ -174,6 +176,11 @@ class Incident:
             if d > 0.05:
                 u["heading"] = round(math.atan2(Y - prev[1], X - prev[0]), 3)
         u["x"], u["y"], u["q"] = round(X, 2), round(Y, 2), q
+        trail = u.setdefault("_trail", [])                 # the path walked, for the report (a point every metre or so)
+        if self.started_t and (not trail or math.dist(trail[-1][1:], (X, Y)) >= 1.0):
+            trail.append([round(t - self.started_t, 1), round(X, 2), round(Y, 2)])
+            if len(trail) > 600:
+                del trail[:100]
         u["sigma_m"] = round(sigma, 2) if sigma is not None else None
         lat, lon = self.twin.to_geo(X, Y)
         u["geo"] = {"lat": round(lat, 7), "lon": round(lon, 7)}
@@ -251,11 +258,12 @@ class Incident:
         elif self.phase == "egress" and not self.mayday and (self.victims or self.phones):
             rescued = [v for v in self._people() if v["rescuer"] and v["status"] in ("reached", "evacuating", "out")]
             others = [r for r in self.units.values() if r["_was_interior"]]
-            if rescued and all(v["status"] == "out" for v in rescued) and all(r["status"] == "out" for r in others):
+            phones_done = all(v["status"] in ("out", "handed_over") for v in self.phones.values())    # every phone that reported people inside
+            if rescued and all(v["status"] == "out" for v in rescued) and phones_done and all(r["status"] == "out" for r in others):
                 self.phase = "terminated"
                 names = ", ".join(v["id"] for v in rescued)
-                left = [v for v in self._people() if v["status"] != "out"]
-                rest = (f" Still inside and not reached: {', '.join(v['id'] for v in left)}" +
+                left = [v for v in self._people() if v["status"] not in ("out",)]
+                rest = (f" Handed over, still inside and not reached: {', '.join(v['id'] for v in left)}" +
                         (lambda n: f" ({n} {'person' if n == 1 else 'people'} reported)")(sum(int(v.get('people') or 1) for v in left)) + ".") if left else ""
                 self._log("par", f"All crews are out of the floor with {names}." + (rest or " Accountability complete."))
                 self._situation("all_out", None, {})
@@ -271,6 +279,11 @@ class Incident:
             if v["status"] == "assigned":
                 a = r["assignment"] or {}
                 if a.get("target") != v["id"] or r["x"] is None or r["_follow"] is not None:
+                    continue
+                if v.get("kind") == "phone" and v.get("geometry") == "candidates":
+                    # at a candidate point: whether the person is there is the crew's observation (report_search), not the arrival
+                    if r["route"] and r["route"].get("done") and not v.get("at_candidate"):
+                        v["at_candidate"] = {"x": v["x"], "y": v["y"], "by": r["id"]}
                     continue
                 arrived = bool(r["route"] and r["route"].get("done"))
                 if v.get("match") == "room":                      # a ring or a zone: reached when the crew is in that room
@@ -320,6 +333,35 @@ class Incident:
         if self.phase not in ("standby", "terminated"):
             self._situation("scan", None, brief)
 
+    def report_search(self, pid: str, unit_id: str, found: bool) -> None:
+        """A crew's observation at a phone's candidate point: found (the phone is reached) or nobody there (that candidate is pruned:
+        the Beacon link relays it as pruned "searched by <crew>: nobody there", and with one candidate left the phone becomes a fix)."""
+        v, u = self.phones.get(pid), self.units.get(unit_id)
+        if v is None or u is None:
+            return
+        at = v.get("at_candidate") or {"x": v["x"], "y": v["y"]}
+        v["at_candidate"] = None
+        if found:
+            v["status"], v["reached_t"] = "reached", self.clock()
+            if self.phase in ("operations", "rescue"):
+                self.phase = "egress"
+            self._log("phone", f"{u['label']} has reached phone {pid} in {v['room_label']}: {v['what']}", unit_id)
+            self._situation("phone_reached", unit_id, {"phone": pid, "rescuer": unit_id, "geometry": v["geometry"], "room": v["room"],
+                                                       "room_label": v["room_label"], "node": v["node"], "people": v["people"]})
+            return
+        v.setdefault("searched", []).append({"x": round(float(at["x"]), 2), "y": round(float(at["y"]), 2), "by": u["label"]})
+        self._log("search", f"{u['label']} searched the candidate point of phone {pid} in {v['room_label']}: nobody there", unit_id)
+
+    def phone_searches(self) -> dict:
+        return {k: list(v["searched"]) for k, v in self.phones.items() if v.get("searched")}
+
+    def hand_over(self, pid: str, why: str) -> None:
+        """A located phone nobody reached is handed over explicitly (the incident does not end as if it were accounted for)."""
+        v = self.victim_target(pid)
+        if v is not None and v["status"] not in ("out", "handed_over"):
+            v["status"] = "handed_over"
+            self._log("handover", f"{pid} handed over, still inside and not reached ({v.get('what')} in {v.get('room_label')}): {why}")
+
     def log_scout(self, text: str, unit: str | None = None) -> dict:
         return self._log("scout", text, unit)
 
@@ -352,7 +394,12 @@ class Incident:
             return {"x": float(p["x"]), "y": float(p["y"]), "room": room, "room_label": label, "node": p.get("node") or loc["node"],
                     "dst": [float(p["x"]), float(p["y"])], "match": "point", "label": f"phone {pid} (fix) in {label}"}
         if geom == "candidates" and p.get("candidates"):
-            cs = sorted(p["candidates"], key=lambda c: -float(c.get("weight") or 0))
+            from .scout.session import room_door
+            doors = [d["at"] for d in (room_door(self.twin, c.get("room") or self.twin.locate(c["x"], c["y"])["room"]) for c in p["candidates"]) if d]
+
+            def near_door(c):
+                return min((math.dist((c["x"], c["y"]), d) for d in doors), default=0.0)
+            cs = sorted(p["candidates"], key=lambda c: (-round(float(c.get("weight") or 0), 1), round(near_door(c), 1)))   # a tie: nearer the door first
             c = cs[0]
             loc = self.twin.locate(c["x"], c["y"])
             room = c.get("room") or loc["room"]
@@ -428,6 +475,8 @@ class Incident:
                 (tgt["match"] == "point" and math.dist((tgt["x"], tgt["y"]), (e["x"], e["y"])) > 1.5))
             if e["status"] in ("located", "assigned"):
                 e.update(tgt)
+                if geom != "candidates":
+                    e["at_candidate"] = None
             if moved and e["rescuer"] in self.units:           # the rescue team follows the phone's best geometry (reflex, logged by assign)
                 task = (self.units[e["rescuer"]]["assignment"] or {}).get("task") or "rescue"
                 self.assign(e["rescuer"], task, p["id"], source="reflex")
@@ -502,7 +551,7 @@ class Incident:
         f = u["_follow"]
         if not f:
             return
-        if f.get("by") in HELD_WHILE_AGENT_BUSY and (self.script_hold or (self.agent_busy is not None and self.agent_busy())):
+        if u["id"] in self.held_units or (f.get("by") in HELD_WHILE_AGENT_BUSY and (self.script_hold or (self.agent_busy is not None and self.agent_busy()))):
             return                     # replay determinism: a crew ordered by the agent starts walking when the agent's turn ends
         f["s"] = min(f["total"], f["s"] + config.WALK_SPEED_MPS * dt)
         pts, acc = f["pts"], 0.0

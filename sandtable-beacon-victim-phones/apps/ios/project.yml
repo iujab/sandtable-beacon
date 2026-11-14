@@ -1,7 +1,9 @@
 # SandtableBeacon - XcodeGen spec. UNCOMPILED SOURCE: see docs/IOS_BUILD.md.
 #
+# SECONDARY route. The committed, hand-written SandtableBeacon.xcodeproj is the primary
+# one; use this only if that project will not open or build for project-file reasons:
 #   brew install xcodegen      # once
-#   cd apps/ios && xcodegen    # writes SandtableBeacon.xcodeproj (replaces the hand-written one)
+#   cd apps/ios && xcodegen    # REPLACES SandtableBeacon.xcodeproj (git checkout restores it)
 #
 # Before building: set DEVELOPMENT_TEAM below (or pick your team in Xcode) and make the
 # bundle id unique (change com.example.sandtablebeacon to something of your own).
@@ -24,13 +26,13 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: SandtableBeacon
+    scheme: {}
     settings:
       base:
         PRODUCT_NAME: SandtableBeacon
         PRODUCT_BUNDLE_IDENTIFIER: com.example.sandtablebeacon
         INFOPLIST_FILE: SandtableBeacon/Info.plist
         GENERATE_INFOPLIST_FILE: NO
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1"

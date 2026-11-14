@@ -1,6 +1,6 @@
 {"type":"hello","kit":"uwb-kit","v":1,"simulated":true,"source":"udp:127.0.0.1:1815","profile":"mesh5","rate_hz":10,"nodes":{"N1":{"role":"mesh"},"N2":{"role":"mesh"},"N3":{"role":"mesh"},"N4":{"role":"mesh"},"N5":{"role":"mesh"}},"frame":"mesh","dims":2,"kit_version":"1.0.0","note":"SIMULATED: recorded from the kit's fake-board emulator (hardware/scenarios/scout_pucks_mesh5.json for 4 s, then scout_pucks_mesh5_person.json). This first hello was patched to simulated=true: the hub sent it before it detected the emulator."}
 {"type":"anchors","frame":"mesh","anchors":{"A1":{"x":0.0,"y":0.0,"z":1.2},"A2":{"x":3.6,"y":0.0,"z":1.2},"A3":{"x":3.6,"y":4.4,"z":1.2},"A4":{"x":0.0,"y":4.4,"z":1.2}},"calibrated":"manual"}
-{"type":"status","t":1794679196.895,"rate_hz":0.0,"nodes_online":[],"dropped":0,"battery":{},"clients":0,"uptime_s":1.1,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679196.895,"rate_hz":0.0,"nodes_online":[],"dropped":0,"battery":{},"clients":0,"uptime_s":1.1,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"hello","kit":"uwb-kit","v":1,"simulated":true,"source":"udp:127.0.0.1:1815","profile":"mesh5","rate_hz":10,"nodes":{"N1":{"role":"mesh"},"N2":{"role":"mesh"},"N3":{"role":"mesh"},"N4":{"role":"mesh"},"N5":{"role":"mesh"}},"frame":"mesh","dims":2,"kit_version":"1.0.0","sim":{"scenario":null,"noise":null,"description":"fake-board emulator (uwbkit fakeboard): simulated ranges over the real board path"}}
 {"type":"anchors","frame":"mesh","anchors":{"A1":{"x":0.0,"y":0.0,"z":1.2},"A2":{"x":3.6,"y":0.0,"z":1.2},"A3":{"x":3.6,"y":4.4,"z":1.2},"A4":{"x":0.0,"y":4.4,"z":1.2}},"calibrated":"manual"}
 {"type":"range","t":1794679197.8383,"seq":1,"a":"N1","b":"N2","d":2.217,"raw":2.252,"rssi":-75.1,"fp":-79.3,"los":0.96}
@@ -23,7 +23,7 @@
 {"type":"event","t":1794679197.938,"id":"N3","name":"node_online","data":{}}
 {"type":"event","t":1794679197.938,"id":"N4","name":"node_online","data":{}}
 {"type":"event","t":1794679197.938,"id":"N5","name":"node_online","data":{}}
-{"type":"status","t":1794679197.938,"rate_hz":0.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":2.1,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679197.938,"rate_hz":0.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":2.1,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679197.9381,"seq":11,"a":"N1","b":"N2","d":2.207,"raw":2.242,"rssi":-75.6,"fp":-79.1,"los":0.98}
 {"type":"range","t":1794679197.9396,"seq":12,"a":"N1","b":"N3","d":1.924,"raw":1.959,"rssi":-74.1,"fp":-77.5,"los":0.98}
 {"type":"range","t":1794679197.9396,"seq":13,"a":"N1","b":"N4","d":3.099,"raw":3.134,"rssi":-77.7,"fp":-80.7,"los":0.98}
@@ -171,7 +171,7 @@
 {"type":"pos","t":1794679198.9383,"id":"N3","x":-0.7113,"y":1.8452,"z":0.0,"vx":-0.0172,"vy":0.2035,"vz":0.0,"speed":0.2043,"heading":1.655,"cov":[0.0009,0.0,0.0009],"n":3,"q":0.9455,"src":"mds"}
 {"type":"pos","t":1794679198.9383,"id":"N4","x":1.5589,"y":2.6097,"z":0.0,"vx":-0.0909,"vy":0.0285,"vz":0.0,"speed":0.0953,"cov":[0.0013,0.0,0.0013],"n":4,"q":0.958,"src":"mds"}
 {"type":"pos","t":1794679198.9383,"id":"N5","x":-0.3355,"y":3.3612,"z":0.0,"vx":0.1727,"vy":0.1075,"vz":0.0,"speed":0.2035,"heading":0.5569,"cov":[0.0016,0.0,0.0016],"n":4,"q":0.9388,"src":"mds"}
-{"type":"status","t":1794679198.938,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":3.1,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679198.938,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":3.1,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679198.9383,"seq":108,"a":"N1","b":"N2","d":2.185,"raw":2.22,"rssi":-71.4,"fp":-73.7,"los":0.99}
 {"type":"range","t":1794679198.9392,"seq":109,"a":"N1","b":"N3","d":1.958,"raw":1.993,"rssi":-76.3,"fp":-78.4,"los":0.99}
 {"type":"range","t":1794679198.9392,"seq":110,"a":"N1","b":"N4","d":3.103,"raw":3.138,"rssi":-79.2,"fp":-82.0,"los":0.99}
@@ -320,7 +320,7 @@
 {"type":"pos","t":1794679199.9383,"id":"N3","x":-0.7685,"y":1.7761,"z":0.0,"vx":-0.0714,"vy":-0.0889,"vz":0.0,"speed":0.114,"cov":[0.0008,0.0,0.0008],"n":3,"q":0.9758,"src":"mds"}
 {"type":"pos","t":1794679199.9383,"id":"N4","x":1.5722,"y":2.5469,"z":0.0,"vx":-0.0943,"vy":-0.1384,"vz":0.0,"speed":0.1674,"heading":-2.1689,"cov":[0.001,0.0,0.001],"n":4,"q":0.966,"src":"mds"}
 {"type":"pos","t":1794679199.9383,"id":"N5","x":-0.4322,"y":3.2866,"z":0.0,"vx":-0.1792,"vy":-0.1502,"vz":0.0,"speed":0.2339,"heading":-2.4439,"cov":[0.0011,0.0,0.0011],"n":4,"q":0.9376,"src":"mds"}
-{"type":"status","t":1794679199.938,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":4.1,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679199.938,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":4.1,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679199.9383,"seq":206,"a":"N1","b":"N2","d":2.226,"raw":2.261,"rssi":-75.8,"fp":-82.0,"los":0.82}
 {"type":"range","t":1794679199.939,"seq":207,"a":"N1","b":"N3","d":2.004,"raw":2.039,"rssi":-72.9,"fp":-76.3,"los":0.98}
 {"type":"range","t":1794679199.939,"seq":208,"a":"N1","b":"N4","d":2.998,"raw":3.033,"rssi":-80.8,"fp":-84.8,"los":0.97}
@@ -469,7 +469,7 @@
 {"type":"pos","t":1794679200.939,"id":"N3","x":-0.7356,"y":1.7892,"z":0.0,"vx":0.0405,"vy":-0.0097,"vz":0.0,"speed":0.0417,"cov":[0.0008,0.0,0.0008],"n":4,"q":0.981,"src":"mds"}
 {"type":"pos","t":1794679200.939,"id":"N4","x":1.5969,"y":2.5912,"z":0.0,"vx":0.0348,"vy":0.1547,"vz":0.0,"speed":0.1586,"heading":1.3497,"cov":[0.0008,0.0,0.0008],"n":4,"q":0.9686,"src":"mds"}
 {"type":"pos","t":1794679200.939,"id":"N5","x":-0.3162,"y":3.3862,"z":0.0,"vx":0.1598,"vy":0.1383,"vz":0.0,"speed":0.2114,"heading":0.7134,"cov":[0.0008,0.0,0.0008],"n":4,"q":0.9738,"src":"mds"}
-{"type":"status","t":1794679200.939,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":5.1,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679200.939,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":5.1,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679200.939,"seq":304,"a":"N1","b":"N3","d":1.99,"raw":2.025,"rssi":-72.5,"fp":-75.8,"los":0.98}
 {"type":"range","t":1794679200.9403,"seq":305,"a":"N1","b":"N4","d":3.016,"raw":3.051,"rssi":-76.1,"fp":-80.5,"los":0.95}
 {"type":"range","t":1794679200.9403,"seq":306,"a":"N1","b":"N5","d":3.402,"raw":3.437,"rssi":-75.5,"fp":-78.4,"los":0.99}
@@ -617,7 +617,7 @@
 {"type":"pos","t":1794679202.0578,"id":"N3","x":-0.6193,"y":1.8058,"z":0.0,"vx":0.1697,"vy":0.0476,"vz":0.0,"speed":0.1763,"heading":0.2733,"cov":[0.001,0.0,0.001],"n":4,"q":0.9613,"src":"mds"}
 {"type":"pos","t":1794679202.0578,"id":"N4","x":1.6301,"y":2.5825,"z":0.0,"vx":0.1746,"vy":-0.0317,"vz":0.0,"speed":0.1774,"heading":-0.1798,"cov":[0.001,0.0,0.001],"n":4,"q":0.9324,"src":"mds"}
 {"type":"pos","t":1794679202.0578,"id":"N5","x":-0.323,"y":3.3543,"z":0.0,"vx":0.2655,"vy":0.0602,"vz":0.0,"speed":0.2723,"heading":0.223,"cov":[0.0011,0.0,0.0011],"n":4,"q":0.9053,"src":"mds"}
-{"type":"status","t":1794679202.058,"rate_hz":9.4,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":6.3,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679202.058,"rate_hz":9.4,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":6.3,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679202.0578,"seq":401,"a":"N1","b":"N2","d":2.284,"raw":2.319,"rssi":-75.7,"fp":-78.4,"los":0.99}
 {"type":"range","t":1794679202.0587,"seq":402,"a":"N1","b":"N3","d":1.979,"raw":2.014,"rssi":-74.6,"fp":-76.7,"los":0.99}
 {"type":"range","t":1794679202.0587,"seq":403,"a":"N1","b":"N4","d":3.136,"raw":3.171,"rssi":-82.8,"fp":-93.6,"los":0.09}
@@ -764,7 +764,7 @@
 {"type":"pos","t":1794679203.0587,"id":"N3","x":-0.6155,"y":1.9415,"z":0.0,"vx":0.2658,"vy":0.3706,"vz":0.0,"speed":0.4561,"heading":0.9485,"cov":[0.0012,0.0,0.0012],"n":4,"q":0.9563,"src":"mds"}
 {"type":"pos","t":1794679203.0587,"id":"N4","x":1.7069,"y":2.6451,"z":0.0,"vx":0.416,"vy":0.0759,"vz":0.0,"speed":0.4229,"heading":0.1804,"cov":[0.0035,0.0,0.0035],"n":4,"q":0.7921,"src":"mds"}
 {"type":"pos","t":1794679203.0587,"id":"N5","x":-0.1221,"y":3.4405,"z":0.0,"vx":0.712,"vy":0.2089,"vz":0.0,"speed":0.742,"heading":0.2854,"cov":[0.007,0.0,0.007],"n":4,"q":0.6733,"src":"mds"}
-{"type":"status","t":1794679203.059,"rate_hz":9.4,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":7.3,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679203.059,"rate_hz":9.4,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":7.3,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679203.0587,"seq":497,"a":"N1","b":"N2","d":2.195,"raw":2.23,"rssi":-74.0,"fp":-78.2,"los":0.96}
 {"type":"range","t":1794679203.0597,"seq":498,"a":"N1","b":"N3","d":2.053,"raw":2.088,"rssi":-73.2,"fp":-77.5,"los":0.96}
 {"type":"range","t":1794679203.0597,"seq":499,"a":"N1","b":"N4","d":3.185,"raw":3.22,"rssi":-82.4,"fp":-89.6,"los":0.65}
@@ -933,7 +933,7 @@
 {"type":"pos","t":1794679204.1577,"id":"N3","x":-0.6834,"y":1.8212,"z":0.0,"vx":0.2421,"vy":0.1337,"vz":0.0,"speed":0.2765,"heading":0.5045,"cov":[0.001,0.0,0.001],"n":4,"q":0.9631,"src":"mds"}
 {"type":"pos","t":1794679204.1577,"id":"N4","x":1.5486,"y":2.6038,"z":0.0,"vx":0.1269,"vy":-0.1551,"vz":0.0,"speed":0.2005,"heading":-0.885,"cov":[0.0014,0.0,0.0014],"n":4,"q":0.8713,"src":"mds"}
 {"type":"pos","t":1794679204.1577,"id":"N5","x":-0.4906,"y":3.3375,"z":0.0,"vx":0.0645,"vy":-0.0444,"vz":0.0,"speed":0.0783,"cov":[0.0018,0.0,0.0018],"n":4,"q":0.8308,"src":"mds"}
-{"type":"status","t":1794679204.158,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":8.4,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679204.158,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":8.4,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679204.1577,"seq":603,"a":"N1","b":"N2","d":2.19,"raw":2.225,"rssi":-73.4,"fp":-75.9,"los":0.99}
 {"type":"range","t":1794679204.1591,"seq":604,"a":"N1","b":"N3","d":2.067,"raw":2.102,"rssi":-72.5,"fp":-76.5,"los":0.96}
 {"type":"range","t":1794679204.1591,"seq":605,"a":"N1","b":"N4","d":3.236,"raw":3.271,"rssi":-82.0,"fp":-89.1,"los":0.67}
@@ -1084,7 +1084,7 @@
 {"type":"pos","t":1794679205.1587,"id":"N3","x":-0.6638,"y":1.7541,"z":0.0,"vx":-0.1035,"vy":-0.1412,"vz":0.0,"speed":0.1751,"heading":-2.2031,"cov":[0.001,0.0,0.001],"n":4,"q":0.9694,"src":"mds"}
 {"type":"pos","t":1794679205.1587,"id":"N4","x":1.5873,"y":2.668,"z":0.0,"vx":-0.3022,"vy":0.1001,"vz":0.0,"speed":0.3184,"heading":2.8219,"cov":[0.0015,0.0,0.0015],"n":4,"q":0.9011,"src":"mds"}
 {"type":"pos","t":1794679205.1587,"id":"N5","x":-0.4331,"y":3.3637,"z":0.0,"vx":-0.3537,"vy":-0.0746,"vz":0.0,"speed":0.3615,"heading":-2.9338,"cov":[0.0022,0.0,0.0022],"n":4,"q":0.8576,"src":"mds"}
-{"type":"status","t":1794679205.159,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":9.4,"recording":"sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
+{"type":"status","t":1794679205.159,"rate_hz":10.0,"nodes_online":["N1","N2","N3","N4","N5"],"dropped":0,"battery":{"N1":3.72,"N2":3.79,"N3":3.86,"N4":3.93,"N5":4.0},"clients":1,"uptime_s":9.4,"recording":"~/dev/princetonhackathonbench/sandtable-live-fireground-twin/hardware/recordings/scout_mesh5_fakeboard.ndjson"}
 {"type":"range","t":1794679205.1587,"seq":700,"a":"N1","b":"N3","d":1.98,"raw":2.015,"rssi":-74.0,"fp":-77.1,"los":0.98}
 {"type":"range","t":1794679205.1598,"seq":701,"a":"N1","b":"N5","d":3.408,"raw":3.443,"rssi":-76.3,"fp":-80.1,"los":0.97}
 {"type":"range","t":1794679205.16,"seq":702,"a":"N2","b":"N3","d":3.47,"raw":3.505,"rssi":-76.8,"fp":-81.1,"los":0.95}

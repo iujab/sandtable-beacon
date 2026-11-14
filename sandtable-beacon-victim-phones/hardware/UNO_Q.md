@@ -4,6 +4,10 @@
 > Sources are cited inline; the notes are in `docs/research/puck_hardware.md` section 3. The UNO Q is **optional**:
 > with Qorvo's stock firmware a puck needs only power, and the iPhone app reports every range.
 
+**Tonight it is part of puck A**: one battery bank powers the UNO Q (through a USB-C hub/dongle with a PD input) and
+board A1, which plugs into the hub. The UNO Q joins the Android phone's Wi-Fi hotspot like everything else
+(`hardware/BRINGUP.md` step 4).
+
 Two jobs it can do, independently:
 
 - **A. Puck host** (10 min): power one puck and tell the board it is hosted; optionally read that puck's debug log
@@ -48,29 +52,32 @@ A battery bank works as the PD supply only if it delivers 5 V / 3 A over USB-C P
 
 ## Getting a shell
 
-1. Put the UNO Q on the same Wi-Fi as the laptop (Arduino's first-run setup; or the Android phone's hotspot).
+1. Put the UNO Q on the same Wi-Fi as the laptop and the iPhones: tonight, the Android phone's hotspot (Arduino's
+   first-run setup asks for a Wi-Fi network).
 2. Find its address (your router's or hotspot's client list; or `hostname -I` in a terminal on the board). Call it
    `UNOQ_IP`.
 3. `ssh <user>@UNOQ_IP` from the laptop. The user name is the one set during the board's first-run setup (often
    `arduino`; not confirmed).
-4. Copy the project over, without the laptop's `.venv` (it will not run on arm64):
+4. Get the project onto the UNO Q (needs internet once, so do it before you leave, or on a hotspot with mobile data):
    ```bash
-   # on the laptop, in the folder that contains the project folder
-   rsync -a --exclude .venv --exclude data --exclude __pycache__ sandtable-beacon-victim-phones <user>@UNOQ_IP:~/
-   # no rsync (Windows): zip the folder without .venv, then:  scp beacon.zip <user>@UNOQ_IP:~/   and unzip there
+   git clone https://github.com/iujab/sandtable-beacon
+   cd sandtable-beacon/sandtable-beacon-victim-phones
    ```
+   No internet on the UNO Q: copy the folder from the laptop instead, without the laptop's `.venv` (it will not run on
+   arm64): `rsync -a --exclude .venv --exclude data sandtable-beacon <user>@UNOQ_IP:~/` (or zip it and `scp` the zip).
 
 ## A. Puck host (10 min)
 
 The host is pure standard-library Python: **no install needed** for the heartbeat. On the UNO Q:
 
 ```bash
-cd ~/sandtable-beacon-victim-phones
+cd ~/sandtable-beacon/sandtable-beacon-victim-phones
 python3 -m beacon.host --help
 python3 -m beacon.host --server http://LAPTOP_IP:1885 --puck P1 --name uno-q
 ```
 
-`P1` is the puck id you gave this board on the command board (BRINGUP step 5). If the server runs on the UNO Q itself
+`P1` is the puck id you gave this board on the command board (BRINGUP step 7). `LAPTOP_IP` is the address the server
+printed (BRINGUP step 4.1). If the server runs on the UNO Q itself
 (job B), use `--server http://127.0.0.1:1885`.
 
 **Works when** the command board lists the puck with host `uno-q`. The host prints one line when the server is
@@ -148,7 +155,7 @@ the WCN3980 (above). On a Mac the cold scan always stays off ("Passive scanning 
 Runs the Beacon server (port 1885) on the UNO Q; the laptop and the iPhones only need a browser and the app.
 
 ```bash
-cd ~/sandtable-beacon-victim-phones
+cd ~/sandtable-beacon/sandtable-beacon-victim-phones
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt       # needs internet; every dependency is a wheel
 .venv/bin/python -m beacon.demo --source live --lan       # live mode, reachable from the Wi-Fi
@@ -161,5 +168,5 @@ python3 -m venv .venv
 - Both jobs at once: start the server, then the host with `--server http://127.0.0.1:1885`.
 - Keep it running after you log out: `nohup .venv/bin/python -m beacon.demo --source live --lan > server.log 2>&1 &`.
 
-**If anything here fights you, drop it**: run the server on the laptop (`hardware/BRINGUP.md` step 4.2) and power the
+**If anything here fights you, drop it**: run the server on the laptop (`hardware/BRINGUP.md` step 4.1) and power the
 pucks from battery banks. The demo does not depend on the UNO Q.

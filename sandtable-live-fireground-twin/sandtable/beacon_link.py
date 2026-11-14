@@ -22,6 +22,7 @@ import asyncio
 import copy
 import json
 import logging
+import math
 import os
 import time
 import urllib.error
@@ -35,7 +36,6 @@ log = logging.getLogger("sandtable.beacon")
 SAMPLE = config.FIXTURES / "beacon" / "sample_beacons.json"
 STORY = config.FIXTURES / "beacon" / "story_two_pucks.json"        # a recorded run of the simulated Beacon module (scripts/make_beacon_story.py)
 SCENE = config.FIXTURES / "beacon" / "two_puck_scene.json"         # the owner's two-puck setup: puck positions and the simulated phones
-SIBLING_SAMPLE = config.ROOT.parent / "sandtable-beacon-victim-phones" / "fixtures" / "beacon" / "sample_beacons.json"
 POLL_S = 0.5
 
 
@@ -79,6 +79,45 @@ def _unscanned(obj: dict) -> dict:
         acc["priorities"] = []
         acc["text"] = "SAMPLE. No pucks are in yet: every suite is unscanned."
     return o
+
+
+def apply_searches(obj: dict, searches: dict) -> dict:
+    """A crew searched a phone's candidate point and found nobody: that candidate is pruned ("searched by <crew>: nobody there");
+    with one candidate left the phone is a fix there. This is Sandtable's annotation on the Beacon module's object (the module has no
+    search input); the phone carries "annotated" saying so."""
+    if not searches:
+        return obj
+    phones, changed = [], False
+    for p in obj.get("phones") or []:
+        done = searches.get(p.get("id"))
+        if not done or p.get("geometry") != "candidates":
+            phones.append(p)
+            continue
+        keep, gone = [], []
+        for c in p.get("candidates") or []:
+            (gone if any(math.dist((c["x"], c["y"]), (q["x"], q["y"])) <= 1.0 for q in done) else keep).append(c)
+        if not gone:
+            phones.append(p)
+            continue
+        changed = True
+        by = done[-1]["by"]
+        q = dict(p)
+        q["pruned"] = list(p.get("pruned") or []) + [{"x": c["x"], "y": c["y"], "reason": f"searched by {by}: nobody there"} for c in gone]
+        rep = p.get("report") or {}
+        n = rep.get("people")
+        who = (f"{n} {'person' if n == 1 else 'people'}" if n else "occupant") + (f", {rep['status']}" if rep.get("status") else "") + \
+              (", cannot move" if rep.get("can_move") is False else "")
+        if len(keep) == 1:
+            c = keep[0]
+            q.update({"geometry": "fix", "x": c["x"], "y": c["y"], "sigma_m": c.get("sigma_m"), "cov": None, "geo": c.get("geo"),
+                      "room": c.get("room"), "room_label": c.get("room_label"), "room_prob": None, "candidates": [],
+                      "text": f"Phone {p['id']}: {who}. Fix in {c.get('room_label')} at the other candidate: {by} searched the first one and found nobody there"})
+        else:
+            tot = sum(float(c.get("weight") or 0) for c in keep) or 1.0
+            q["candidates"] = [{**c, "weight": round(float(c.get("weight") or 0) / tot, 3)} for c in keep]
+        q["annotated"] = f"Sandtable: a candidate removed by a crew's search ({by}); not a Beacon module output"
+        phones.append(q)
+    return {**obj, "phones": phones, "annotated": True} if changed else obj
 
 
 class BeaconLink:
@@ -163,10 +202,12 @@ class BeaconLink:
         self._accept(obj)
 
     def _accept(self, obj: dict) -> None:
-        key = (self.source, self.pucks_are_in, obj.get("seq"), obj.get("t"), (self.story or {}).get("step"))
+        searches = self.incident.phone_searches() if self.incident is not None and hasattr(self.incident, "phone_searches") else {}
+        key = (self.source, self.pucks_are_in, obj.get("seq"), obj.get("t"), (self.story or {}).get("step"), json.dumps(searches, sort_keys=True))
         if key == self._key:
             return
         self._key = key
+        obj = apply_searches(obj, searches)
         if self.placed and obj.get("pucks"):
             obj = {**obj, "pucks": [{**p, "placed": self.placed[p["id"]]} if p.get("id") in self.placed else p for p in obj["pucks"]]}
         self.beacons = obj
@@ -177,6 +218,11 @@ class BeaconLink:
     def refresh(self) -> None:
         """Re-relay the current object (after a reset or when pucks go in)."""
         self._key = None
+
+    async def repoll(self) -> None:
+        """Re-relay now (after a crew's search changed what is known)."""
+        self.refresh()
+        await self.poll_once()
 
     # ---- actions on the Beacon server (all tolerant)
     async def remote(self, method: str, path: str, body: dict | None = None, timeout: float = 3.0) -> dict:
@@ -251,6 +297,30 @@ class BeaconLink:
 
 
 # ---------------------------------------------------------------------------- accountability (sandtable.accountability/1)
+def _outcome(row: dict, here: list[dict]) -> str:
+    """One line per suite: what happened to the people located there, or what the evidence is when nobody was."""
+    def who(ps):
+        return ", ".join(f"{p['id']}" + (f" ({p['people']} {'person' if p['people'] == 1 else 'people'})" if p.get("people") else "") for p in ps)
+    out = [p for p in here if p["status"] == "out"]
+    moving = [p for p in here if p["status"] in ("reached", "evacuating")]
+    assigned = [p for p in here if p["status"] == "assigned"]
+    waiting = [p for p in here if p["status"] == "located"]
+    parts = []
+    if out:
+        parts.append(f"brought out: {who(out)}")
+    if moving:
+        parts.append(f"reached, coming out: {who(moving)}")
+    if assigned:
+        parts.append(f"crew on the way: {who(assigned)}")
+    if waiting:
+        parts.append(f"located, not reached: {who(waiting)}")
+    if parts:
+        return "; ".join(parts)
+    return {"unscanned": "unscanned: nothing known beyond the record", "silent": "silent: a puck heard nothing (weak evidence of empty, never proof)",
+            "vacant-on-record": "vacant on the record", "devices-heard": "devices heard, no opt-in phone (devices are not people)",
+            "people-reported": "people reported, none located"}.get(row.get("state"), str(row.get("state")))
+
+
 def accountability(beacons: dict | None, incident, twin, provider) -> dict:
     """The Beacon object's accountability (record suites against phones) joined with what only this board knows:
     crews in each room, hazards, radar victims, and who was assigned to and reached whom."""
@@ -282,8 +352,15 @@ def accountability(beacons: dict | None, incident, twin, provider) -> dict:
                      "targets": sorted(p["id"] for p in here),
                      "assigned": assigned[0] if assigned else None,
                      "reached": any(p["status"] in ("reached", "evacuating", "out") for p in here),
-                     "out": bool(here) and all(p["status"] == "out" for p in here if p.get("rescuer")) and any(p.get("rescuer") for p in here)})
+                     "out": bool(here) and all(p["status"] == "out" for p in here if p.get("rescuer")) and any(p.get("rescuer") for p in here),
+                     "outcome": _outcome(r, here)})
     totals = dict(acc.get("totals") or {})
+    exp = [(r.get("expected") or {}) for r in rows_in]
+    un = [(r.get("unaccounted") or {}) for r in rows_in]
+    totals.update({"expected_people": sum(int(e.get("people") or 0) for e in exp), "expected_low": sum(int(e.get("low") or 0) for e in exp),
+                   "expected_high": sum(int(e.get("high") or 0) for e in exp), "unaccounted_low": sum(int(u.get("low") or 0) for u in un if isinstance(u, dict)),
+                   "unaccounted_high": sum(int(u.get("high") or 0) for u in un if isinstance(u, dict)),
+                   "safe_outside": sum(int(r.get("safe_outside") or 0) for r in rows_in)})
     totals.update({"targets": len(people), "assigned": sum(1 for p in people if p.get("rescuer")),
                    "reached": sum(1 for p in people if p["status"] in ("reached", "evacuating", "out")),
                    "out": sum(1 for p in people if p["status"] == "out")})

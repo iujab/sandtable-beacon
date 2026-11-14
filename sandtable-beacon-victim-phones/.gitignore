@@ -10,3 +10,25 @@ __pycache__/
 build/
 *.log.tmp
 logs/
+
+# never publish: secrets, signing material, vendor firmware binaries, downloads
+.env*
+*.pem
+*.key
+*.p12
+*.cer
+*.mobileprovision
+*.hex
+*.bin
+*.uf2
+*.zip
+*.pdf
+.secrets/
+# Xcode / macOS per-user files
+xcuserdata/
+*.xcuserstate
+DerivedData/
+.DS_Store
+# local runtime output
+uwbkit_anchors.json
+*.ndjson

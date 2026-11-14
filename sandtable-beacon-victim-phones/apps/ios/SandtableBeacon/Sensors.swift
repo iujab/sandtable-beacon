@@ -16,6 +16,7 @@
 // Threading: every handler is delivered on the main queue.
 
 import Foundation
+import Combine
 import UIKit
 import CoreMotion
 import CoreLocation

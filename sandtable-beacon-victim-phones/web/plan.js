@@ -178,7 +178,9 @@ export class Plan {
     const bb = this.focusMode === "room" ? this._focusBBox() : null;
     const pad = 1.4;
     let to = this._floorBox();
-    if (bb) {
+    const fit = bb || [this.fx0 - 1.2, this.fy0 - 1.2, this.fx + 1.2, this.fy + 1.2];
+    if (fit) {
+      const bb = fit;
       // fit the box below a band kept free for the caption (opts.topReserve, in screen px)
       const rect = this.svg.getBoundingClientRect(), W = Math.max(rect.width, 50), H = Math.max(rect.height, 50);
       const res = Math.min(H * 0.45, (this.opts.topReserve ? this.opts.topReserve() : 0) + 30);
@@ -261,8 +263,11 @@ export class Plan {
       if (out.length >= 3) g.appendChild(el("polygon", { points: this.pts(out), class: "lay-mirror" }));
       const ext = 60, a = this.P([A[0] - dx / L * ext, A[1] - dy / L * ext]), b = this.P([A[0] + dx / L * ext, A[1] + dy / L * ext]);
       g.appendChild(el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "lay-line" }));
-      const mid = [(A[0] + B[0]) / 2 - side * n[0] * 1.2, (A[1] + B[1]) / 2 - side * n[1] * 1.2], mp = this.P(mid);
-      g.appendChild(el("text", { x: mp[0], y: mp[1], class: "lay-note" }, "mirror images fall on this side"));
+      // the note runs along the line, on the mirror side, so it never sits across the room
+      const mid = [(A[0] + B[0]) / 2 - side * n[0] * 0.9, (A[1] + B[1]) / 2 - side * n[1] * 0.9], mp = this.P(mid);
+      let ang = Math.atan2(-dy, dx) * 180 / Math.PI;
+      if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+      g.appendChild(el("text", { x: mp[0], y: mp[1], class: "lay-note", transform: `rotate(${ang.toFixed(1)} ${mp[0]} ${mp[1]})` }, "mirror images fall on this side"));
     }
     this.layEls = [];
     for (const q of pts) {
@@ -345,11 +350,12 @@ export class Plan {
     for (const [roomId, v] of byRoom) {
       const p = v.best, n = p.count ?? 0, rg = p.count_range || [n, n];
       const g = el("g", { class: "pres" });
-      const rect = el("rect", { rx: 0 }), t1 = el("text", { class: "n" }, n === 0 ? "no devices heard" : `about ${n} device${n === 1 ? "" : "s"}`);
+      const long = n === 0 ? "no devices heard" : `about ${n} device${n === 1 ? "" : "s"}`, short = n === 0 ? "0 devices" : `~${n} device${n === 1 ? "" : "s"}`;
+      const rect = el("rect", { rx: 0 }), t1 = el("text", { class: "n" }, long);
       const t2 = el("text", { class: "s" }, n === 0 ? "weak evidence of empty, never proof" : `${rg[0]} to ${rg[1]} · devices, not people`);
       g.append(rect, t1, t2, el("title", {}, v.all.map((q) => q.text || "").filter(Boolean).join("\n") || "Cold Bluetooth count: devices, not people; no identities kept"));
       this.g.presence.appendChild(g);
-      this.presEls.push({ g, rect, t1, t2, room: this.rooms[roomId] });
+      this.presEls.push({ g, rect, t1, t2, long, short, room: this.rooms[roomId] });
     }
   }
   _updateZones(phones) {
@@ -406,12 +412,14 @@ export class Plan {
       ph.g.classList.toggle("stale", !!p.stale);
       const tgt = this._target(p);
       const key = JSON.stringify(tgt, (k, v) => (typeof v === "number" ? Math.round(v * 20) / 20 : v));
-      if (key !== ph.key) { ph.key = key; this._transition(ph, tgt); }
+      // structure = what kind of shape it is; a change of structure plays the collapse, a change of numbers only glides
+      const sig = `${p.geometry}|${p.ring ? p.ring.puck + p.ring.kind : ""}|${(p.candidates || []).length}`;
+      if (key !== ph.key) { ph.key = key; this._transition(ph, tgt, sig === ph.sig); ph.sig = sig; }
       this._drawPruned(ph, p);
     }
     for (const [id, ph] of this.phones) if (!seen.has(id) && !ph.leaving) {
       ph.leaving = true; ph.key = null;
-      this._transition(ph, {});
+      this._transition(ph, {}, true);
     }
   }
   _newPhone(id) {
@@ -431,7 +439,19 @@ export class Plan {
     return ph;
   }
   _snapshot(ph) { return clone(ph.cur || {}); }
-  _transition(ph, tgt) {
+  _transition(ph, tgt, smooth = false) {
+    // a new measurement during a collapse: retarget the running animation instead of restarting it
+    if (smooth && ph.structural && performance.now() < ph.t0 + ph.dur) {
+      if (tgt.fix && ph.to.fix) ph.to.fix = { ...tgt.fix };
+      if (tgt.ring && ph.to.ring && ph.to.ring.op > 0) ph.to.ring = { ...tgt.ring, arcs: ph.to.ring.arcs.length === tgt.ring.arcs.length ? tgt.ring.arcs : ph.to.ring.arcs };
+      const live = Object.keys(ph.to).filter((k) => k[0] === "c" && ph.to[k].op > 0);
+      for (const c of Object.keys(tgt).filter((k) => k[0] === "c").map((k) => tgt[k])) {
+        let best = null;
+        for (const k of live) { const d = Math.hypot(ph.to[k].x - c.x, ph.to[k].y - c.y); if (!best || d < best[0]) best = [d, k]; }
+        if (best) ph.to[best[1]] = { ...c };
+      }
+      return;
+    }
     const cur = this._snapshot(ph);
     // drop parts that have already faded out
     for (const k of Object.keys(cur)) if (!(cur[k].op > 0.02)) delete cur[k];
@@ -454,7 +474,9 @@ export class Plan {
     const ring = cur.ring;
     const toPts = Object.keys(to).filter((k) => k[0] === "c").map((k) => [k, to[k]]);
     if (to.fix) toPts.push(["fix", to.fix]);
-    if (ring && !to.ring && toPts.length) {
+    if (smooth) {
+      dur = 450;
+    } else if (ring && !to.ring && toPts.length) {
       // the ah-ha: the ring collapses onto the new point(s)
       const fromArcs = [], toArcs = [];
       let rsum = 0;
@@ -473,7 +495,7 @@ export class Plan {
       from.ring = { ...ring, arcs: fromArcs };
       to.ring = { ...ring, r: rsum / toPts.length, arcs: toArcs, op: 0, ghost: 0 };
       dur = to.fix ? 1500 : 1300; pulse = !!to.fix;
-    } else if (!ring && curC.length && to.fix && !newC.length) {
+    } else if (curC.length && to.fix && !newC.length) {
       // two candidates become one fix: the nearer glides into the fix, the other fades out
       let best = null;
       for (const k of curC) { const d = Math.hypot(cur[k].x - to.fix.x, cur[k].y - to.fix.y); if (!best || d < best[0]) best = [d, k]; }
@@ -488,7 +510,7 @@ export class Plan {
       if (!(k in from)) from[k] = k === "ring" ? { ...to[k], op: 0, ghost: 0 } : k === "fix" ? { ...to[k], op: 0 } : { ...to[k], s: 0, op: 0 };
       if (!(k in to)) to[k] = { ...from[k], op: 0, ...(k === "ring" ? { ghost: 0 } : {}) };
     }
-    ph.from = from; ph.to = to; ph.t0 = performance.now(); ph.dur = reduceMotion() ? 1 : dur;
+    ph.from = from; ph.to = to; ph.t0 = performance.now(); ph.dur = reduceMotion() ? 1 : dur; ph.structural = !smooth;
     if (pulse) ph.pulseT0 = ph.t0 + ph.dur * 0.75;
     this.kick();
   }
@@ -628,11 +650,19 @@ export class Plan {
     const u = this.u, placed = [];
     // fixed things labels must not cover: pucks and presence badges
     for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 12 * u, P[1] - 24 * u, P[0] + 12 * u, P[1] + 8 * u]); }
+    // and the phones' own markers (fix cores, candidate markers with their weights)
+    for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) {
+      if (!(q.op > 0.3) || !isNum(q.x) || k === "ring") continue;
+      const P = this.P([q.x, q.y]), r = (k === "fix" ? 9 : 13) * u;
+      placed.push([P[0] - r, P[1] - r, P[0] + r, P[1] + r + (k === "fix" ? 0 : 14 * u)]);
+    }
     const list = [...this.phones.values()].filter((ph) => ph.labAt && ph.labOp > 0.05).sort((a, b) => a.labRank - b.labRank || String(a.id).localeCompare(String(b.id)));
     const hit = (b) => placed.some((q) => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1]);
     for (const ph of list) {
       const w = Math.max(ph.lab.getComputedTextLength(), ph.sub.getComputedTextLength(), ph.assume.textContent ? ph.assume.getComputedTextLength() : 0) / 2 + 4 * u;
-      const [x, y] = ph.labAt;
+      const bx = this.box || [0, 0, 1e9, 1e9];
+      const x = Math.max(bx[0] + w + 4 * u, Math.min(bx[0] + bx[2] - w - 4 * u, ph.labAt[0]));
+      const y = Math.max(bx[1] + 20 * u, Math.min(bx[1] + bx[3] - 34 * u, ph.labAt[1]));
       let dy = 0;
       for (const step of [0, -1, 1, -2, 2, -3, 3]) {
         const yy = y + step * 30 * u, box = [x - w, yy - 15 * u, x + w, yy + (ph.assume.textContent ? 30 : 17) * u];
@@ -679,15 +709,20 @@ export class Plan {
       const bb = bboxOf(b.room.polygon), pad = 7 * u, m = 0.25;
       b.t1.setAttribute("x", 0); b.t1.setAttribute("y", 0); b.t2.setAttribute("x", 0); b.t2.setAttribute("y", 0);
       const w = Math.max(b.t1.getComputedTextLength(), b.t2.getComputedTextLength()) + 2 * pad, h = 37 * u;
+      const compact = w > (bb[2] - bb[0]) * 0.75;
+      b.t2.style.display = compact ? "none" : "";
+      if (compact) b.t1.textContent = b.short; else b.t1.textContent = b.long;
+      const w2 = compact ? b.t1.getComputedTextLength() + 2 * pad : w, h2 = compact ? 22 * u : h;
       let best = null;
       for (const [cx, cy] of [[0, 1], [1, 1], [0, 0], [1, 0]]) {      // building-frame corners: x left/right, y bottom/top
-        const x0 = cx ? Math.max(bb[0] + m, bb[2] - m - w) : bb[0] + m, y0b = cy ? bb[3] - m - h : bb[1] + m;   // y0b = bottom of the box, building frame
-        const c = [x0 + w / 2, y0b + h / 2];
-        const score = busy.length ? Math.min(...busy.map((q) => Math.max(Math.abs(q[0] - c[0]) - w / 2, Math.abs(q[1] - c[1]) - h / 2))) : (cy ? 1 : 0);
+        const x0 = cx ? Math.max(bb[0] + m, bb[2] - m - w2) : bb[0] + m, y0b = cy ? bb[3] - m - h2 : bb[1] + m;   // y0b = bottom of the box, building frame
+        const c = [x0 + w2 / 2, y0b + h2 / 2];
+        const score = busy.length ? Math.min(...busy.map((q) => Math.max(Math.abs(q[0] - c[0]) - w2 / 2, Math.abs(q[1] - c[1]) - h2 / 2))) : (cy ? 1 : 0);
         if (!best || score > best[0] + 1e-6) best = [score, x0, y0b];
       }
-      const x = best[1], y = this.fy - best[2] - h;
-      b.rect.setAttribute("x", x); b.rect.setAttribute("y", y); b.rect.setAttribute("width", w); b.rect.setAttribute("height", h); b.rect.setAttribute("rx", 4 * u);
+      if (best[0] < 0.15) best = [0, Math.max(bb[0], bb[2] - w2), bb[3] + 4 * u];   // nothing free inside: sit on the top wall, outside
+      const x = best[1], y = this.fy - best[2] - h2;
+      b.rect.setAttribute("x", x); b.rect.setAttribute("y", y); b.rect.setAttribute("width", w2); b.rect.setAttribute("height", h2); b.rect.setAttribute("rx", 4 * u);
       b.t1.setAttribute("x", x + pad); b.t1.setAttribute("y", y + 16 * u); b.t2.setAttribute("x", x + pad); b.t2.setAttribute("y", y + 30 * u);
     }
     for (const q of this.layEls || []) { q.c.setAttribute("r", 10 * u); q.t.setAttribute("y", q.P[1] + 22 * u); }

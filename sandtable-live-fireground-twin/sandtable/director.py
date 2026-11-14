@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 
 from . import config
 
@@ -208,6 +209,16 @@ class Director:
             await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish its turn")
         if not vid:                                        # nobody to rescue: let the agent finish its turn on the scan or phones first
             await self._wait(lambda: not s.agent_busy(), (config.AGENT_FALLBACK_AFTER_S + 120) * slow, f"the agent's turn on the {what}")
+        await self._withdraw(human, slow)
+
+    async def _withdraw(self, human: float, slow: float) -> None:
+        """Phones nobody reached are handed over explicitly; everybody who went in comes out."""
+        s, inc = self.s, self.s.incident
+        e1 = inc.units["E1"]
+        for pid, v in sorted(inc.phones.items()):
+            if v["status"] == "located" or (v["status"] == "assigned" and not v.get("rescuer")):
+                self._script_fallback(f"{pid} handed over to the incoming crews")
+                inc.hand_over(pid, "the exercise ends with this phone not reached; incoming crews take over")
         for u in inc.units.values():                       # everybody who went in comes out
             if u["_was_interior"] and u["status"] not in ("exiting", "out") and (u["assignment"] or {}).get("task") != "exit":
                 self._script_fallback(f"{u['label']} withdraws with the others")
@@ -216,7 +227,7 @@ class Director:
             self._say("YOUR MOVE: walk the Engine 1 token out to the stair shown")
         else:
             self._say("all crews withdraw")
-        if not vid or not person().get("rescuer"):         # nobody was rescued: there is no rescue to end the incident
+        if not any(v.get("rescuer") and v["status"] in ("reached", "evacuating", "out") for v in inc._people()):   # nobody rescued: no rescue ends it
             await self._wait(lambda: all(u["status"] == "out" for u in inc.units.values() if u["_was_interior"]), 120 * human, "the crews out")
             if inc.phase != "terminated":
                 inc.phase = "terminated"
@@ -313,11 +324,14 @@ class Director:
             else:
                 self._say("phones answer (SAMPLE)")
             await self._wait(lambda: bool(inc.phones), 30, "a phone")
-            vid = self._beacon_target()
-            if not vid:
-                self._say("no phone answered: crews withdraw")
-                inc._log("beacon", "No opt-in phone answered; the exercise ends with the crews withdrawing")
-            await self._rescue_and_out(vid, "phone", slow, human)
+            if (story or link.connected) and len(inc.phones) >= 2:
+                await self._two_phones(scene, room, slow, human)
+            else:
+                vid = self._beacon_target()
+                if not vid:
+                    self._say("no phone answered: crews withdraw")
+                    inc._log("beacon", "No opt-in phone answered; the exercise ends with the crews withdrawing")
+                await self._rescue_and_out(vid, "phone", slow, human)
             if story and "after_rescue" in link.story["frames"]:
                 await link.story_step("after_rescue")
             self._say("after-action report")
@@ -332,7 +346,77 @@ class Director:
             self.step = "failed"
         finally:
             inc.script_hold = False
+            inc.held_units = set()
             self.running = False
+
+    async def _two_phones(self, scene: dict, room: str, slow: float, human: float) -> None:
+        """Two phones, two crews, one crew in the room at a time. The first (the priority, a fix) is rescued by the crew the agent sends
+        (else the rescue team); the second has two candidates the radio cannot choose between: the crew the agent sends (else Engine 1,
+        at the door) waits at the door, then searches the candidate nearer the door. Nobody there: that candidate is pruned and the phone
+        becomes a fix at the other point; the crew goes on, reaches it, and both crews bring their people out."""
+        s, inc = self.s, self.s.incident
+        label = s.twin.room(room)["label"]
+        busy_t = (config.AGENT_FALLBACK_AFTER_S + 120) * slow
+        first = self._beacon_target()
+        second = next((p for p in sorted(inc.phones) if p != first), None)
+        await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turns on the phones")
+        if not inc.phones[first]["rescuer"]:
+            self._script_fallback(f"the agent sent nobody to {first}, so the script sends the rescue team")
+            inc.assign("RIT", "rescue", first, source="script-fallback")
+        r1 = inc.phones[first]["rescuer"]
+        if second and (not inc.phones[second]["rescuer"] or inc.phones[second]["rescuer"] == r1):
+            other = next((u for u in ("E1", "RIT") if u != r1), "E1")
+            self._script_fallback(f"the agent sent nobody to {second} (two candidates), so {inc.units[other]['label']}, at the door, will search it")
+            inc.assign(other, "search", second, source="script-fallback")
+        r2 = inc.phones[second]["rescuer"] if second else None
+        if r2:
+            inc.held_units = {r2}
+            inc._log("script", f"{inc.units[r2]['label']} holds at the door of {label} until {inc.units[r1]['label']} is out with {first} (one crew in the room at a time)", r2)
+
+        def st(pid):
+            return inc.phones[pid]["status"]
+        self._say(f"{inc.units[r1]['label']} goes to {first}")
+        await self._wait(lambda: st(first) in ("reached", "evacuating", "out"), 120 * human, f"{first} to be reached")
+        await self._exit_with(first, r1, slow)
+        await self._wait(lambda: st(first) == "out", 120 * human, f"{first} out")
+        if s.beacon.story is not None and "after_rescue" in s.beacon.story["frames"]:
+            await s.beacon.story_step("after_rescue")
+            await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turn after the rescue")
+        if not r2:
+            await self._withdraw(human, slow)
+            return
+        inc.held_units = set()
+        n = len(((s.beacon.beacons or {}).get("phones") and next((p.get("candidates") or [] for p in s.beacon.beacons["phones"] if p.get("id") == second), [])) or [])
+        self._say(f"{inc.units[r2]['label']} searches for {second}" + (f": {n} candidates, the nearer one first" if n else ""))
+        if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
+            inc.drive(r2)
+        await self._wait(lambda: bool(inc.phones[second].get("at_candidate")) or st(second) in ("reached", "evacuating", "out"), 90 * human, "the search")
+        at = inc.phones[second].get("at_candidate")
+        if at:
+            idx = sorted(inc.phones).index(second)
+            truth = scene["phones"][idx] if idx < len(scene.get("phones") or []) else None
+            found = truth is not None and math.dist((at["x"], at["y"]), (truth["x"], truth["y"])) <= 1.5
+            inc.report_search(second, r2, found)
+            if not found:
+                self._say(f"nobody at the first point: the search removes that candidate and {second} is a fix at the other")
+                await s.beacon.repoll()
+                await self._wait(lambda: not s.agent_busy(), busy_t, "the agent's turn on the fix")
+                if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
+                    inc.drive(r2)
+                await self._wait(lambda: st(second) in ("reached", "evacuating", "out"), 90 * human, f"{second} to be reached")
+        await self._exit_with(second, r2, slow)
+        await self._withdraw(human, slow)
+
+    async def _exit_with(self, pid: str, unit: str, slow: float) -> None:
+        """After `<pid>` is reached: the agent's exit order, else the labelled fallback."""
+        s, inc = self.s, self.s.incident
+        self._say(f"{pid} reached: the agent plans the way out")
+        await self._wait(lambda: inc.phones[pid]["status"] in ("evacuating", "out") or not s.agent_busy(), (config.AGENT_FALLBACK_AFTER_S + 120) * slow, "the exit order")
+        await self._wait(lambda: inc.phones[pid]["status"] in ("evacuating", "out"), 2.0, "an exit order after the agent's turn")
+        if inc.phones[pid]["status"] == "reached":
+            self._script_fallback(f"the agent gave no exit order, so the script brings {pid} out with {inc.units[unit]['label']}")
+            inc.assign(unit, "exit", "exit", source="script-fallback")
+        await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish its turn")
 
     def _beacon_target(self) -> str | None:
         """Whom the script expects the rescue to go to: the Beacon accountability's first priority when it is a phone here,

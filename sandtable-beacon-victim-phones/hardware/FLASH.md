@@ -68,9 +68,9 @@ Script: **`hardware/jlink/flash_qani.jlink`** (erase, load the hex, reset, run, 
 J-Link Commander page: `Erase` ("Erases all flash sectors"), `LoadFile <FileName>` (`.hex` supported), `Reset` (`r`),
 `Go` (`g`), `Exit` ([SEGGER](https://kb.segger.com/J-Link_Commander)).
 
-**The one thing to edit:** the hex path. Either copy Qorvo's hex to `hardware/jlink/qani.hex` (that folder's
-`.gitignore` keeps it out of the repository; the licence was not found, so never commit it), or replace the path on the
-`loadfile` line with the full path of your hex (avoid spaces in the path).
+**The one thing to edit:** the hex path. Either copy Qorvo's hex to `data/qani.hex` inside the project folder
+(`data/` is git-ignored; Qorvo's licence was not found, so the hex must never be committed), or keep the hex outside the
+repository folder and put its full path on the `loadfile` line (avoid spaces in the path).
 
 Run from the project folder, J9 plugged in:
 
@@ -137,4 +137,4 @@ Several boards: plug the next board's J9, press the Up arrow, Enter.
 | Board flashed with the wrong device (nRF52832) | Erase Chip with the right device `NRF52833_XXAA`, then Program Device again ([forum 25626](https://forum.qorvo.com/t/dwm3001cdk-iphone-16-demo-not-working/25626)) |
 | Flashed, but the app stays at "Scanning for accessories" | wrong hex: use `DWM3001CDK-QANI-FreeRTOS...hex`, never another board's image ([forum 23229](https://forum.qorvo.com/t/how-to-use-dwm3001cdk-with-apple-ni/23229)); if you have both the `_full_QNI_3_0_0` hex and the SDK hex, try the other one |
 | RTT shows `fds_init() returned 0x860A` / `pm_init failed because pds_init() returned NRF_ERROR_STORAGE_FULL` | full chip erase (J-Flash Lite **Erase Chip**, or `erase` in J-Link Commander), then program again. The error is from [forum 23229](https://forum.qorvo.com/t/how-to-use-dwm3001cdk-with-apple-ni/23229); that a full erase fixes it is **not confirmed** there, but it clears the flash storage the message complains about |
-| Still dead | Nordic's own tools also drive this J-Link (`nrfjprog`, `nrfutil`, nRF Connect Programmer; the Zephyr board page lists `nrfjprog` and `nrfutil` as flash runners, [Zephyr](https://docs.zephyrproject.org/latest/boards/qorvo/decawave_dwm3001cdk/doc/index.html)); not checked tonight. Otherwise set the board aside: three working boards are enough for the main demo (BRINGUP step 5) |
+| Still dead | Nordic's own tools also drive this J-Link (`nrfjprog`, `nrfutil`, nRF Connect Programmer; the Zephyr board page lists `nrfjprog` and `nrfutil` as flash runners, [Zephyr](https://docs.zephyrproject.org/latest/boards/qorvo/decawave_dwm3001cdk/doc/index.html)); not checked tonight. Otherwise set the board aside: two working boards are enough for the main demo (BRINGUP step 7) |

@@ -358,3 +358,18 @@ def test_help_and_bad_arguments():
 
 def test_no_test_imported_bleak():
     assert "bleak" not in sys.modules
+
+
+# --- the layout numbers quoted in hardware/BRINGUP.md and hardware/LAYOUT.md ----------------------------------------
+
+def test_layout_table_numbers_match_the_documents():
+    p = subprocess.run([sys.executable, str(ROOT / "hardware" / "layout_table.py"), "--scale", "3"], cwd=str(ROOT),
+                       capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0, p.stderr
+    out = p.stdout
+    assert "3.17 m x 2.88 m" in out
+    assert "| P1 | 9.15, 6.70 | 3.05, 2.23 |" in out and "| P2 | 9.15, 2.70 | 3.05, 0.90 |" in out
+    assert "0.12 m on the tape" in out and "1.33 m on the tape" in out and "(3.17, 2.40), 0.30 m wide" in out
+    docs = (ROOT / "hardware" / "BRINGUP.md").read_text(encoding="utf-8") + (ROOT / "hardware" / "LAYOUT.md").read_text(encoding="utf-8")
+    for n in ("3.17 m by 2.88 m", "2.23 m", "0.90 m", "1.33 m", "0.12 m", "2.40 m"):
+        assert n in docs, n

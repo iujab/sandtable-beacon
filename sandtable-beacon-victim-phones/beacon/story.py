@@ -234,7 +234,13 @@ class Story:
                 nlabel = tw.room(self.neighbour["room"])["label"] if self.neighbour.get("room") else "the next room"
                 model = self.neighbour.get("model") or "phone"
                 self._say(5, "second phone", f"a second phone ({model}) reports from {nlabel}: it resolves the same way")
-                await self._wait(lambda: self._geom(nk) == "fix", 4.0, 10.0)
+                got = await self._wait(lambda: self._geom(nk) == "fix", 4.0, 8.0)
+                if not got and self.neighbour.get("uwb", True):
+                    # a puck's link is blocked (the holder's body, in the simulator): the app asks the occupant to hold the phone up
+                    self._upsert(self.neighbour, pointing=True, camera_assist=True)
+                    self._say(5, "phone held up", "only one puck reaches that phone; the app asks the occupant to hold it up toward "
+                                                  "the door: its direction estimate turns the ring into a point")
+                    await self._wait(lambda: self._geom(nk) == "fix", 3.0, 8.0)
 
             if self.out is not None:
                 ok_key = self.out["key"]

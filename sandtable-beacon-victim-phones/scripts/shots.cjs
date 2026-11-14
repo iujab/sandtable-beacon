@@ -75,9 +75,23 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
       console.log(`  (timed out waiting for ${what})`);
       return false;
     };
-    if (await stepAnd(2, "ring", "a ring")) { await sleep(2200); await shot(board, "01_ring"); }
-    if (await stepAnd(3, "candidates", "two candidates")) { await sleep(2200); await shot(board, "02_cannot_choose"); }
-    if (await stepAnd(4, "fix", "a fix from two pucks")) { await sleep(2600); await shot(board, "03_fix_two_pucks"); }
+    // the published geometry can change back and forth for a moment: shoot only once it has held still
+    const held = async (geometry, holdMs, timeout) => {
+      const end = Date.now() + timeout;
+      let since = null;
+      while (Date.now() < end) {
+        const b = await get("/api/beacons");
+        const ok = (b.phones || []).some((p) => p.geometry === geometry);
+        since = ok ? since || Date.now() : null;
+        if (since && Date.now() - since >= holdMs) return true;
+        await sleep(200);
+      }
+      return false;
+    };
+    if (await stepAnd(2, "ring", "a ring") && await held("ring", 1800, 8000)) await shot(board, "01_ring");
+    let gotChoose = false;
+    if (await stepAnd(3, "candidates", "two candidates") && await held("candidates", 1800, 8000)) { await shot(board, "02_cannot_choose"); gotChoose = true; }
+    if (await stepAnd(4, "fix", "a fix from two pucks") && await held("fix", 2200, 9000)) await shot(board, "03_fix_two_pucks");
     if (await stepAnd(7, null, "the accountability step", 60000)) {
       await sleep(3000);
       await board.hover("table.acct tbody tr.r1").catch(() => {});
@@ -85,6 +99,26 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
     }
     const end = Date.now() + 100000;
     while (Date.now() < end) { const st = await story(); if (st.done || !st.running) break; await sleep(1000); }
+    if (!gotChoose) {
+      // the walk-through did not leave two candidates on this engine: stage the careless layout by hand, derived from
+      // the fire room's own box (two pucks on a line through the middle of the room, the phone off that line)
+      console.log("  staging the careless two-puck layout by hand for ui_02_cannot_choose");
+      await post("/api/reset");
+      const bundle = await get("/api/bundle");
+      const roomId = bundle.config.room, room = bundle.twin.rooms.find((r) => r.id === roomId);
+      const xs = room.polygon.map((p) => p[0]), ys = room.polygon.map((p) => p[1]);
+      const [x0, y0, x1, y1] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      const at = (fx, fy) => ({ x: +(x0 + fx * (x1 - x0)).toFixed(2), y: +(y0 + fy * (y1 - y0)).toFixed(2) });
+      await post("/api/pucks", { pucks: [{ id: "P1", ...at(0.55, 0.85) }, { id: "P2", ...at(0.55, 0.15) }], room: roomId, floor: room.floor });
+      const floorNo = Number((bundle.twin.floors.find((f) => f.id === room.floor) || {}).label) || null;
+      await post("/api/sim/phone", { key: "shots-careless", ...at(0.25, 0.45), opt_in: true, uwb: true, pointing: false, chip: "U1", model: "iPhone 14",
+        report: { status: "trapped", people: 2, can_move: false, battery_pct: 41, floor_reported: floorNo, text: "Two of us in the back office, smoke under the door", model: "iPhone 14", chip: "U1", platform: "sim" } });
+      const end2 = Date.now() + 20000;
+      while (Date.now() < end2) { const b = await get("/api/beacons"); if ((b.phones || []).some((p) => p.geometry === "candidates")) break; await sleep(300); }
+      await sleep(2500);
+      await shot(board, "02_cannot_choose");
+      await post("/api/sim/phone", { key: "shots-careless", remove: true });
+    }
     const agent = await get("/api/agent").catch(() => null);
     if (agent && agent.available !== false && agent.plan) { await sleep(1500); await shot(board, "06_agent"); }
     await board.click('#focus-seg button[data-focus="floor"]');

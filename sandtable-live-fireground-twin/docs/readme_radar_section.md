@@ -27,7 +27,7 @@ Scout is a secondary, **simulation-only** mode of Sandtable Beacon. No board has
 
 ![Detection and location error against the number of pucks, simulated](figures/scout_ablation.png)
 
-Data: `results/scout_ablation.json` and `results/scout_placement.json`, written by `.venv/bin/python scripts/eval_scout.py` (about 3 minutes on 4 cores). More detail, and why 1, 2 and 3 pucks fail: [docs/RADAR_FEASIBILITY.md, Simulated evidence](docs/RADAR_FEASIBILITY.md#simulated-evidence).
+Data: `results/scout_ablation.json` and `results/scout_placement.json`, written by `.venv/bin/python scripts/eval_scout.py` (about 4 minutes on 4 cores). More detail, and why 1, 2 and 3 pucks fail: [docs/RADAR_FEASIBILITY.md, Simulated evidence](docs/RADAR_FEASIBILITY.md#simulated-evidence).
 <!-- eval_scout:end -->
 
 Full argument, sources and corrections: [docs/RADAR_FEASIBILITY.md](docs/RADAR_FEASIBILITY.md). Numbers: `scripts/radar_arithmetic.py` writes `results/radar_arithmetic.json`. Figures: `figures/radar_ellipses.png`, `figures/radar_wavelengths.png`.

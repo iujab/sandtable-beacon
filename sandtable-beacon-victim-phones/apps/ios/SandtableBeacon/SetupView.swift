@@ -52,7 +52,7 @@ struct SetupView: View {
 
     private var serverSection: some View {
         Section(header: Text("Rescue server"),
-                footer: Text("The Beacon server's address on this Wi-Fi or tailnet, port 1885. The launcher (python -m beacon.demo --source live --lan) prints it. Use the IP address.")) {
+                footer: Text("Fastest: scan the QR code on the board page with the iPhone's Camera app. Or type the address the launcher (python -m beacon.demo --source live --lan) prints, port 1885. Use the IP address.")) {
             TextField("http://192.168.1.20:1885", text: $settings.serverAddress)
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
@@ -94,8 +94,8 @@ struct SetupView: View {
     // MARK: Suite
 
     private var suiteSection: some View {
-        Section(header: Text("Your suite (optional)"),
-                footer: Text("Lets the rescue team compare the building's tenant list with the phones still inside. Floor 0 = do not send a floor.")) {
+        Section(header: Text("Which suite are you in?"),
+                footer: Text("Optional. Tells the rescue team where you say you are, and lets them compare the building's tenant list with the phones still inside. Floor 0 = do not send a floor.")) {
             Button("Load suites from server") {
                 loadDirectory()
             }
@@ -171,17 +171,26 @@ struct SetupView: View {
 
     private var beaconsSection: some View {
         Section(header: Text("Rescue beacons"),
-                footer: Text("Each board probably serves one phone at a time, so two phones must share the boards: keep this at 2 or 3 when two phones are in the room. The key (name#ABCD) is what the server sees: write it on the board.")) {
+                footer: Text("A board serves ONE phone at a time (Qorvo's stock firmware) and stops advertising while connected. Two phones sharing boards: turn on Take turns on BOTH phones, or switch boards off per phone with the use toggles. The key (name#ABCD) is what the server sees: write it on the board.")) {
             Stepper(value: $settings.maxPucks, in: 1...5) {
-                Text("Use at most \(settings.maxPucks) boards")
+                Text("Use at most \(settings.maxPucks) boards at once")
+            }
+            .disabled(settings.takeTurns)
+            Toggle("Take turns (one board at a time)", isOn: $settings.takeTurns)
+            if settings.takeTurns {
+                Stepper(value: $settings.holdSeconds, in: 2...20) {
+                    Text("Hold each board \(settings.holdSeconds) s")
+                }
             }
             Toggle("Find beacons now (sends nothing)", isOn: testBinding)
                 .disabled(reporter.isSharing)
-            Text(pucks.bluetoothText + ". Heard: \(pucks.boardsHeard)")
+            Text(pucks.bluetoothText + ". Connected: \(pucks.connectedCount)")
                 .font(.footnote)
             ForEach(pucks.rows) { row in
-                BeaconRowView(row: row)
-                    .listRowBackground(Theme.card)
+                BeaconRowView(row: row, onToggle: { on in
+                    pucks.setBoardEnabled(row.id, on)
+                })
+                .listRowBackground(Theme.card)
             }
             if let problem = pucks.lastProblem {
                 Text("Last problem: " + problem)

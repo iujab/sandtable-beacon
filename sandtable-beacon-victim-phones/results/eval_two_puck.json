@@ -1,0 +1,744 @@
+{
+ "simulated": true,
+ "generated_by": "scripts/eval_beacon.py",
+ "noise_model": {
+  "noise": {
+   "uwb": {
+    "sigma_los_m": 0.1,
+    "link_bias_sigma_m": 0.1,
+    "wall_bias_m": 0.3,
+    "wall_extra_sigma_m": 0.35,
+    "body_bias_m": 0.3,
+    "body_extra_sigma_m": 0.3,
+    "body_block_prob": 0.25,
+    "outlier_prob": 0.02,
+    "outlier_m": 2.0,
+    "dropout_prob": 0.05,
+    "max_range_m": 15.0,
+    "max_walls": 1
+   },
+   "ble": {
+    "tx_1m_dbm": -62.0,
+    "tx_spread_db": 4.5,
+    "n_los": 2.5,
+    "wall_loss_db": 5.0,
+    "shadow_sigma_db": 6.0,
+    "fast_fading_sigma_db": 4.0,
+    "body_loss_db": 11.5,
+    "sensitivity_dbm": -95.0
+   },
+   "bearing": {
+    "sigma_deg": 25.0,
+    "fov_deg": 120.0,
+    "available_only_when_pointing": true
+   },
+   "puck": {
+    "position_sigma_m": 0.08
+   }
+  },
+  "sim": {
+   "simulated": true,
+   "schedule": {
+    "uwb_hz": 5.0,
+    "sos_hz": 2.0,
+    "bearing_hz": 2.0,
+    "report_every_s": 5.0,
+    "cold_every_s": 5.0,
+    "cold_window_s": 10.0,
+    "jitter_frac": 0.1,
+    "max_catchup_s": 2.0
+   },
+   "eid_rotate_s": 600.0,
+   "ble_shadow_redraw_m": 0.5,
+   "links": "same floor only; a device outside the floor outline has no link",
+   "uwb_link": {
+    "needs_ble_link": true,
+    "outlier_scale": [
+     0.25,
+     1.0
+    ],
+    "los_body_drop": 0.3,
+    "fp_gap_body_db": 6.0,
+    "los_clear_mean": 0.88,
+    "los_clear_sd": 0.06,
+    "los_wall_mean": [
+     0.32,
+     0.18
+    ],
+    "los_wall_sd": 0.12,
+    "rssi_1m_dbm": -62.0,
+    "rssi_wall_db": 5.0,
+    "rssi_sd_db": 1.5,
+    "fp_gap_clear_db": 2.0,
+    "fp_gap_wall_db": 9.0,
+    "fp_sd_db": 1.0
+   },
+   "bearing": {
+    "needs_wall_free_link": true,
+    "aim_sd_deg": 20.0,
+    "one_puck_at_a_time": true
+   },
+   "cold": {
+    "window_s": 10.0,
+    "samples_per_window": 3,
+    "scan_hit_prob": 0.95,
+    "addr_rotate_s": 900.0,
+    "classes": {
+     "phone": {
+      "tx_offset_db": 0.0,
+      "silent_frac": 0.4,
+      "p_multi": 0.08
+     },
+     "wearable": {
+      "tx_offset_db": -6.0,
+      "silent_frac": 0.0,
+      "p_multi": 0.04
+     },
+     "laptop": {
+      "tx_offset_db": 0.0,
+      "silent_frac": 0.2,
+      "p_multi": 0.04
+     }
+    },
+    "random_class_mix": {
+     "phone": 0.5,
+     "wearable": 0.35,
+     "laptop": 0.15
+    },
+    "sources": "address rotation about 15 min: docs/research/android_ble_models.md section 7; silent fractions and p_multi are assumptions"
+   },
+   "report": {
+    "every_s": 5.0,
+    "needs_ble_link": true,
+    "safe_outside_uplink": true,
+    "baro_ground_hpa": 1002.0,
+    "baro_hpa_per_m": 0.12,
+    "baro_phone_height_m": 1.0,
+    "baro_offset_sd_hpa": 0.5,
+    "baro_offset_max_hpa": 1.4,
+    "baro_noise_hpa": 0.03,
+    "battery_drain_pct_per_s": 0.0016666666666666668,
+    "still_after_s": 5.0,
+    "text_max": 120
+   },
+   "throw": {
+    "stages": [
+     [
+      1.5,
+      5.5,
+      1.2,
+      0.5,
+      75
+     ],
+     [
+      1.0,
+      5.5,
+      1.0,
+      0.4,
+      90
+     ],
+     [
+      0.8,
+      6.5,
+      0.8,
+      0.3,
+      120
+     ],
+     [
+      0.5,
+      8.0,
+      0.6,
+      0.25,
+      180
+     ]
+    ],
+    "stage_fields": [
+     "r_min_m",
+     "r_max_m",
+     "min_separation_m",
+     "wall_clearance_m",
+     "half_angle_deg"
+    ],
+    "collinear_ratio": 0.18,
+    "credit": "throw model copied from Sandtable's Scout (scout/scene.py)",
+    "layout_truth_sd_m": 0.03,
+    "two_puck_default": "n == 2: beacon.layout.recommend(strategy='door-wall'); truth = recommended spot + N(0, 0.03 m)"
+   },
+   "chips": {
+    "U1": {
+     "model": "iPhone 14",
+     "bearing": "pointing",
+     "source": "ni-direction+compass",
+     "sigma_factor": 1.0
+    },
+    "U2": {
+     "model": "iPhone 15",
+     "bearing": "pointing+camera_assist",
+     "source": "camera-assist+compass",
+     "sigma_factor": 1.3
+    }
+   }
+  },
+  "text": "see the beacon/sim.py module docstring (stated model); radio constants: models.DEFAULT_NOISE"
+ },
+ "pipeline": "beacon.track.PhoneTrack (median of the last UWB ranges, mean RSSI, hysteresis) -> beacon.locate.estimate",
+ "obs_s": 3.0,
+ "sim_hz": 10.0,
+ "estimate_hz": 4.0,
+ "estimate_last_s": 1.0,
+ "base_seed": 20261114,
+ "fire_room": "r310",
+ "neighbours": [
+  "r309",
+  "r311"
+ ],
+ "trial_counts": {
+  "main_trials": 90,
+  "mismatch_trials": 50,
+  "cold_trials": 200,
+  "layout_trials": 50,
+  "layout_bearing_trials": 60,
+  "cadence_check": 60,
+  "tp_positions": 400,
+  "tp_draws": 2,
+  "tp_false_positions": 150,
+  "tp_ref_draws": 1,
+  "tp_cadence_check": 40
+ },
+ "quick": false,
+ "locator_rules": {
+  "hpd_mass": 0.9,
+  "fix_sigma_max_m": {
+   "uwb": 1.0,
+   "uwb+bearing": 2.5,
+   "ble": 2.5
+  },
+  "bearing_fix_max_arc_sigma_deg": 30.0,
+  "max_candidates": 4,
+  "min_component_mass": 0.03,
+  "merge_components_m": 0.75,
+  "ble_ring_max_sigma_m": 2.5,
+  "ble_fix_min_pucks": 3,
+  "collinear_tol_m": 0.3,
+  "same_puck_m": 0.02,
+  "los_threshold": 0.8,
+  "los_wall_factor": 0.1,
+  "los_body_factor": 0.1,
+  "bearing_blunder_prob": 0.01,
+  "wall_half_thickness_m": 0.075,
+  "region_k_sigma": 2.0,
+  "arc_bin_deg": 2.0,
+  "prune_margin_m": 3.0,
+  "prune_keep_m": 1.0,
+  "impossible_log_penalty": 20.0
+ },
+ "title": "SIMULATED: the owner's two-puck demo: how often two pucks give one answer, and how often it is wrong",
+ "live_like": "UWB ranges only (no los, rssi or fp fields: the iPhone gives a distance), no Bluetooth, no bearing, a still U1 phone, 3 s of ranges per puck at about 5 Hz; default noise model (body blocks, static link bias); twin on",
+ "definitions": {
+  "twin_fix": "the locator (twin on) publishes a fix by itself",
+  "statement_fix": "the locator publishes two candidates and beacon.prune.apply_statement with the occupant's stated suite (the fire room) leaves one: a fix that rests on what was said",
+  "cannot_choose": "two (or more) candidates remain after the statement (both in the room, or none in it)",
+  "ring_or_other": "ring, zone or none",
+  "wrong_fix": "a published fix whose error exceeds 3 sigma_m or 1.5 m",
+  "false_statement": "the phone is really in a neighbouring room (r309, r311, within 6 m of the fire room) but the occupant says the fire room",
+  "positions": "400 phone positions uniform over the fire room (>= 0.3 m from walls) x 2 noise draws per layout (the reference: 1); false statement: 150 positions x 2 draws",
+  "pucks": "placed by hand at beacon.layout.recommend's spots: the locator gets those spots, the truth is within a few cm (N(0, 0.03 m) per axis)"
+ },
+ "layouts": {
+  "door-wall": {
+   "n": 800,
+   "outcome_share": {
+    "twin_fix": 0.481,
+    "statement_fix": 0.292,
+    "cannot_choose": 0.0,
+    "ring_or_other": 0.226
+   },
+   "twin_fix": {
+    "n": 385,
+    "wrong_fix_rate_of_these": 0.013,
+    "fix_err_median_m": 0.264,
+    "fix_err_p90_m": 0.768,
+    "sigma_median_m": 0.48
+   },
+   "statement_fix": {
+    "n": 234,
+    "wrong_fix_rate_of_these": 0.017,
+    "fix_err_median_m": 0.249,
+    "fix_err_p90_m": 0.575,
+    "sigma_median_m": 0.49
+   },
+   "all_fixes": {
+    "n": 619,
+    "share_of_trials": 0.774,
+    "wrong_fix_rate_of_fixes": 0.015,
+    "wrong_fix_rate_of_trials": 0.011,
+    "fix_err_median_m": 0.259,
+    "fix_err_p90_m": 0.756
+   },
+   "hpd_area_median_m2": 1.94,
+   "geometry_after_statement_share": {
+    "fix": 0.774,
+    "candidates": 0.0,
+    "ring": 0.2,
+    "zone": 0.0,
+    "none": 0.026
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.026,
+    "1": 0.156,
+    "2": 0.818,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r311": 183,
+    "r309": 47,
+    "rcW": 3,
+    "rcS": 7
+   },
+   "conflict_share": 0.0,
+   "twin_pruned_share": 0.476,
+   "pucks": {
+    "pucks": [
+     {
+      "id": "P1",
+      "x": 9.15,
+      "y": 6.7
+     },
+     {
+      "id": "P2",
+      "x": 9.15,
+      "y": 2.7
+     }
+    ],
+    "wall": "east wall (the wall the door is in)",
+    "spacing_m": 4.0,
+    "mirror_falls": "the west corridor",
+    "certain": false,
+    "why": "Both pucks 0.35 m inside the wall the door is in, 4.0 m apart: one beside the door, one slid along the wall. The mirror image of anyone in the room falls in the west corridor, where the crew is; it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed."
+   }
+  },
+  "exterior-wall": {
+   "n": 800,
+   "outcome_share": {
+    "twin_fix": 0.776,
+    "statement_fix": 0.052,
+    "cannot_choose": 0.0,
+    "ring_or_other": 0.171
+   },
+   "twin_fix": {
+    "n": 621,
+    "wrong_fix_rate_of_these": 0.023,
+    "fix_err_median_m": 0.257,
+    "fix_err_p90_m": 0.767,
+    "sigma_median_m": 0.46
+   },
+   "statement_fix": {
+    "n": 42,
+    "wrong_fix_rate_of_these": 0.0,
+    "fix_err_median_m": 0.256,
+    "fix_err_p90_m": 0.596,
+    "sigma_median_m": 0.505
+   },
+   "all_fixes": {
+    "n": 663,
+    "share_of_trials": 0.829,
+    "wrong_fix_rate_of_fixes": 0.021,
+    "wrong_fix_rate_of_trials": 0.018,
+    "fix_err_median_m": 0.257,
+    "fix_err_p90_m": 0.763
+   },
+   "hpd_area_median_m2": 1.44,
+   "geometry_after_statement_share": {
+    "fix": 0.829,
+    "candidates": 0.0,
+    "ring": 0.146,
+    "zone": 0.0,
+    "none": 0.025
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.025,
+    "1": 0.142,
+    "2": 0.833,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r309": 42
+   },
+   "conflict_share": 0.0,
+   "twin_pruned_share": 0.26,
+   "pucks": {
+    "pucks": [
+     {
+      "id": "P1",
+      "x": 0.35,
+      "y": 6.33
+     },
+     {
+      "id": "P2",
+      "x": 0.35,
+      "y": 2.33
+     }
+    ],
+    "wall": "west wall (outside wall)",
+    "spacing_m": 4.0,
+    "mirror_falls": "outside the building",
+    "certain": true,
+    "why": "Both pucks 0.35 m inside the west wall, 4.0 m apart. The mirror image of anyone in the room is outside the building, so the twin removes it."
+   }
+  },
+  "careless": {
+   "n": 800,
+   "outcome_share": {
+    "twin_fix": 0.17,
+    "statement_fix": 0.005,
+    "cannot_choose": 0.575,
+    "ring_or_other": 0.25
+   },
+   "twin_fix": {
+    "n": 136,
+    "wrong_fix_rate_of_these": 0.0,
+    "fix_err_median_m": 0.485,
+    "fix_err_p90_m": 0.962,
+    "sigma_median_m": 0.64
+   },
+   "statement_fix": {
+    "n": 4,
+    "wrong_fix_rate_of_these": 0.0,
+    "fix_err_median_m": 0.569,
+    "fix_err_p90_m": 0.629,
+    "sigma_median_m": 0.895
+   },
+   "all_fixes": {
+    "n": 140,
+    "share_of_trials": 0.175,
+    "wrong_fix_rate_of_fixes": 0.0,
+    "wrong_fix_rate_of_trials": 0.0,
+    "fix_err_median_m": 0.502,
+    "fix_err_p90_m": 0.962
+   },
+   "hpd_area_median_m2": 2.0,
+   "geometry_after_statement_share": {
+    "fix": 0.175,
+    "candidates": 0.575,
+    "ring": 0.245,
+    "zone": 0.0,
+    "none": 0.005
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.005,
+    "1": 0.089,
+    "2": 0.906,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r309": 4
+   },
+   "conflict_share": 0.0,
+   "twin_pruned_share": 0.0,
+   "pucks": {
+    "pucks": [
+     {
+      "id": "P1",
+      "x": 3.19,
+      "y": 2.77
+     },
+     {
+      "id": "P2",
+      "x": 6.31,
+      "y": 5.88
+     }
+    ],
+    "wall": null,
+    "spacing_m": 4.41,
+    "mirror_falls": "inside the room",
+    "certain": false,
+    "why": "Comparison layout: both pucks mid-room. The mirror image stays inside the room and nothing can dismiss it."
+   }
+  },
+  "three-pucks (door-wall pair + far corner)": {
+   "n": 400,
+   "outcome_share": {
+    "twin_fix": 0.838,
+    "statement_fix": 0.048,
+    "cannot_choose": 0.028,
+    "ring_or_other": 0.087
+   },
+   "twin_fix": {
+    "n": 335,
+    "wrong_fix_rate_of_these": 0.012,
+    "fix_err_median_m": 0.199,
+    "fix_err_p90_m": 0.614,
+    "sigma_median_m": 0.27
+   },
+   "statement_fix": {
+    "n": 19,
+    "wrong_fix_rate_of_these": 0.0,
+    "fix_err_median_m": 0.244,
+    "fix_err_p90_m": 0.449,
+    "sigma_median_m": 0.36
+   },
+   "all_fixes": {
+    "n": 354,
+    "share_of_trials": 0.885,
+    "wrong_fix_rate_of_fixes": 0.011,
+    "wrong_fix_rate_of_trials": 0.01,
+    "fix_err_median_m": 0.202,
+    "fix_err_p90_m": 0.608
+   },
+   "hpd_area_median_m2": 0.62,
+   "geometry_after_statement_share": {
+    "fix": 0.885,
+    "candidates": 0.028,
+    "ring": 0.083,
+    "zone": 0.0,
+    "none": 0.005
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.005,
+    "1": 0.052,
+    "2": 0.245,
+    "3": 0.698
+   },
+   "dismissed_mirror_rooms": {
+    "r311": 11,
+    "r309": 8
+   },
+   "conflict_share": 0.0,
+   "twin_pruned_share": 0.11,
+   "pucks": {
+    "pucks": [
+     {
+      "id": "P1",
+      "x": 9.15,
+      "y": 6.7
+     },
+     {
+      "id": "P2",
+      "x": 9.15,
+      "y": 2.7
+     },
+     {
+      "id": "P3",
+      "x": 0.37,
+      "y": 0.33
+     }
+    ],
+    "why": "the door-wall pair plus a third puck 0.35 m in from the corner farthest from the door"
+   }
+  }
+ },
+ "false_statement": {
+  "door-wall": {
+   "n": 300,
+   "outcome_share": {
+    "twin_fix": 0.013,
+    "statement_fix": 0.043,
+    "cannot_choose": 0.0,
+    "ring_or_other": 0.943
+   },
+   "twin_fix": {
+    "n": 4,
+    "wrong_fix_rate_of_these": 0.25,
+    "fix_err_median_m": 1.159,
+    "fix_err_p90_m": 8.759,
+    "sigma_median_m": 0.55
+   },
+   "statement_fix": {
+    "n": 13,
+    "wrong_fix_rate_of_these": 1.0,
+    "fix_err_median_m": 3.026,
+    "fix_err_p90_m": 4.008,
+    "sigma_median_m": 0.27
+   },
+   "all_fixes": {
+    "n": 17,
+    "share_of_trials": 0.057,
+    "wrong_fix_rate_of_fixes": 0.824,
+    "wrong_fix_rate_of_trials": 0.047,
+    "fix_err_median_m": 2.851,
+    "fix_err_p90_m": 4.416
+   },
+   "hpd_area_median_m2": 17.75,
+   "geometry_after_statement_share": {
+    "fix": 0.057,
+    "candidates": 0.0,
+    "ring": 0.773,
+    "zone": 0.0,
+    "none": 0.17
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.17,
+    "1": 0.52,
+    "2": 0.31,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r309": 2,
+    "rcS": 1,
+    "r311": 11
+   },
+   "conflict_share": 0.0,
+   "twin_pruned_share": 0.003,
+   "statement_produced_wrong_fix_rate_of_trials": 0.043,
+   "by_true_room": {
+    "r309": {
+     "twin_fix": 0.005,
+     "statement_fix": 0.009,
+     "cannot_choose": 0.0,
+     "ring_or_other": 0.986
+    },
+    "r311": {
+     "twin_fix": 0.037,
+     "statement_fix": 0.138,
+     "cannot_choose": 0.0,
+     "ring_or_other": 0.825
+    }
+   }
+  },
+  "exterior-wall": {
+   "n": 300,
+   "outcome_share": {
+    "twin_fix": 0.013,
+    "statement_fix": 0.01,
+    "cannot_choose": 0.003,
+    "ring_or_other": 0.973
+   },
+   "twin_fix": {
+    "n": 4,
+    "wrong_fix_rate_of_these": 0.0,
+    "fix_err_median_m": 0.428,
+    "fix_err_p90_m": 0.704,
+    "sigma_median_m": 0.76
+   },
+   "statement_fix": {
+    "n": 3,
+    "wrong_fix_rate_of_these": 0.333,
+    "fix_err_median_m": 1.294,
+    "fix_err_p90_m": 1.752,
+    "sigma_median_m": 0.5
+   },
+   "all_fixes": {
+    "n": 7,
+    "share_of_trials": 0.023,
+    "wrong_fix_rate_of_fixes": 0.143,
+    "wrong_fix_rate_of_trials": 0.003,
+    "fix_err_median_m": 0.821,
+    "fix_err_p90_m": 1.523
+   },
+   "hpd_area_median_m2": 16.625,
+   "geometry_after_statement_share": {
+    "fix": 0.023,
+    "candidates": 0.003,
+    "ring": 0.733,
+    "zone": 0.0,
+    "none": 0.24
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.24,
+    "1": 0.46,
+    "2": 0.3,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r309": 3
+   },
+   "conflict_share": 0.003,
+   "twin_pruned_share": 0.003,
+   "statement_produced_wrong_fix_rate_of_trials": 0.003,
+   "by_true_room": {
+    "r309": {
+     "twin_fix": 0.009,
+     "statement_fix": 0.014,
+     "cannot_choose": 0.0,
+     "ring_or_other": 0.977
+    },
+    "r311": {
+     "twin_fix": 0.025,
+     "statement_fix": 0.0,
+     "cannot_choose": 0.013,
+     "ring_or_other": 0.963
+    }
+   }
+  },
+  "careless": {
+   "n": 300,
+   "outcome_share": {
+    "twin_fix": 0.0,
+    "statement_fix": 0.003,
+    "cannot_choose": 0.087,
+    "ring_or_other": 0.91
+   },
+   "twin_fix": {
+    "n": 0,
+    "wrong_fix_rate_of_these": null,
+    "fix_err_median_m": null,
+    "fix_err_p90_m": null,
+    "sigma_median_m": null
+   },
+   "statement_fix": {
+    "n": 1,
+    "wrong_fix_rate_of_these": 1.0,
+    "fix_err_median_m": 2.555,
+    "fix_err_p90_m": 2.555,
+    "sigma_median_m": 0.86
+   },
+   "all_fixes": {
+    "n": 1,
+    "share_of_trials": 0.003,
+    "wrong_fix_rate_of_fixes": 1.0,
+    "wrong_fix_rate_of_trials": 0.003,
+    "fix_err_median_m": 2.555,
+    "fix_err_p90_m": 2.555
+   },
+   "hpd_area_median_m2": 13.69,
+   "geometry_after_statement_share": {
+    "fix": 0.003,
+    "candidates": 0.087,
+    "ring": 0.74,
+    "zone": 0.0,
+    "none": 0.17
+   },
+   "uwb_pucks_heard_share": {
+    "0": 0.17,
+    "1": 0.407,
+    "2": 0.423,
+    "3": 0.0
+   },
+   "dismissed_mirror_rooms": {
+    "r309": 1
+   },
+   "conflict_share": 0.08,
+   "twin_pruned_share": 0.013,
+   "statement_produced_wrong_fix_rate_of_trials": 0.003,
+   "by_true_room": {
+    "r309": {
+     "twin_fix": 0.0,
+     "statement_fix": 0.005,
+     "cannot_choose": 0.073,
+     "ring_or_other": 0.923
+    },
+    "r311": {
+     "twin_fix": 0.0,
+     "statement_fix": 0.0,
+     "cannot_choose": 0.125,
+     "ring_or_other": 0.875
+    }
+   }
+  }
+ },
+ "cadence_check": {
+  "text": "estimates every 0.25 s over 3 s vs only in the last second (this run)",
+  "records": 40,
+  "identical_outcome_and_fix": 40
+ },
+ "timings_s": {
+  "main_s": 29.1,
+  "cadence_check_s": 2.5,
+  "cold_s": 0.3,
+  "layouts_s": 23.8,
+  "two_puck_s": 10.8,
+  "two_puck_cadence_check_s": 0.2,
+  "layout_figures_s": 1.4,
+  "two_puck_figures_s": 0.9
+ }
+}

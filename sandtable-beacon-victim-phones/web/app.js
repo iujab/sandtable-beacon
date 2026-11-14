@@ -124,10 +124,11 @@ function renderCaption(phones) {
     x = `Cannot choose: ${n} possible spots${n === 2 ? ", mirror images across the line between the pucks" : ""}.${pr ? ` ${pr} more ruled out.` : ""} A puck slid to a wall, another puck, or the phone held up and pointed picks one.`;
   } else if (g === "fix") {
     const nP = (p.ranges || []).length;
-    x = `Located${p.room_label ? ` in ${esc(p.room_label)}` : ""} to ±${num(p.sigma_m)} m: ${p.method === "uwb-twr+bearing" ? "a range plus the phone's own direction to the puck" : p.method === "ble-rssi" ? "Bluetooth signal strength from several pucks" : `UWB ranges from ${nP} pucks`}.`;
+    x = `Located${p.room_label ? ` in ${esc(p.room_label)}` : ""} to ±${num(p.sigma_m)} m: ${p.method === "uwb-twr+bearing" ? "a range plus the phone's own direction to the puck" : p.method === "ble-rssi" ? "Bluetooth signal strength from several pucks" : nP ? `UWB ranges from ${nP} pucks` : "UWB ranges"}.`;
   } else if (g === "zone" && p.zone) {
     x = `Bluetooth only: probably in ${esc(p.zone.room_label || "this room")} (${esc(p.zone.band)} signal band). No point is drawn.`;
   }
+  if (p.stale) x += ` Not heard for ${num(p.track && p.track.last_seen_s, 0)} s: the last known shape, growing until the phone is heard again.`;
   const before = cap.offsetHeight;
   if ((p.assumptions || []).length) x += ` <span style="color:#ffcf8a">Assumption: ${esc(plan.assumptionTag(p.assumptions[0]))}.</span>`;
   if (p.conflict) x += ` <span style="color:#ffb4ae">${esc(typeof p.conflict === "string" ? p.conflict : p.conflict.text || "")}</span>`;
@@ -476,7 +477,7 @@ setInterval(() => { if (ws && ws.readyState === 1) ws.send("ping"); }, 20000);
 
 async function loadSample() {
   S.conn = "static";
-  for (const path of ["/fixtures/beacon/sample_beacons.json", "dev_sample.json"]) {
+  for (const path of ["/fixtures/beacon/sample_beacons.json"]) {
     try { const b = await getJSON(path); onMessage({ ...b, type: "beacons", sample: true }); return; } catch { /* next */ }
   }
   toast("No sample file found (fixtures/beacon/sample_beacons.json)");

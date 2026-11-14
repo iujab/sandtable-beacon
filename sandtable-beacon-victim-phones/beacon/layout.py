@@ -5,9 +5,9 @@ to ONE wall of the room, that line runs along the wall, and the mirror image of 
 far side of that wall:
 
 * "door-wall": both pucks just inside the wall the door is in (a crew at the door slides one puck along the wall
-  and drops the other at the door). The mirror image falls in the corridor, where the crew is standing. The twin
-  does not forbid that spot, so it is dismissed only on stated evidence (the occupant's suite, or command's
-  search room), visibly.
+  and drops the other at the door). The mirror image falls beyond that wall: in the corridor, where the crew is
+  standing, or in the suite next door. The twin removes it when the ranges do not fit a spot behind a wall;
+  otherwise it is dismissed only on stated evidence (the occupant's suite, or command's search room), visibly.
 * "exterior-wall": both pucks along an outside wall of the building. The mirror image falls outside the building,
   which the twin removes by itself. Harder to place from the door; natural when the outside wall is reachable.
 * "careless" (for comparison in the evaluation): pucks in the middle of the room; the mirror image stays inside
@@ -135,6 +135,6 @@ def recommend(twin, room_id: str, n: int = 2, strategy: str = "door-wall", spaci
             except Exception:
                 pass
     return {"room": room_id, "strategy": "door-wall", "pucks": [{"id": f"P{i + 1}", "x": p[0], "y": p[1]} for i, p in enumerate(pts)],
-            "wall": _wall_name(edge, c) + " (the wall the door is in)", "spacing_m": round(s, 2), "mirror_falls": beyond, "certain": False,
+            "wall": _wall_name(edge, c) + " (the wall the door is in)", "spacing_m": round(s, 2), "mirror_falls": "beyond the door wall: " + beyond + " or the next suite", "certain": False,
             "why": (f"Both pucks {inset_m:.2f} m inside the wall the door is in, {s:.1f} m apart: one beside the door, one slid along the wall. "
-                    f"The mirror image of anyone in the room falls in {beyond}, where the crew is; it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed.")}
+                    f"The mirror image of anyone in the room falls beyond that wall, outside the room (in {beyond} or the suite next door); the twin removes it when the ranges do not fit a spot behind a wall, otherwise it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed.")}

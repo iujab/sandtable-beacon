@@ -13,6 +13,7 @@
 // JSON names, so there is no key-mapping step that could go wrong.
 
 import Foundation
+import Combine
 
 // MARK: - Time and rounding helpers
 

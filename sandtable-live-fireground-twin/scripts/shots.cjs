@@ -88,7 +88,13 @@ const missed = [];
     await sleep(900); await shot("03_engine1_door_smoke");
     await waitFor((s) => ["ranging", "located", "registered"].includes(s.scout?.phase), "pucks ranging"); await sleep(700); await shot("04_pucks_ranging");
     await waitFor((s) => s.scout?.phase === "done", "scan landed"); await sleep(3000); await shot("05_scan_landed");
-    await doc(); await click("#btn-smoke"); await sleep(1500); await shot("06_smoke_view"); await click("#btn-smoke"); await sleep(400);
+    // the smoke view on (the script's own smoke usually has it on already); then back to the script's setting
+    await doc();
+    const smokeOn = () => page.evaluate(() => document.getElementById("btn-smoke").getAttribute("aria-pressed") === "true");
+    const was = await smokeOn();
+    if (!was) await click("#btn-smoke");
+    await sleep(1500); await shot("06_smoke_view");
+    if (!was) { await click("#btn-smoke"); await sleep(400); }
     await waitFor((s) => (s.units || []).some((u) => u.assignment && /^V\d/.test(u.assignment.target || "")), "rescue order to the victim", 90000);
     await sleep(7000); await shot("07_orders_route");
     await phone("07b_crew_phone");

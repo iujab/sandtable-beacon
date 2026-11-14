@@ -79,6 +79,15 @@ class LLM:
             return cached["response"], {"source": "replay", "key": key, "recorded_with": cached.get("backend"), "model": cached.get("model")}
         if self.backend == "replay":
             self.calls["miss"] += 1
+            miss_dir = os.environ.get("SANDTABLE_MISS_DIR")      # debugging aid: keep the request that had no recording, to diff it
+            if miss_dir:
+                try:
+                    out = Path(miss_dir) / f"{key}.json"
+                    config.guard_write(out)                       # live mode: only under data/live/
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    out.write_text(json.dumps({"tier": tier, "request": {"system": system, "messages": messages, "image_sha": image_sha}}), encoding="utf-8")
+                except Exception:
+                    pass
             raise ReplayMiss(key)
         if self.backend == "claude-cli":
             text, model = await self._cli(system, messages, tier, image_path)

@@ -40,7 +40,7 @@ Built for HackPrinceton Fall 2026. Main track: **Healthcare**. Special tracks: *
 
 **What the record adds.** The phones say who is in a suite now; the record says who should be. The board sets the two side by side on purpose. On the live record of the private run, the scanned suite has one occupancy entry with no tenant named and no head count, so the panel's headline reads: "The record does not say who is in this suite; the phones say 3 people are in it. 5 tenancies on this storey have no puck: about 25 to 62 people on record, nobody accounted for." The storey's other tenancies, where no puck stands, are shown as not covered, with the range the record's employee counts imply. Had the record listed the suite as available space or vacant, the row would say "against the record" (`docs/BEACON_BOARD_CONTRACT.md`, section 4). On the stand-in data, the record gives a dental office in Suite 310 with a head count estimated from floor area, the phones report three people there, and the floor's other suites, with no puck in range, show as not scanned with the record's expected range.
 
-**The two-puck demo** is built for the owner's hardware: two pucks and two iPhones (an iPhone 14 and an iPhone 15) through lane L16's Beacon module. Each phone answers both pucks with two rings that cross at two candidate points. For one phone the twin's walls rule out the mirror candidate and it becomes a point in the room, beside who the record expects there. For the other both candidates are possible, and the board says so: two weighted places and an order to search both, until a crew's search settles it. The map does the work a third puck would otherwise do. Neither iPhone reports direction to these boards, so nothing here uses a bearing. The hands-free exercise plays the same set-up from a recorded run of lane L16's simulated module.
+**The two-puck demo** is built for the owner's hardware: two pucks and two iPhones (an iPhone 14 and an iPhone 15) through lane L16's Beacon module. Each phone is ranged by both pucks, giving two rings that cross at two candidate points (a board serves one phone at a time, so the two phones take turns, or four boards are powered). Where the pucks stand decides what happens next: placed just inside the wall the door is in, a phone's mirror candidate lands on the far side of that wall, and the twin's walls, or the suite the occupant named in the app, rule it out, visibly and with the reason, so the phone becomes a point in the room, beside who the record expects there. Where both candidates are possible, the board says so: two weighted places and an order to search both, until a crew's search settles it. The map does the work a third puck would otherwise do. Neither iPhone reports direction to these boards, so nothing here uses a bearing. The hands-free exercise plays a two-puck set-up from a recorded run of lane L16's simulated module. How often each outcome happens, in simulation: Results, below.
 
 ![The reporting centre: the incident report a command post keeps](figures/report_screen_live.png)
 
@@ -142,6 +142,28 @@ Open <http://localhost:1810/>. The launcher also starts the vendored Beacon modu
 
 Tests (offline, replay-mode model): `bash run_tests.sh`. Re-record the agent after changing a prompt, a tool or the bundle: `bash scripts/record_all.sh` (needs the Claude CLI or `LLM_BACKEND=anthropic`), then `python scripts/check_replay.py auto`.
 
+## What the hardware does and does not do
+
+Checked against lane L16's guides (`vendor/beacon/README.md`, `vendor/beacon/hardware/`, `vendor/beacon/docs/PHONE_FEASIBILITY.md`). None of it has run yet.
+
+What the boards do:
+
+- Each puck is a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware. There is no firmware of our own: a board that does not already run Qorvo's image is flashed with it once (`vendor/beacon/hardware/FLASH.md`). After that a puck needs power only.
+- A board ranges **one phone at a time** over UWB, through Apple's accessory protocol (forum reports collected by lane L16), and gives a **distance only**: neither an iPhone 14 nor an iPhone 15 reports a direction to it. The distance arrives in the phone's app, which posts it to the Beacon server over Wi-Fi.
+- So two victims on two boards **take turns** (the app's "Take turns" switch, never tested), unless four boards are powered as two pairs, one pair per phone.
+- **Two boards on one device do not resolve the two places**: the baseline between them is too short, and in lane L16's simulation, at 0.1 to 0.5 m apart, they never gave one position. The pucks are separate, a few metres apart.
+- **The pucks do not range each other**, so their positions are tape-measured and clicked onto the plan. Lane L16's `hardware/LAYOUT.md` gives the spots: both pucks just inside the wall the door is in.
+- **Device counts of phones without the app are not collected by the stock firmware.** The simulated pucks show them; the UNO Q's own radio could count them (written, never run).
+
+What is not done:
+
+- Nothing has run on the boards or the iPhones.
+- The iOS app is uncompiled Swift source with an Xcode project in `vendor/beacon/apps/ios`; it has not been built or run here.
+- The puck enclosure (`hardware/puck/`) is designed and checked in software, not printed.
+- The UNO Q, as a puck host or as the command post in a box, is untested.
+
+Bring-up, step by step: `vendor/beacon/hardware/BRINGUP.md`.
+
 ## Three sensing modes
 
 | Mode | Finds | Needs | Cannot do | Status |
@@ -220,7 +242,7 @@ Full argument, sources and corrections: [docs/RADAR_FEASIBILITY.md](docs/RADAR_F
 
 ## Hardware and bring-up
 
-- **Phones and pucks (Beacon):** lane L16's documents, copied into `vendor/beacon/` by `scripts/vendor_beacon.py`: `docs/PHONE_FEASIBILITY.md` (what an iPhone 14 and 15 can and cannot do with these boards, one puck against two against three, two boards on one device), `docs/PRIVACY.md`, `docs/research/`, and its hardware guide. In short: flash nothing, power each puck, measure where each puck stands, click it onto the plan, build and install lane L16's iOS app with Xcode (not done here), and point this board at the Beacon server with `--beacon-url`.
+- **Phones and pucks (Beacon):** lane L16's documents, copied into `vendor/beacon/` by `scripts/vendor_beacon.py`: `docs/PHONE_FEASIBILITY.md` (what an iPhone 14 and 15 can and cannot do with these boards, one puck against two against three, two boards on one device), `docs/PRIVACY.md`, `docs/research/`, and its hardware guide. In short: flash Qorvo's stock Nearby Interaction firmware onto any board that does not already run it, power each puck, place the pucks where `hardware/LAYOUT.md` says and measure them, click them onto the plan, build and install lane L16's iOS app with Xcode (not done here), and point this board at the Beacon server with `--beacon-url`.
 - **This board next to a Beacon server, and the simulated modes:** `hardware/BRINGUP.md`.
 - **The puck as an object:** `hardware/puck/README.md` (a self-righting ball for one DWM3001CDK and a cell, and a command brick for the UNO Q host). Figures: `figures/puck_render.png`, `figures/puck_exploded.png`, `figures/puck_section.png`, `figures/puck_brick.png`.
 - **Sponsor data:** `docs/TOOLKIT_SWAP.md` (how the same code switches each layer to live with keys and a private bundle; the layers switch independently) and `docs/LIVE_STATUS.md` (what has been read live, what is still a stand-in, what broke).
@@ -256,7 +278,7 @@ tests/  results/  figures/
 
 - **Not run on hardware.** No phone and no puck has been in the loop of any result. The live path (stock Qorvo firmware, lane L16's iOS source reporting ranges over Wi-Fi) is written but has not been built or run here; the accuracy of an iPhone ranging these boards in a room has not been measured by anyone we could find.
 - **Opt-in only.** A phone is ranged only if its owner opened the app; without it the most a puck could do is count Bluetooth devices, and devices are not people. As built, the app must stay open with the screen on.
-- **Two pucks often leave two candidates.** The twin removes one only when the geometry allows; otherwise the board says two places and the order is to search both.
+- **Two pucks often leave two candidates.** The twin removes one only when the placement allows (along the door wall, often; mid-room, rarely: simulated numbers in Results); otherwise the board says two places and the order is to search both. A candidate dismissed on the occupant's stated suite rests on what they said, and a wrong statement can produce a wrong point; the board shows every dismissal with its reason.
 - **Sponsor data.** This repository holds none. Its twin is synthetic, so every wall that prunes a phone candidate here is plausible, not real. The private live run covered one scanned suite, not the storey; the scan's georeference lands about 90 m from the record's map point (flagged, not corrected); its first run needed one order given by hand (fixed since). Life hazards and expected head counts are inferences and estimates.
 - **Replays cover the recorded scripts.** Any other situation needs a live model, or gets the labelled fallback policy.
 - **Privacy, as built.** This board keeps everything it received about phones for the incident report until reset, and serves `/api/beacons` and `/api/report` without authentication to anyone on the local network. Dropping a phone at once on "Stop sharing", and after 15 minutes of silence, happens in lane L16's module only. A phone id that rotates every 10 minutes is a design, not implemented. A real deployment needs transport security and an access model.

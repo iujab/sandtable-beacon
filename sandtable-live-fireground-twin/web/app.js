@@ -146,6 +146,8 @@ function renderState() {
       `<div class="nums">${u.time_in_s ? `in ${mmss(u.time_in_s)}<br>air ${Math.round(u.air_pct)}%` : (u.sigma_m != null ? `±${u.sigma_m.toFixed(1)} m` : "")}</div></div>`;
   }).join("") + victimRows(st);
   $("board").insertAdjacentHTML("afterbegin", phoneRows());
+  // the incident's own closing line (personnel accountability report), word for word
+  if (st.phase === "terminated" && S.closing) $("board").insertAdjacentHTML("afterbegin", `<div class="closing">${esc(S.closing)}</div>`);
   for (const el of $("board").querySelectorAll(".unit-row")) el.onclick = () => { S.selected = el.dataset.unit; S._pinned = true; renderState(); };
   renderHere();
   plan.update(st, S.selected);
@@ -756,7 +758,7 @@ function setInject(on) {
   if (on) setView("2d");
 }
 function resetUi() {
-  S.runs.clear(); S.preplan = null; S.aar = null; S._pinned = false; S.selected = "E1"; S.smokeForce = null; S.focus = "room";
+  S.runs.clear(); S.preplan = null; S.aar = null; S._pinned = false; S.selected = "E1"; S.smokeForce = null; S.focus = "room"; S.closing = null;
   scout.reset(); applySmoke(); if (!beacon.dev) beacon.reset();
   twin3d?.setFocus(null); plan.setFocus(null);
   $("agent-log").innerHTML = `<div class="empty">Dispatch the alarm: the agent reads the record, the aerial and the twin, and writes the pre-plan.</div>`;
@@ -780,6 +782,7 @@ function connect() {
       case "tag": plan.addTag(m.tag); twin3d?.addTag?.(m.tag); break;
       case "alert": if (m.level !== "mayday") toast(m.text); break;
       case "reset": resetUi(); break;
+      case "timeline": if (m.entry?.kind === "par") { S.closing = m.entry.text; if (S.state) renderState(); } break;
       case "scout": scout.onScout(m, live); break;
       case "beacons": if (!beacon.dev) beacon.onBeacons(m, live); break;
       case "accountability": if (!beacon.dev) beacon.onAccountability(m); break;

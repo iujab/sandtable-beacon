@@ -576,3 +576,4 @@ details.acc-storey .acc-row { opacity: .9; }
 .mirror-l { fill: var(--puck); font-family: var(--sans); font-weight: 600; paint-order: stroke; stroke: #0b0e12; stroke-width: .12px; }
 .here .caption { margin-top: 3px; color: #ffe3a3; font-size: 12px; }
 .unit-row .asg.cap { color: #ffe3a3; white-space: normal; }
+#board .closing { padding: 8px 12px; border-bottom: 1px solid var(--line); background: rgba(63,207,142,.08); box-shadow: inset 3px 0 0 var(--ok); font: 600 13px/1.35 var(--sans); color: #d9f5e8; }

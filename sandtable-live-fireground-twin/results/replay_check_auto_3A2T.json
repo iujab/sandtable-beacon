@@ -5,34 +5,50 @@
  "llm_backend": "replay",
  "final_step": "done",
  "phase": "terminated",
- "wall_s": 75.9,
+ "wall_s": 64.5,
  "runs": {
   "preplan": [
    "replay"
   ],
-  "mayday#1": [
+  "phone#1": [
+   "reflex-fallback",
    "replay"
   ],
-  "hazard#2": [
+  "phone#2": [
+   "reflex-fallback",
    "replay"
   ],
-  "contact#3": [
+  "phone_reached#3": [
+   "reflex-fallback",
+   "replay"
+  ],
+  "phone#4": [
+   "reflex-fallback",
+   "replay"
+  ],
+  "phone_reached#5": [
+   "reflex-fallback",
    "replay"
   ],
   "aar": [
+   "reflex-fallback",
    "replay"
   ]
  },
- "radio_messages": 5,
- "fallback_runs": [],
+ "radio_messages": 7,
+ "fallback_runs": [
+  "aar",
+  "phone#1",
+  "phone#2",
+  "phone#4",
+  "phone_reached#3",
+  "phone_reached#5"
+ ],
  "preplan_backend": "replay",
- "aar_backend": "replay",
+ "aar_backend": "reflex-fallback",
  "metrics_simulated": {
-  "replans": 1,
-  "hazards": 1,
-  "mayday_to_assign_s": 2.5,
-  "mayday_to_contact_s": 34.2,
-  "mayday_to_all_out_s": 40.6
+  "replans": 0,
+  "hazards": 0
  },
- "at": "2026-11-14T11:33:47-0600"
+ "at": "2026-11-14T14:32:48-0600"
 }

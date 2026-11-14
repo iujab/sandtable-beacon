@@ -21,7 +21,7 @@ export function chipSpot(room, b) {
 export function mirrorCaption(p) {
   const uwb = (p.ranges || []).filter((r) => r.kind === "uwb");
   if (p.geometry === "fix" && (p.pruned || []).length && uwb.length === 2)
-    return `2 pucks give 2 possible places. One is ${p.pruned[0].reason}: the twin rules it out.`;
+    return /search/i.test(p.pruned[0].reason) ? `2 pucks gave 2 possible places. One was ${p.pruned[0].reason}, so it is ruled out.` : `2 pucks give 2 possible places. One is ${p.pruned[0].reason}: the twin rules it out.`;
   if (p.geometry === "candidates" && (p.candidates || []).length === 2) {
     const rs = [...new Set(p.candidates.map((c) => c.room_label || "an unknown room"))];
     return rs.length === 1 ? `2 possible places, both inside ${rs[0]}: cannot choose until a crew looks.` : `2 possible places, in ${rs.join(" and in ")}: cannot choose until a crew looks.`;

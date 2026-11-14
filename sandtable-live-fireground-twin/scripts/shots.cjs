@@ -75,7 +75,7 @@ const missed = [];
 
   await waitFor((s) => s.phase === "operations", "pre-plan");
   await sleep(700);
-  await shot("02_preplan");
+  if (EX !== "beacon") await shot("02_preplan");
   if (EX === "mayday") {
     await click("#btn-preplan"); await sleep(500);
     await shot("03_preplan_document");
@@ -111,43 +111,56 @@ const missed = [];
     await sleep(1200); await doc(); await shot("08_victim_reached");
     await view("2d"); await shot("09_plan_2d"); await view("3d");
   } else {
-    await waitFor((s) => s.beacon?.pucks_in || (s.beacon?.phones || 0) > 0, "pucks in", 120000);
-    await sleep(1500); await shot("03_pucks_in");
-    await waitFor((s) => (s.beacon?.phones || 0) > 0, "phones answer", 90000); await sleep(1200); await shot("04_phones");
-    await waitFor((s) => (s.beacon?.fixes || 0) > 0, "a fix", 90000); await sleep(800); await shot("05_located");
-    await waitFor((s) => (s.units || []).some((u) => u.assignment && /^B\d/.test(u.assignment.target || "")), "rescue order to a phone", 90000);
-    await sleep(2500); await shot("06_orders_route");
-    await phone("06b_crew_phone");
-    await view("2d"); await shot("07_plan_2d"); await view("3d");
-    await waitFor((s) => (s.phones || []).some((p) => ["reached", "evacuating", "out"].includes(p.status)), "phone reached", 150000);
-    await sleep(1200); await doc(); await shot("08_phone_reached");
+    // the hands-free beacon storyboard on the replayed recorded agent turns: two pucks placed by hand, two phones
+    const phoneOf = (s, id) => (s.phones || []).find((p) => p.id === id) || {};
+    const select = async (id) => { await click(`#board .unit-row[data-unit="${id}"]`); await sleep(500); };
+    await click("#btn-preplan"); await sleep(700);
+    await shot("02_preplan_document");
+    await doc();
+    await waitFor((s) => s.beacon?.pucks_in, "two pucks placed by hand", 120000);
+    await sleep(300); await shot("03_pucks_placed_by_hand");
+    await waitFor((s) => (s.beacon?.fixes || 0) > 0, "B1 located: the twin rules out the mirror place", 90000);
+    await sleep(1500); await select("B1");
+    await shot("04_two_puck_moment_3d");
+    await view("2d"); await shot("05_two_puck_moment_plan"); await view("3d");
+    await waitFor((s) => phoneOf(s, "B2").geometry === "candidates", "B2: two places", 90000);
+    await sleep(900); await select("B2"); await shot("06_b2_cannot_choose");
+    await waitFor((s) => unit(s, "E1").assignment?.target === "B2", "the order to search for B2", 90000);
+    await sleep(2500); await shot("07_order_to_search");
+    const ph = await browser.newPage({ viewport: { width: 390, height: 844 } }); watch(ph);
+    await ph.goto(BASE + "/crew.html?unit=E1", { waitUntil: "networkidle" }); await sleep(2600); await shot("07b_crew_phone_engine1", ph); await ph.close();
+    await waitFor((s) => /Rescue team goes to B1/.test(s.storyboard?.step || ""), "the rescue team on its way", 90000);
+    await sleep(4500); await select("B1"); await shot("08_rescue_route_radio");
+    await waitFor((s) => /nobody at the first point/.test(s.storyboard?.step || ""), "the search result", 150000);
+    await sleep(1600); await select("B2"); await shot("09_search_result_b2_point");
+    await view("2d"); await shot("10_accountability_and_plan"); await view("3d");
   }
   await waitFor((s) => s.phase === "terminated", "all out", 200000);
   for (let i = 0; i < 120; i++) { if (await get("/api/aar")) break; await sleep(500); }
   await sleep(1800);
   const wall = Number(((Date.now() - t0) / 1000).toFixed(1));
   console.log("storyboard wall time (s):", wall);
-  await page.evaluate(() => document.getElementById("btn-aar")?.click()); await sleep(600);
-  await shot("10_after_action");
-  await doc(); await shot("11_terminated");
-  await page.setViewportSize({ width: 1280, height: 720 }); await sleep(900);
-  await shot("12_1280x720");
   if (EX === "beacon") {
-    // the ring-to-fix moment, from the board's hand-made DEV SAMPLE story (marked on screen): a sample source has no transition
-    await page.setViewportSize({ width: 1600, height: 900 });
-    // two pucks placed by hand, two phones: two rings each, two places each; the twin rules out one mirror (resolved) and not the other
-    await page.goto(`${BASE}/?mode=beacon&devbeacons=1`, { waitUntil: "networkidle" }); await sleep(1500);
-    await page.click("#btn-place"); await sleep(700);
+    await doc(); await shot("11_all_out");
+    await page.evaluate(() => document.getElementById("btn-aar")?.click()); await sleep(700);
+    await shot("12_after_action");
+    await doc();
+    await page.setViewportSize({ width: 1280, height: 720 }); await sleep(900);
+    await shot("13_1280x720");
+    // the board's control for tape-measured pucks (the storyboard places them server-side): opened, two clicks, not sent
+    await page.setViewportSize({ width: 1600, height: 900 }); await sleep(600);
+    await click("#btn-place"); await sleep(700);
     const box = await page.locator("#plan").boundingBox();
-    await page.mouse.click(box.x + box.width * 0.33, box.y + box.height * 0.9); await sleep(250);
-    await page.mouse.click(box.x + box.width * 0.30, box.y + box.height * 0.82); await sleep(500);
-    await shot("13_dev_sample_place_pucks");
-    await click("#pp-cancel"); await view("3d");
-    for (let i = 0; i < 3; i++) { await page.keyboard.press("n"); await sleep(1500); }
-    await shot("14_dev_sample_two_rings_two_places");
-    await page.keyboard.press("n"); await sleep(700);
-    await shot("15_dev_sample_wall_rules_out_mirror");
-    await sleep(4500); await view("2d"); await shot("16_dev_sample_resolved_and_unresolved_plan");
+    await page.mouse.click(box.x + box.width * 0.33, box.y + box.height * 0.84); await sleep(250);
+    await page.mouse.click(box.x + box.width * 0.27, box.y + box.height * 0.76); await sleep(500);
+    await shot("14_place_pucks_control");
+    await click("#pp-cancel");
+  } else {
+    await page.evaluate(() => document.getElementById("btn-aar")?.click()); await sleep(600);
+    await shot("10_after_action");
+    await doc(); await shot("11_terminated");
+    await page.setViewportSize({ width: 1280, height: 720 }); await sleep(900);
+    await shot("12_1280x720");
   }
   const issues = [...new Set(errors)].slice(0, 20);
   console.log(issues.length ? "console issues:\n  " + issues.join("\n  ") : "no console errors");

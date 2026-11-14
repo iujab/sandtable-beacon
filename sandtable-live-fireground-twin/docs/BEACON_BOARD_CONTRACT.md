@@ -4,11 +4,11 @@
 
 | Mode | What it finds | What it needs | Status this weekend |
 |---|---|---|---|
-| **Beacon** (headline) | occupants, by their phones | pucks with Bluetooth and UWB (Qorvo DWM3001CDK) thrown into the room; an opt-in app on the phone for a ring or a fix; without the app only a device count | built by sibling lane L16 in `../sandtable-beacon-victim-phones/` (port 1885); real hardware targeted |
+| **Beacon** (headline) | occupants, by their phones | pucks with Bluetooth and UWB (Qorvo DWM3001CDK) thrown into the room; an opt-in app on the phone for a ring or a fix; without the app only a device count | built by sibling lane L16, vendored here in `vendor/beacon/` (port 1885); real hardware targeted |
 | Scout | an untagged, breathing person; a coarse echo outline | several pucks reading channel impulse responses | **simulation only**: the echo-reading firmware reused from lane L08 is for ESP32 boards and the owner's boards are nRF52833 + DW3110 |
 | Crews | firefighters carrying tags | anchors and tags | **simulation only** for the same reason; the mayday exercise keeps working as it is |
 
-The Beacon module's feed is frozen in `../sandtable-beacon-victim-phones/docs/BEACON_FEED.md` (**read it fully before writing code against it**; its section 0 is the physics that must not be over-claimed: a ring is a ring, two candidates are two candidates, no `x`/`y` unless `geometry` is `"fix"`, devices are not people). Its sample is `../sandtable-beacon-victim-phones/fixtures/beacon/sample_beacons.json`. That directory is another team's: never edit it. `docs/SCOUT_CONTRACT.md` section 3 (rules, ports, reports) still applies to everyone.
+The Beacon module's feed is frozen in `vendor/beacon/docs/BEACON_FEED.md` (lane L16's) (**read it fully before writing code against it**; its section 0 is the physics that must not be over-claimed: a ring is a ring, two candidates are two candidates, no `x`/`y` unless `geometry` is `"fix"`, devices are not people). Its sample is `vendor/beacon/fixtures/beacon/sample_beacons.json`. `vendor/beacon/` is lane L16's work, copied with credit: never edit it here (change the sibling project and re-run `scripts/vendor_beacon.py`). `docs/SCOUT_CONTRACT.md` section 3 (rules, ports, reports) still applies to everyone.
 
 ## 1. Server side (builder R3: `sandtable/beacon_link.py` plus `server.py`, `incident.py`, `director.py`)
 

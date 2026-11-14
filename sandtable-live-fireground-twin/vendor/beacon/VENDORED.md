@@ -1,6 +1,6 @@
 # Vendored: the Beacon module (lane L16)
 
-A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T14:22:31-0600.
+A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T14:34:32-0600.
 
 Source: commit `095fd6736b8c58f65ace804557286a4951bb645b` (2026-11-14T14:20:11-06:00): "Recorded agent run for the final walk-through; final screenshots; manifest". Copied with `git archive`, so only committed files are here.
 

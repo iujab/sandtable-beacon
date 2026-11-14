@@ -38,7 +38,7 @@ Copy-Item <path to the private .env> .env
 #   then add the line  COSTAR_KIT_DIR=C:\costar-kit  to .env
 .venv\Scripts\python scripts\pack_live_bundle.py unpack <path>\sandtable-live-bundle.zip
 .venv\Scripts\python -m sandtable.adapters.check --live
-$env:SANDTABLE_DATA_MODE="live"; $env:LLM_BACKEND="anthropic"; .venv\Scripts\python -m sandtable.demo
+$env:SANDTABLE_DATA_MODE="live"; $env:LLM_BACKEND="replay"; .venv\Scripts\python -m sandtable.demo     # with a key: $env:LLM_BACKEND="anthropic"
 ```
 
 - **The unzip password.** The `unzip` command reads it from `COSTAR_KIT_ZIP_PASSWORD` in `.env`.
@@ -54,10 +54,12 @@ cp <path to the private .env> .env
 echo "COSTAR_KIT_DIR=$HOME/costar-kit" >> .env
 .venv/bin/python scripts/pack_live_bundle.py unpack ~/Downloads/sandtable-live-bundle.zip
 .venv/bin/python -m sandtable.adapters.check --live
-SANDTABLE_DATA_MODE=live LLM_BACKEND=anthropic .venv/bin/python -m sandtable.demo
+SANDTABLE_DATA_MODE=live LLM_BACKEND=replay .venv/bin/python -m sandtable.demo     # with a key: LLM_BACKEND=anthropic
 ```
 
 **Then, on both:**
+
+- **Which model backend.** `LLM_BACKEND=replay` needs no key: the hands-free `beacon` exercise (the Exercise button, or add `--storyboard`) replays the private recordings from the bundle against the recorded simulated Beacon run on the live twin. On the machine that made the bundle this reached the report four times in a row, in about a minute each, with every agent turn replayed. Anything outside that recorded exercise (real phones, another script, another building) has no recording: with `LLM_BACKEND=replay` it runs on the labelled fallback policy, which always finishes; with `LLM_BACKEND=anthropic` and a key, or `LLM_BACKEND=claude-cli` where the Claude CLI is installed and signed in, a live model decides.
 
 - **Open the board at `http://localhost:1810`.** The Matterport Showcase SDK key is restricted to `localhost`: an IP address or a host name shows no real scan. For the phone, use `adb reverse tcp:1810 tcp:1810` and open `http://localhost:1810` on the phone.
 - **What unpack reports.** `unpack` checks every file against the manifest's hashes and prints what is still missing on the machine: keys, the kit, the property id. `check --live` must say OK for all three layers.

@@ -63,20 +63,20 @@
  },
  "images": [
   {
-   "path": "figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png",
-   "caption": "Two pucks, two phones (stand-in building): the twin rules out phone B1's mirror place outside the building so it becomes a point; phone B2 stays 'cannot choose: 2 places'. Development sample (hand-made phones), labelled DEV SAMPLE on screen."
+   "path": "figures/ui_beacon_04_two_puck_moment_3d.png",
+   "caption": "Hands-free beacon run (simulated phones, pucks and crews; replayed recorded agent turns): two pucks placed by hand in Suite 310; phone B1's second possible place is a mirror image across the line between the pucks and falls outside the building, so the twin rules it out and B1 is a point."
   },
   {
-   "path": "figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png",
-   "caption": "The same moment on the 2-D plan: rings from P1 and P2, the ruled-out mirror, B2's two weighted places. Development sample."
+   "path": "figures/ui_beacon_06_b2_cannot_choose.png",
+   "caption": "The same run a moment later: B1 a point, B2 still two places inside Suite 310 that the twin cannot choose between; the agent orders a search. Simulated, replayed turns."
   },
   {
-   "path": "figures/ui_beacon_06b_crew_phone.png",
-   "caption": "The rescue team's phone page: the current order, the route through the twin, and the located people read from the GeoJSON feed. Simulated."
+   "path": "figures/ui_beacon_07b_crew_phone_engine1.png",
+   "caption": "Engine 1's phone page in the hands-free run: the order to search for B2 (one of 2 places in Suite 310), what the occupant typed, and the located people read from the GeoJSON feed. Simulated."
   },
   {
-   "path": "figures/report_screen_live.png",
-   "caption": "The reporting centre (/report.html) after a hands-free simulated run on the labelled sample feed: people found with times, accountability against the building record, plan, timeline, limits."
+   "path": "figures/report_plan_beacon_run.png",
+   "caption": "The reporting centre (/report.html) after the hands-free beacon run on the stand-in building (simulated phones, pucks and crews; replayed recorded agent turns): the plan of the floor with each phone's last place, B1's mirror place ruled out because it is outside the building, B2's other place ruled out by Engine 1's search, the two pucks and the line through them."
   },
   {
    "path": "figures/puck_render.png",

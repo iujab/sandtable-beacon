@@ -1,28 +1,27 @@
 {
- "exercise": "beacon",
+ "exercise": "mayday",
  "base": "localhost",
  "sponsor_layers_live": [],
- "storyboard_wall_s": 88.6,
+ "storyboard_wall_s": 81.7,
  "console_issues": [],
  "waits_timed_out": [],
  "figures": [
-  "ui_beacon_01_standby.png",
-  "ui_beacon_02_preplan_document.png",
-  "ui_beacon_03_pucks_placed_by_hand.png",
-  "ui_beacon_04_two_puck_moment_3d.png",
-  "ui_beacon_05_two_puck_moment_plan.png",
-  "ui_beacon_06_b2_cannot_choose.png",
-  "ui_beacon_07_order_to_search.png",
-  "ui_beacon_07b_crew_phone_engine1.png",
-  "ui_beacon_08_rescue_route_radio.png",
-  "ui_beacon_09_search_result_b2_point.png",
-  "ui_beacon_10_accountability_and_plan.png",
-  "ui_beacon_11_all_out.png",
-  "ui_beacon_12_after_action.png",
-  "ui_beacon_13_1280x720.png",
-  "ui_beacon_14_place_pucks_control.png"
+  "ui_mayday_01_standby.png",
+  "ui_mayday_02_preplan.png",
+  "ui_mayday_03_preplan_document.png",
+  "ui_mayday_03b_preplan_what_the_agent_looked_at.png",
+  "ui_mayday_04_engine1_inside.png",
+  "ui_mayday_05_mayday.png",
+  "ui_mayday_06_rescue_route.png",
+  "ui_mayday_06b_crew_phone.png",
+  "ui_mayday_07_replan_after_hazard.png",
+  "ui_mayday_08_plan_2d.png",
+  "ui_mayday_09_egress.png",
+  "ui_mayday_10_after_action.png",
+  "ui_mayday_11_terminated.png",
+  "ui_mayday_12_1280x720.png"
  ],
- "at": "2026-11-14T20:43:59.549Z",
+ "at": "2026-11-14T20:59:59.992Z",
  "runs": {
   "beacon": {
    "exercise": "beacon",
@@ -54,7 +53,7 @@
    "exercise": "mayday",
    "base": "localhost",
    "sponsor_layers_live": [],
-   "storyboard_wall_s": 83.1,
+   "storyboard_wall_s": 81.7,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -73,13 +72,13 @@
     "ui_mayday_11_terminated.png",
     "ui_mayday_12_1280x720.png"
    ],
-   "at": "2026-11-14T20:40:17.566Z"
+   "at": "2026-11-14T20:59:59.992Z"
   },
   "scout": {
    "exercise": "scout",
    "base": "localhost",
    "sponsor_layers_live": [],
-   "storyboard_wall_s": 68.9,
+   "storyboard_wall_s": 73.4,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -97,7 +96,7 @@
     "ui_scout_11_terminated.png",
     "ui_scout_12_1280x720.png"
    ],
-   "at": "2026-11-14T20:38:46.213Z"
+   "at": "2026-11-14T20:58:29.909Z"
   }
  }
 }

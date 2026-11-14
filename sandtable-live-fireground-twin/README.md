@@ -4,11 +4,15 @@
 
 When a commercial building is on fire, the incident commander's hardest question is who is still inside, and where. Sandtable Beacon is a command and reporting centre for that question. When the alarm comes in, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. A crew places small pucks (Qorvo DWM3001CDK boards: Bluetooth and UWB) in the building. Occupants who opened an opt-in app are ranged through their phones, and each phone is drawn as what the measurement supports: a ring, two candidate points, or one point, in the right room and beside who the building record expects there. The agent prioritises, routes a rescue crew through the twin, issues the radio order and writes the report the command post keeps. The same code has run privately on live CoStar, Matterport and Vexcel data for one real building; this repository runs on labelled stand-ins, and phones, pucks and crews are simulated.
 
-![Two pucks, two phones: the twin rules out one phone's mirror place, the other stays two places](figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png)
+![Two pucks, one phone: the twin rules out the phone's mirror place outside the building](figures/ui_beacon_04_two_puck_moment_3d.png)
 
-*Two pucks placed by hand (P1, P2) in Suite 310 of the stand-in building hear two phones. Phone B1's two candidate places are mirror images across the line between the pucks; one falls outside the building outline, so the twin rules it out (the red cross) and B1 becomes a point, beside what the stand-in record has for that suite (a dental office; patients may be sedated). Phone B2's two places are both inside the room: the board says "cannot choose: 2 places" with their weights. Made with the board's development sample (`DEV SAMPLE` badge: hand-made phones, not a measurement); crews simulated; the agent turns shown are the labelled fallback policy.*
+*The hands-free beacon run on the stand-in building (phones, pucks and crews simulated; the agent turns are replays of a recorded real model run). Two pucks placed by hand (P1, P2) in Suite 310 hear phone B1. Its two possible places are mirror images across the line between the pucks (the dashed mirror line); one falls outside the building, so the twin rules it out ("ruled out: outside the building") and B1 becomes a point, beside what the stand-in record has for that suite (a dental office; patients may be sedated). The badges say what is real: `BEACON REPLAY · SIM`, `REPLAY, MODULE NOT LIVE`, `SPONSOR DATA: FIXTURE`.*
 
-![The same moment on the 2-D plan](figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png)
+![The same moment on the 2-D plan](figures/ui_beacon_05_two_puck_moment_plan.png)
+
+![A moment later: B1 a point, B2 still two places](figures/ui_beacon_06_b2_cannot_choose.png)
+
+*The same run a moment later: B1 is a point; phone B2's two places are both inside Suite 310, so the board says "cannot choose: 2 places" and the agent orders a search, which settles it (`figures/ui_beacon_09_search_result_b2_point.png`).*
 
 Built for HackPrinceton Fall 2026. Main track: **Healthcare**. Special tracks: **CoStar "Inside and Out: AI for the Built World"** (primary), **Best Hardware Hack**, **Best Physical AI Hack**, **Amazon Best Practical AI Innovation**.
 

@@ -163,3 +163,19 @@ def test_the_drop_zone_gives_credentials_but_never_switches_a_process_live(tmp_p
     environ = {"LLM_BACKEND": "replay"}
     config._load_env_files(project_env=tmp_path / ".env", drop_zone=zone, environ=environ)
     assert environ["SANDTABLE_DATA_MODE"] == "live" and environ["LLM_BACKEND"] == "replay"   # own .env counts; the command wins
+
+
+def test_boards_on_different_ports_do_not_share_runtime_files():
+    """Two boards from one checkout (the standing demo and another one) must not write the same tag overlay or corrections
+    file: one board's incident or reset would change the other's prompts. The standard port keeps the plain names."""
+    state = (config.INSTANCE, config.TAGS_OVERLAY_JSON, config.CORRECTIONS_JSON)
+    try:
+        config.set_instance(1810)
+        plain = (config.TAGS_OVERLAY_JSON.name, config.CORRECTIONS_JSON.name)
+        assert plain == ("twin_tags_overlay.json", "record_corrections.json")
+        config.set_instance(1820)
+        other = (config.TAGS_OVERLAY_JSON, config.CORRECTIONS_JSON)
+        assert other[0].name == "twin_tags_overlay.1820.json" and other[1].name == "record_corrections.1820.json"
+        assert other[0].parent == config.DATA_DIR and other[1].parent == config.DATA_DIR
+    finally:
+        config.INSTANCE, config.TAGS_OVERLAY_JSON, config.CORRECTIONS_JSON = state

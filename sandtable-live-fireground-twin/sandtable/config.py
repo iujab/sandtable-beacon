@@ -131,14 +131,30 @@ def live_layers() -> list[str]:
     return sorted(_LIVE_LAYERS)
 
 
+# Several boards may run from one checkout at once (the standing demo, a private live instance, a recording run, a builder's
+# test board). The files a board writes at run time (tags written back, corrections filed, the dry-run log of pins) feed the
+# agent's prompts, so they must not be shared: one board's incident, or its reset, would change another board's prompts and a
+# recorded run would stop replaying. The standard port keeps the plain file names; any other port gets its own.
+INSTANCE = ""
+
+
+def set_instance(port) -> None:
+    """Name this process's runtime files after its board port (called by the launcher and the server at start)."""
+    global INSTANCE, TAGS_OVERLAY_JSON, CORRECTIONS_JSON
+    port = str(port or "")
+    INSTANCE = "" if port in ("", "1810") else f".{port}"
+    TAGS_OVERLAY_JSON = DATA_DIR / f"twin_tags_overlay{INSTANCE}.json"
+    CORRECTIONS_JSON = DATA_DIR / f"record_corrections{INSTANCE}.json"
+
+
 def enter_live(layers) -> None:
     """Switch this process's runtime outputs to the private root (idempotent)."""
     global DATA_DIR, TAGS_OVERLAY_JSON, CORRECTIONS_JSON
     _LIVE_LAYERS.update(layers)
     if _LIVE_LAYERS:
         DATA_DIR = LIVE_DIR
-        TAGS_OVERLAY_JSON = LIVE_DIR / "twin_tags_overlay.json"
-        CORRECTIONS_JSON = LIVE_DIR / "record_corrections.json"
+        TAGS_OVERLAY_JSON = LIVE_DIR / f"twin_tags_overlay{INSTANCE}.json"
+        CORRECTIONS_JSON = LIVE_DIR / f"record_corrections{INSTANCE}.json"
 
 
 def privacy_state() -> tuple:

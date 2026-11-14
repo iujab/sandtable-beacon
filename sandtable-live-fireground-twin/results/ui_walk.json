@@ -2,7 +2,7 @@
  "exercise": "beacon",
  "base": "localhost",
  "sponsor_layers_live": [],
- "storyboard_wall_s": 88.7,
+ "storyboard_wall_s": 88.6,
  "console_issues": [],
  "waits_timed_out": [],
  "figures": [
@@ -22,13 +22,13 @@
   "ui_beacon_13_1280x720.png",
   "ui_beacon_14_place_pucks_control.png"
  ],
- "at": "2026-11-14T20:37:27.474Z",
+ "at": "2026-11-14T20:43:59.549Z",
  "runs": {
   "beacon": {
    "exercise": "beacon",
    "base": "localhost",
    "sponsor_layers_live": [],
-   "storyboard_wall_s": 88.7,
+   "storyboard_wall_s": 88.6,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -48,12 +48,13 @@
     "ui_beacon_13_1280x720.png",
     "ui_beacon_14_place_pucks_control.png"
    ],
-   "at": "2026-11-14T20:37:27.474Z"
+   "at": "2026-11-14T20:43:59.549Z"
   },
   "mayday": {
    "exercise": "mayday",
    "base": "localhost",
-   "storyboard_wall_s": 80,
+   "sponsor_layers_live": [],
+   "storyboard_wall_s": 83.1,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -72,12 +73,13 @@
     "ui_mayday_11_terminated.png",
     "ui_mayday_12_1280x720.png"
    ],
-   "at": "2026-11-14T18:40:40.348Z"
+   "at": "2026-11-14T20:40:17.566Z"
   },
   "scout": {
    "exercise": "scout",
    "base": "localhost",
-   "storyboard_wall_s": 64.6,
+   "sponsor_layers_live": [],
+   "storyboard_wall_s": 68.9,
    "console_issues": [],
    "waits_timed_out": [],
    "figures": [
@@ -95,7 +97,7 @@
     "ui_scout_11_terminated.png",
     "ui_scout_12_1280x720.png"
    ],
-   "at": "2026-11-14T18:50:49.372Z"
+   "at": "2026-11-14T20:38:46.213Z"
   }
  }
 }

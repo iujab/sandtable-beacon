@@ -117,8 +117,10 @@ def main(argv=None) -> int:
             print("[demo] the hub did not answer on port", hub_port, flush=True)
             hub_proc.terminate()
             return 2
-    beacon_proc = None if args.no_beacon else _start_beacon(args)
     os.environ["HOST"], os.environ["PORT"], os.environ["HUB_PORT"] = host, str(args.port), str(hub_port)
+    from sandtable import config as _config
+    _config.set_instance(args.port)             # this board's own runtime files (tags written back, corrections): never shared with another board
+    beacon_proc = None if args.no_beacon else _start_beacon(args)
 
     if args.storyboard:
         def kick():

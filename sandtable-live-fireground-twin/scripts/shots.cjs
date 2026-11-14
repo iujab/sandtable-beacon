@@ -151,8 +151,8 @@ const missed = [];
     await page.setViewportSize({ width: 1600, height: 900 }); await sleep(600);
     await click("#btn-place"); await sleep(700);
     const box = await page.locator("#plan").boundingBox();
-    await page.mouse.click(box.x + box.width * 0.33, box.y + box.height * 0.84); await sleep(250);
-    await page.mouse.click(box.x + box.width * 0.27, box.y + box.height * 0.76); await sleep(500);
+    await page.mouse.click(box.x + box.width * 0.42, box.y + box.height * 0.6); await sleep(250);
+    await page.mouse.click(box.x + box.width * 0.56, box.y + box.height * 0.38); await sleep(500);
     await shot("14_place_pucks_control");
     await click("#pp-cancel");
   } else {

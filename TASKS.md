@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 2:38 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 2:53 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,7 +8,7 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 80% | All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass. |
+| Command board | `sandtable-live-fireground-twin/` | building | 85% | Fixture demo: agent turns re-recorded on corrected, deterministic prompts; all three scripts replay hands-free with no fallback; independent judge review done and its findings fixed (true closing line instead of 'accountability complete', accountability never behind the phones, write-ups consistent on what ran live). Live (private): accountability reads the real record against the phones; the hands-free live replay run is being recorded and proven on lane L16's final Beacon module; then the owner's private instance, new figures, final write-up pass. |
 | Phones and pucks | `sandtable-beacon-victim-phones/` | partial | 92% | complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
@@ -68,16 +68,15 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass.
+**Being worked on now:** Fixture demo: agent turns re-recorded on corrected, deterministic prompts; all three scripts replay hands-free with no fallback; independent judge review done and its findings fixed (true closing line instead of 'accountability complete', accountability never behind the phones, write-ups consistent on what ran live). Live (private): accountability reads the real record against the phones; the hands-free live replay run is being recorded and proven on lane L16's final Beacon module; then the owner's private instance, new figures, final write-up pass.
 
 **Left to build (agents):**
 
-- Verify the all-three-live board run end to end (server builder, in progress): pre-plan from the real record, the scanned suite as the map, phones, accountability against the real tenant roster, report
-- Live board UI (board builder, in progress): record card, tenants by storey, the four oblique views, the Matterport scan view; live screenshots stay private
-- Fix the replay misses on a real-time server, then re-record the beacon and scout scripts: PORT=1930 HUB_PORT=1931 DEMO_ARGS=--no-beacon SCRIPTS="beacon scout" bash scripts/record_all.sh, then bash run_tests.sh and python scripts/check_replay.py
-- Independent skeptical-judge review (running) and fixes
-- Final vendoring of lane L16's Beacon module: python scripts/vendor_beacon.py
-- Final write-up pass: what ran live on Nov 14, what is stand-in data in the public repository, what did not run on hardware
+- Record a complete hands-free run on the live data and prove twice that live mode with LLM_BACKEND=replay reaches the report with zero fallback lines (server builder, in progress); then re-pack the private bundle: .venv/bin/python scripts/pack_live_bundle.py pack
+- Private live instance for the owner on the tailnet, port 1820 (never used for repository figures)
+- Report page fixes from the judge review (report builder, in progress): the pruned phone drawn on the report plan, labels, provenance wording
+- Re-take the tracked board and report figures from the hands-free replayed run, fixture mode (board builder, in progress); update figure references in README, PITCH, DEVPOST
+- Final pass: bash run_tests.sh, python scripts/check_replay.py for all three scripts, bash scripts/check_publishable.sh, commit, restart the standing demo on the final code
 
 **Left to do with real hardware (you):**
 

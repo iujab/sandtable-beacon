@@ -4,36 +4,18 @@
  "profile": "3A2T",
  "simulated": true,
  "llm_backend": "replay",
- "final_step": "done",
- "phase": "terminated",
- "wall_s": 82.1,
+ "final_step": "stopped",
+ "phase": "standby",
+ "wall_s": 23.4,
  "runs": {
   "preplan": [
    "replay"
-  ],
-  "mayday#1": [
-   "replay"
-  ],
-  "hazard#2": [
-   "replay"
-  ],
-  "contact#3": [
-   "replay"
-  ],
-  "aar": [
-   "replay"
   ]
  },
- "radio_messages": 5,
+ "radio_messages": 0,
  "fallback_runs": [],
- "preplan_backend": "replay",
- "aar_backend": "replay",
- "metrics_simulated": {
-  "replans": 1,
-  "hazards": 1,
-  "mayday_to_assign_s": 2.5,
-  "mayday_to_contact_s": 38.0,
-  "mayday_to_all_out_s": 45.9
- },
- "at": "2026-11-14T14:30:26-0600"
+ "preplan_backend": null,
+ "aar_backend": null,
+ "metrics_simulated": null,
+ "at": "2026-11-14T14:47:48-0600"
 }

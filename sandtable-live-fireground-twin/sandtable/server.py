@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import math
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,6 +35,7 @@ BACKLOG_TYPES = {"agent", "radio", "timeline", "alert", "tag"}
 
 class AppState:
     def __init__(self):
+        config.set_instance(os.environ.get("PORT", ""))     # a board on a non-standard port keeps its own runtime files
         self.provider = get_provider()
         self._clear_local_writes()
         self.twin = Twin(self.provider.twin_raw())

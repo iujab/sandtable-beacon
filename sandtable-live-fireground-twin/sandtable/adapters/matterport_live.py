@@ -174,7 +174,7 @@ class MatterportLive:
 
     # ---- tags: dry run unless MATTERPORT_WRITE_TAGS=1
     def _dryrun_log(self) -> Path | None:
-        return self.live_dir / f"tags_dryrun_{self.model_id}.json" if self.live_dir else None
+        return self.live_dir / f"tags_dryrun_{self.model_id}{config.INSTANCE}.json" if self.live_dir else None   # one log per board (config.set_instance)
 
     def _dryrun_tags(self) -> list[dict]:
         p = self._dryrun_log()

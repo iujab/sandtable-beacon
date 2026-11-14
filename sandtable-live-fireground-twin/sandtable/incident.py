@@ -882,10 +882,15 @@ class Incident:
     def snapshot(self) -> dict:
         """Discrete, deterministic state for agent prompts: ids and labels only, no clock times, no coordinates."""
         units = []
+        field = bool(self.scan or self.phones)              # a scan or phones exist: not the mayday exercise, whose snapshot stays byte-identical
         for u in self.units.values():
             node = self._unit_node(u)
             room = self.twin.node(node)["room"] if (node and u["_logical"] and node == u["_logical"]) else u["room"]
             r = self.twin.room(room) if room else None
+            if field and u["status"] == "out":
+                # A crew that is out of the building: where its tag was last read (the stair, or the corridor before it) is a matter
+                # of timing, not a fact for the agent. Say that it is out and nothing else, so the same incident gives the same prompt.
+                node, room, r = None, None, {"label": "out of the building"}
             units.append({"id": u["id"], "label": u["label"], "kind": u["kind"], "physical": u["physical"], "status": u["status"], "floor": u["floor"],
                           "room": room, "room_label": r["label"] if r else None, "suite": r.get("suite") if r else None, "node": node,
                           "assignment": dict(u["assignment"]) if u["assignment"] else None,

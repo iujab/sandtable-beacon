@@ -83,7 +83,7 @@
       "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T13:40:09-06:00"
+    "updated": "2026-11-14T14:08:58-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",
@@ -166,7 +166,7 @@
     },
     {
       "q": "[Phones] One puck or two for angle?",
-      "a": "One puck gives a ring. Two give two candidate points, mirror images across the line between the pucks; the twin's walls often delete one. Three pucks not in a line give a position. The phone's own direction would turn one ring into a point, but an iPhone 14 or 15 does not report direction to an accessory without camera assistance (a moving phone that can see), so do not count on it. Simulated numbers follow when the evaluation finishes."
+      "a": "Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks, and an iPhone 14 or 15 reports no direction that could choose. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room, with what a real iPhone delivers (distance only): one position in 76% of cases (35% because the twin rules the mirror spot out, 42% after the occupant's stated suite, shown as dismissed), median error 0.26 m, 1.5% of the positions shown wrong; the rest stay a ring (one puck did not reach the phone) or two spots. Pucks dropped mid-room: one position in only 4%, and the board says 'cannot choose' in 86%. Caveat: if the occupant states the wrong suite, the few positions that then appear are wrong. Better if you have it: a third puck gives one position in 84% with 0.20 m median error."
     },
     {
       "q": "[Phones] Will the phone keep answering with the screen off?",
@@ -174,15 +174,23 @@
     },
     {
       "q": "[Phones] Can we put both UWB boards on one device we throw in?",
-      "a": "It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow."
+      "a": "It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the median bearing error is 37, 19 and 22 degrees (10 cm is no better than guessing), the sideways error 2.2, 1.5 and 1.4 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 7 degrees and 0.47 m sideways."
     },
     {
-      "q": "[Phones] Or one puck on the Android phone and one on the UNO Q, two separately powered pucks?",
-      "a": "Two separate pucks a few metres apart are far better than two boards on one device: tens of centimetres, with two candidates that the twin can often cut to one. The Android phone is only worth using as a power source: the stock firmware prints nothing a phone could read. Recommended for the live demo: three separate pucks on battery banks, 2 to 3 m apart, not in a line; the UNO Q can power one and run the server."
+      "q": "[Phones] Two pucks: one on a battery bank with the UNO Q, one powered by the Android phone?",
+      "a": "Yes, that is now the plan. Each board needs only 5 V. Puck A: battery bank, beside the UNO Q (which can run the server). Puck B: the Android phone over a USB-OTG adapter into the board's J-Link port (that port's chip shows up as a USB device, so the phone keeps the power on); keep a second bank as the fallback because some phones cut power to quiet devices. The phone cannot read the board (the stock firmware prints nothing on serial), and does not need to: the range returns through the iPhone app. The same phone can be the Wi-Fi hotspot for the laptop and both iPhones."
     },
     {
       "q": "[Phones] What does a puck need?",
       "a": "Power only (5 V on either micro-USB port). The range comes back through the iPhone app over Wi-Fi. Stand the board upright, at least 15 cm off the floor, component-free side toward the phone. Puck positions are measured with a tape and clicked onto the plan: the stock firmware cannot range board to board."
+    },
+    {
+      "q": "[Phones] Two victims' iPhones on two pucks at once?",
+      "a": "One iPhone can range both pucks at once. One board, on Qorvo's stock firmware, serves only one phone at a time (forum reports). So for two victims either the phones take turns (a switch in our app; simulated: a position after 3.5 s in the median, 9 s at the 90th percentile, and 23% of phones still without one after 24 s; untested on hardware), or each puck position carries two boards, one per phone (you have five boards; continuous ranging, no turn-taking). Prove one phone on both pucks first."
+    },
+    {
+      "q": "[Phones] Where does the server run at the table, and how do the iPhones reach it?",
+      "a": "On the laptop, with the laptop and both iPhones joined to a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic); the Android phone powering puck B can be that hotspot. The board shows a QR code; scanning it with the iPhone camera opens our app with the server address filled in. Fallbacks: the server on the UNO Q on the same hotspot, or this machine over the tailnet if the iPhones run the tailnet client."
     },
     {
       "q": "[Radar] Is one UWB sensor enough to scan a room?",
@@ -190,7 +198,7 @@
     },
     {
       "q": "[Radar] Why not?",
-      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 µs, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
+      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 \u00b5s, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
     },
     {
       "q": "[Radar] How do multiple boards fix it?",
@@ -198,7 +206,7 @@
     },
     {
       "q": "[Radar] How many are needed, and what does each added board buy?",
-      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m² (two boards) to 0.40 m² (three) and 0.15 m² (five)."
+      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m\u00b2 (two boards) to 0.40 m\u00b2 (three) and 0.15 m\u00b2 (five)."
     },
     {
       "q": "[Radar] What is the 'map', and what is it not?",
@@ -206,7 +214,7 @@
     },
     {
       "q": "[Radar] Why does this beat cameras and LiDAR in smoke, and where does it not?",
-      "a": "Smoke particles (0.01 to 1 µm) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
+      "a": "Smoke particles (0.01 to 1 \u00b5m) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
     },
     {
       "q": "[Radar] What is the biggest open risk?",

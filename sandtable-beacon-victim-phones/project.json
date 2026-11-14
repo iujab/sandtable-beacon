@@ -45,14 +45,15 @@
   "role": "thrown pucks range the occupants' iPhones over UWB (Apple Nearby Interaction accessory sessions); the UNO Q hosts and powers a puck",
   "mode_now": "simulated"
  },
- "status": "building",
+ "status": "partial",
  "progress": {
-  "percent": 82,
-  "phase": "fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet",
+  "percent": 92,
+  "phase": "complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's",
   "done": [
    "Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle",
-   "Command agent: the walk-through shows a recorded real model run (replay); other situations get a labelled deterministic fallback",
    "Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885",
+   "Independent review and fix round: a two-puck position is published only when its mirror spot is explained; ranges are forgotten when a puck moves; stale phones are never dots; the simulator gives only what a real iPhone gives (distance); scripts/honesty_check.py hunts for confident wrong positions (9 scenes, passes)",
+   "Command agent: the walk-through shows a recorded real model run (Claude Sonnet 5.5, replayed); other situations get a labelled deterministic fallback unless a live model is configured",
    "Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)",
    "Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md",
    "iOS occupant app source and Xcode project in apps/ios (uncompiled; syntax-parsed; under independent review)",
@@ -63,10 +64,10 @@
    "Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md"
   ],
   "left_software": [
-   "Fix round in progress (independent judge's findings): a two-puck position only when the mirror spot is explained; stale phones never drawn as dots; an adversarial self-check (scripts/honesty_check.py) that hunts for confident wrong positions; simulated ranges without the line-of-sight score a real iPhone does not give; board fixes (phantom phone from the phone page, label collisions, stale agent orders)",
-   "Re-run the evaluation after the fixes and refresh every number in the documents",
-   "Your first Xcode build of apps/ios will tell us what the syntax check could not (paste the errors back); the independent review fixed 10 defects, none a certain compile error",
-   "After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do"
+   "Your first Xcode build of apps/ios will tell us what the syntax check could not: paste the compiler errors back (docs/IOS_BUILD.md section 11 lists the likeliest places)",
+   "After the first real ranges: replace the simulated noise model with what an iPhone 14 and 15 really measure against these boards, and re-run scripts/eval_beacon.py and scripts/honesty_check.py",
+   "Decide at the table how two phones share two boards (take turns in the app, or two boards per puck position) and tell us which, so the walk-through and the pitch match",
+   "Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, pucks surveying their own positions, an Android occupant app"
   ],
   "left_hardware": [
    "1. (5 min) hardware/BRINGUP.md step 1: power one DWM3001CDK and see whether it already ranges with Qorvo's free App Store app 'Qorvo Nearby Interaction'. If yes, skip flashing for that board.",
@@ -86,9 +87,9 @@
    "Xcode with your Apple ID; Developer Mode on both iPhones (Settings > Privacy & Security > Developer Mode)",
    "A USB-C OTG adapter for the Android phone, two micro-USB DATA cables, one battery bank (a second as the fallback for puck B), tape and a tape measure",
    "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
-   "CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then"
+   "CoStar extract and sponsor keys have arrived and stay private: Beacon uses them only through the command board's private live bundle (BEACON_BUNDLE_DIR); nothing to do for Beacon"
   ],
-  "updated": "2026-11-14T14:06:53-06:00"
+  "updated": "2026-11-14T14:20:11-06:00"
  },
  "owner_questions": [
   {
@@ -139,7 +140,7 @@
   "utility": 3,
   "charity": 5,
   "avidity": 4,
-  "track_fit": 4,
+  "track_fit": 3,
   "demo_risk": 3
  },
  "demo": {
@@ -151,7 +152,7 @@
  "images": [
   {
    "path": "figures/ui_03_fix_two_pucks.png",
-   "caption": "Two pucks on the door wall: one position; the mirror spot is ruled out by the twin (simulated)"
+   "caption": "Two pucks on the door wall: one position; the mirror spot is dismissed on the occupant's stated suite and shown as dismissed (simulated)"
   },
   {
    "path": "figures/ui_02_cannot_choose.png",
@@ -166,6 +167,10 @@
    "caption": "Simulated: where in the room two pucks give one answer, for three layouts and for three pucks"
   },
   {
+   "path": "figures/ui_06_agent.png",
+   "caption": "The command agent's plan from the phones and the tenant roster (simulated scene)"
+  },
+  {
    "path": "figures/ui_05_phone.png",
    "caption": "The simulated victim's phone page"
   },
@@ -176,12 +181,13 @@
  ],
  "tests": {
   "command": "bash run_tests.sh",
-  "passed": 0,
+  "passed": 261,
   "failed": 0,
-  "last_run": null
+  "last_run": "2026-11-14T14:20:11-06:00"
  },
  "limitations": [
   "Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.",
+  "An independent review found two faults that drew confident wrong positions (ranges kept after a puck moved; a two-puck position published without accounting for its mirror image). Both are fixed and a self-check now hunts for such cases; real hardware may reveal others.",
   "The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.",
   "Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.",
   "Bring-up guides are written from documentation and forum reports, not from a board.",
@@ -190,7 +196,6 @@
   "A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.",
   "The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.",
   "Not a life-safety product.",
-  "An independent review found the demo could show a confident wrong position after a puck was moved and when both pucks sat mid-room; the first is fixed, the second is being fixed, and a self-check now hunts for such cases. Treat every simulated accuracy number as provisional until the re-run.",
   "The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.",
   "The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such."
  ],

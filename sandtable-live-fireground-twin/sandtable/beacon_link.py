@@ -82,8 +82,10 @@ def _unscanned(obj: dict) -> dict:
 
 
 def twin_hash(twin_raw: dict) -> str:
+    """The building, not the session: tags (pins added during incidents) and private bookkeeping keys are left out."""
     import hashlib
-    return hashlib.sha256(json.dumps(twin_raw, sort_keys=True, default=str).encode()).hexdigest()[:12]
+    stable = {k: v for k, v in twin_raw.items() if k != "tags" and not str(k).startswith("_")}
+    return hashlib.sha256(json.dumps(stable, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
 def live_story_path(twin_raw: dict) -> Path:

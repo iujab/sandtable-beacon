@@ -182,7 +182,7 @@ class ToolBox:
         if isinstance(ref, str) and any(u["id"] == ref for u in self._snap()["units"]):
             u = self._unit(ref)
             if not u["node"]:
-                raise ValueError(f"{ref} has no position yet")
+                raise ValueError(f"{ref} is out of the building" if u.get("status") == "out" else f"{ref} has no position yet")
             return u["node"]
         if isinstance(ref, str) and ref in self._phone_entries() and ref not in self.twin._rooms and ref not in self.twin._nodes:
             target = self._phone_target(ref)[0]

@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 2:07 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 2:20 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -9,7 +9,7 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
 | Command board | `sandtable-live-fireground-twin/` | building | 80% | All three sponsor layers run live on this machine for one real building (private; nothing sponsor-derived is published). A private laptop bundle is packed and the laptop steps are written (docs/TOOLKIT_SWAP.md, 'Laptop setup'). Now: verification of the all-three-live board run, live board UI (obliques, scan view), replay fix and re-record for the public fixture demo, an independent judge review, final write-up pass. |
-| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 82% | fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet |
+| Phones and pucks | `sandtable-beacon-victim-phones/` | partial | 92% | complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
 
@@ -119,14 +119,14 @@ Taken from each part's `project.json` at sync time.
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)
 
-**Being worked on now:** fix round after an independent judge's review: the judge found a confident wrong position after a puck was moved (fixed: ranges are forgotten when a puck moves), flips in the mid-room layout, stale phones still drawn as dots, and wording that claimed too much; four builders are fixing the locator, the simulator and an adversarial self-check, the server, and the board. Nothing has touched hardware yet
+**Being worked on now:** complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's
 
 **Left to build (agents):**
 
-- Fix round in progress (independent judge's findings): a two-puck position only when the mirror spot is explained; stale phones never drawn as dots; an adversarial self-check (scripts/honesty_check.py) that hunts for confident wrong positions; simulated ranges without the line-of-sight score a real iPhone does not give; board fixes (phantom phone from the phone page, label collisions, stale agent orders)
-- Re-run the evaluation after the fixes and refresh every number in the documents
-- Your first Xcode build of apps/ios will tell us what the syntax check could not (paste the errors back); the independent review fixed 10 defects, none a certain compile error
-- After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do
+- Your first Xcode build of apps/ios will tell us what the syntax check could not: paste the compiler errors back (docs/IOS_BUILD.md section 11 lists the likeliest places)
+- After the first real ranges: replace the simulated noise model with what an iPhone 14 and 15 really measure against these boards, and re-run scripts/eval_beacon.py and scripts/honesty_check.py
+- Decide at the table how two phones share two boards (take turns in the app, or two boards per puck position) and tell us which, so the walk-through and the pitch match
+- Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, pucks surveying their own positions, an Android occupant app
 
 **Left to do with real hardware (you):**
 
@@ -148,13 +148,14 @@ Taken from each part's `project.json` at sync time.
 - Xcode with your Apple ID; Developer Mode on both iPhones (Settings > Privacy & Security > Developer Mode)
 - A USB-C OTG adapter for the Android phone, two micro-USB DATA cables, one battery bank (a second as the fallback for puck B), tape and a tape measure
 - Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)
-- CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then
+- CoStar extract and sponsor keys have arrived and stay private: Beacon uses them only through the command board's private live bundle (BEACON_BUNDLE_DIR); nothing to do for Beacon
 
 **Finished:**
 
 - Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle
-- Command agent: the walk-through shows a recorded real model run (replay); other situations get a labelled deterministic fallback
 - Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885
+- Independent review and fix round: a two-puck position is published only when its mirror spot is explained; ranges are forgotten when a puck moves; stale phones are never dots; the simulator gives only what a real iPhone gives (distance); scripts/honesty_check.py hunts for confident wrong positions (9 scenes, passes)
+- Command agent: the walk-through shows a recorded real model run (Claude Sonnet 5.5, replayed); other situations get a labelled deterministic fallback unless a live model is configured
 - Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)
 - Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md
 - iOS occupant app source and Xcode project in apps/ios (uncompiled; syntax-parsed; under independent review)
@@ -167,6 +168,7 @@ Taken from each part's `project.json` at sync time.
 **Known limitations:**
 
 - Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.
+- An independent review found two faults that drew confident wrong positions (ranges kept after a puck moved; a two-puck position published without accounting for its mirror image). Both are fixed and a self-check now hunts for such cases; real hardware may reveal others.
 - The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.
 - Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.
 - Bring-up guides are written from documentation and forum reports, not from a board.
@@ -175,7 +177,6 @@ Taken from each part's `project.json` at sync time.
 - A phone whose owner installed nothing cannot be ranged or identified; at most a rough count of Bluetooth devices nearby.
 - The building record is a public-data fixture (not CoStar data) and the twin is a synthetic interior (not a Matterport scan); expected head counts are estimates from floor area and building-code load factors.
 - Not a life-safety product.
-- An independent review found the demo could show a confident wrong position after a puck was moved and when both pucks sat mid-room; the first is fixed, the second is being fixed, and a self-check now hunts for such cases. Treat every simulated accuracy number as provisional until the re-run.
 - The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.
 - The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.
 
@@ -228,7 +229,7 @@ No. An iPhone's UWB radio only answers a session started by an app with the user
 
 **[Phones] One puck or two for angle?**
 
-One puck gives a ring. Two give two candidate points, mirror images across the line between the pucks; the twin's walls often delete one. Three pucks not in a line give a position. The phone's own direction would turn one ring into a point, but an iPhone 14 or 15 does not report direction to an accessory without camera assistance (a moving phone that can see), so do not count on it. Simulated numbers follow when the evaluation finishes.
+Two pucks, as you chose, give one answer if you place them right. One puck gives a ring; two give two mirror spots across the line between the pucks, and an iPhone 14 or 15 reports no direction that could choose. Put both pucks just inside the wall the door is in (35 cm inside, about 4 m apart). Simulated over 800 phone positions in the room, with what a real iPhone delivers (distance only): one position in 76% of cases (35% because the twin rules the mirror spot out, 42% after the occupant's stated suite, shown as dismissed), median error 0.26 m, 1.5% of the positions shown wrong; the rest stay a ring (one puck did not reach the phone) or two spots. Pucks dropped mid-room: one position in only 4%, and the board says 'cannot choose' in 86%. Caveat: if the occupant states the wrong suite, the few positions that then appear are wrong. Better if you have it: a third puck gives one position in 84% with 0.20 m median error.
 
 **[Phones] Will the phone keep answering with the screen off?**
 
@@ -236,15 +237,23 @@ Not as built tonight: keep the app open (it keeps the screen awake). Two ways ex
 
 **[Phones] Can we put both UWB boards on one device we throw in?**
 
-It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow.
+It works poorly. The boards have one antenna each, so bearing can only come from the difference of two ranges. Simulated: at 10, 30 and 50 cm spacing the median bearing error is 37, 19 and 22 degrees (10 cm is no better than guessing), the sideways error 2.2, 1.5 and 1.4 m, the mirror ambiguity always remains, and the locator never publishes a position, only a ring. Two separate pucks 3 m apart: 7 degrees and 0.47 m sideways.
 
-**[Phones] Or one puck on the Android phone and one on the UNO Q, two separately powered pucks?**
+**[Phones] Two pucks: one on a battery bank with the UNO Q, one powered by the Android phone?**
 
-Two separate pucks a few metres apart are far better than two boards on one device: tens of centimetres, with two candidates that the twin can often cut to one. The Android phone is only worth using as a power source: the stock firmware prints nothing a phone could read. Recommended for the live demo: three separate pucks on battery banks, 2 to 3 m apart, not in a line; the UNO Q can power one and run the server.
+Yes, that is now the plan. Each board needs only 5 V. Puck A: battery bank, beside the UNO Q (which can run the server). Puck B: the Android phone over a USB-OTG adapter into the board's J-Link port (that port's chip shows up as a USB device, so the phone keeps the power on); keep a second bank as the fallback because some phones cut power to quiet devices. The phone cannot read the board (the stock firmware prints nothing on serial), and does not need to: the range returns through the iPhone app. The same phone can be the Wi-Fi hotspot for the laptop and both iPhones.
 
 **[Phones] What does a puck need?**
 
 Power only (5 V on either micro-USB port). The range comes back through the iPhone app over Wi-Fi. Stand the board upright, at least 15 cm off the floor, component-free side toward the phone. Puck positions are measured with a tape and clicked onto the plan: the stock firmware cannot range board to board.
+
+**[Phones] Two victims' iPhones on two pucks at once?**
+
+One iPhone can range both pucks at once. One board, on Qorvo's stock firmware, serves only one phone at a time (forum reports). So for two victims either the phones take turns (a switch in our app; simulated: a position after 3.5 s in the median, 9 s at the 90th percentile, and 23% of phones still without one after 24 s; untested on hardware), or each puck position carries two boards, one per phone (you have five boards; continuous ranging, no turn-taking). Prove one phone on both pucks first.
+
+**[Phones] Where does the server run at the table, and how do the iPhones reach it?**
+
+On the laptop, with the laptop and both iPhones joined to a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic); the Android phone powering puck B can be that hotspot. The board shows a QR code; scanning it with the iPhone camera opens our app with the server address filled in. Fallbacks: the server on the UNO Q on the same hotspot, or this machine over the tailnet if the iPhones run the tailnet client.
 
 **[Radar] Is one UWB sensor enough to scan a room?**
 

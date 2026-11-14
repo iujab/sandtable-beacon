@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 5:08 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 5:19 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -34,7 +34,7 @@ These need hands, hardware or accounts, so only you can do them. Each links to t
 2. **Flash the boards** with Qorvo's Nearby Interaction firmware if step 1 failed. The firmware file sits behind an email form on qorvo.com, so the agents could not fetch it for you. Guide: `sandtable-beacon-victim-phones/hardware/FLASH.md`.
 3. **Build the iPhone app in Xcode** and install it on the iPhone 14 and the iPhone 15 (switch on Developer Mode on both). It has never been compiled: the build server is Linux. Guide: `sandtable-beacon-victim-phones/docs/IOS_BUILD.md`. Paste any compiler errors back to the agent.
 4. **Set up the two pucks.** Puck A: a board on a battery bank beside the UNO Q. Puck B: a board powered from the Android phone through a USB-OTG adapter (keep a second battery bank as the fallback). A puck needs power only; the distance comes back through the iPhone app. Guides: `sandtable-beacon-victim-phones/hardware/PUCK.md` and `hardware/BRINGUP.md`.
-5. **Start the Beacon server where the phones can reach it** (laptop or UNO Q): `bash run_demo.sh --source live --lan` in `sandtable-beacon-victim-phones/`. Venue Wi-Fi may block device-to-device traffic; a phone hotspot is the usual answer. UNO Q guide: `sandtable-beacon-victim-phones/hardware/UNO_Q.md`. Its first section lists what was checked on the real UNO Q on Saturday afternoon: a USB-C hub with two boards works, and plain `python3 -m venv` fails there (the guide has the commands that work without `sudo`). A clone with the requirements installed is already on the UNO Q in `~/sandtable-beacon`; run `git pull` there first. The Beacon server itself has not run on the UNO Q yet.
+5. **Start the Beacon server where the phones can reach it** (laptop or UNO Q): `bash run_demo.sh --source live --lan` in `sandtable-beacon-victim-phones/`. Venue Wi-Fi may block device-to-device traffic; a phone hotspot is the usual answer. UNO Q guide: `sandtable-beacon-victim-phones/hardware/UNO_Q.md`. Its first section lists what was checked on the real UNO Q on Saturday afternoon: a USB-C hub with two boards works, and plain `python3 -m venv` fails there (the guide has the commands that work without `sudo`). A clone with the requirements installed is already on the UNO Q in `~/sandtable-beacon`; run `git pull` there first. The simulated walk-through ran to the end on the UNO Q; live mode has not run there yet.
 6. **Place the pucks and tell the board where they are.** The stock firmware cannot range board to board, so tape-measure each puck's position and click it onto the room plan. Put both pucks along the same wall so the room's walls can rule out the mirror-image answer.
 7. **First real range.** Open the app on one iPhone, walk the room, and check the ring, the two candidates and the fix on the board against where you actually stand. Write down what you measure: the write-ups currently say "simulated" everywhere and need real numbers.
 8. **Live sponsor data on your laptop** (about 15 minutes). The command board runs on your laptop; the UNO Q needs no keys. Two private files travel by hand from the build server, never through this repository: the private `.env` (keys and the demo building's ids) and `sandtable-live-bundle.zip` (that building's record, twin, imagery and recorded agent decisions). In `sandtable-live-fireground-twin/`:
@@ -171,7 +171,7 @@ Taken from each part's `project.json` at sync time.
 - Tenant roster against phones: accountability table, priorities, where the next puck goes; command agent and incident report
 - Puck host for the UNO Q (python -m beacon.host): heartbeat, experimental debug-channel reader, optional Bluetooth device count; tested against stubs only
 - Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md
-- Partly checked on the owner's UNO Q over SSH on 14 Nov (about ten minutes): Debian 13 with Python 3.13; a USB-C hub with two DWM3001CDK boards enumerates as two serial ports the arduino user can open; the requirements install without sudo in 83 s (plain 'python3 -m venv' fails there, hardware/UNO_Q.md gives the working commands); the puck host's --help runs. The test suite did not finish there and the server was not run there
+- Checked on the owner's UNO Q over SSH on 14 Nov: the requirements install without sudo in 83 s; the simulated walk-through runs to the end there (both simulated phones located; the server uses about half of one core); 257 of 261 tests pass there, the 4 failures being time limits written for a faster machine; a USB-C hub with two DWM3001CDK boards enumerates as two serial ports. Live mode and the puck host were not run there (hardware/UNO_Q.md, first section)
 
 **Known limitations:**
 
@@ -187,7 +187,7 @@ Taken from each part's `project.json` at sync time.
 - Not a life-safety product.
 - The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.
 - The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.
-- UNO Q: only a ten-minute check over SSH so far (hardware/UNO_Q.md, first section). The test suite did not finish on it, the Beacon server and the puck host were not run on it, and which firmware the two attached boards carry is still unknown
+- UNO Q: simulation only so far. Live mode, the puck host and the RTT reader have not run on it, and 4 time-limit tests fail there. The two boards attached to it carry the owner's separate board-to-board ranging firmware, not the Nearby Interaction firmware, so an iPhone cannot range them until they are flashed again
 
 
 ## Your questions, answered by the teams

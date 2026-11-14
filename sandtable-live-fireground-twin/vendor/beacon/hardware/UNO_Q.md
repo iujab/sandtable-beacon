@@ -1,7 +1,7 @@
 # Arduino UNO Q: a puck host, and optionally the whole command post
 
 > **Written from documentation and forum reports, then partly checked on the owner's UNO Q** (Saturday 14 November,
-> about ten minutes over SSH; see the next section). Everything not listed there is still unexecuted.
+> two sessions over SSH; see the next section). Everything not listed there is still unexecuted.
 > Sources are cited inline; the notes are in `docs/research/puck_hardware.md` section 3. The UNO Q is **optional**:
 > with Qorvo's stock firmware a puck needs only power, and the iPhone app reports every range.
 
@@ -26,25 +26,27 @@ Seen on the board, over SSH as user `arduino`:
 - Bluetooth: `bluetoothctl` is installed, the controller is powered, and an ordinary (active) scan from the SSH shell
   listed about 300 advertisers in the hall. The passive scan that `--cold-scan` asks for was not tried.
 
-Not seen, or not finished:
+- **The simulated walk-through ran to the end on the UNO Q** (`.venv/bin/python -m beacon.demo --source sim --story
+  --tailnet`): the server answered in 4 seconds, both simulated phones reached a position, `/api/beacons` answered in
+  about 0.1 seconds, and nothing was logged as an error. The server process used about 40 to 50 % of one of the four
+  cores the whole time. Simulated data only: no board and no phone was involved.
+- **The test suite on the UNO Q: 257 passed, 4 failed, in 6 minutes** (under 2 minutes on the build machine). All four
+  failures are time limits written for a faster machine: the quick evaluation did not finish in its 60 seconds, the
+  external-bundle walk-through and the story test ran out of their waiting time, and one position estimate from a
+  Bluetooth-only reading took 40 ms against a 30 ms limit. The UWB estimates stayed inside the limit.
 
-- **The test suite did not finish on the UNO Q**: the SSH session ended while it ran. The Beacon server, the puck host
-  against a server, and RTT were not run there.
-- **Which firmware the two boards carry is still unknown.** In two scans no advertiser offered the Nearby Interaction
-  firmware's Bluetooth services, and neither serial port answered `help` at 115200 baud. That fits boards without that
-  firmware. It also fits boards that were connected to a phone at that moment (the stock firmware stops advertising
-  while connected), so it settles nothing. The check with Qorvo's iPhone app (`hardware/BRINGUP.md`) is still the test.
-- SEGGER's tools are not installed there; J-Link access without `sudo` was not tried.
+Not seen, or not run:
 
-**Tonight it is part of puck A**: one battery bank powers the UNO Q (through a USB-C hub/dongle with a PD input) and
-board A1, which plugs into the hub. The UNO Q joins the Android phone's Wi-Fi hotspot like everything else
-(`hardware/BRINGUP.md` step 4).
-
-Two jobs it can do, independently:
-
-- **A. Puck host** (10 min): power one puck and tell the board it is hosted; optionally read that puck's debug log
-  (experimental) and count nearby Bluetooth devices (optional, never run).
-- **B. Command post** (15 min): run the Beacon server itself, so the laptop only needs a browser.
+- The Beacon server in **live** mode, the puck host against a server, and reading a board's log (RTT) with this
+  project's host were not run on the UNO Q.
+- **The two boards on the UNO Q do not carry the Nearby Interaction firmware.** From about 5 pm that day they run a
+  board-to-board ranging firmware the owner is developing separately, so an iPhone cannot range them until they are
+  flashed again (`hardware/FLASH.md`). Before that, two Bluetooth scans had found no advertiser offering the Nearby
+  Interaction services and neither serial port answered `help`. Whether the owner's other boards carry the Nearby
+  Interaction firmware is still unknown; the check with Qorvo's iPhone app (`hardware/BRINGUP.md`) is the test.
+- **OpenOCD is already installed on the UNO Q** (0.12.0, with the J-Link driver and the nRF52 target), so SEGGER's tools
+  are not needed there to read a board's RTT log or to flash a `.hex`. It needs `root` to open the J-Link. This project's
+  guides were not tried with it.
 
 ## What the research says about the UNO Q
 

@@ -1,7 +1,7 @@
 {
  "source": "lane L16's project.json (the Beacon module, vendored in vendor/beacon/)",
- "vendored": "2026-11-14T16:48:52-0600",
- "commit": "816ccb981c56a4f9c60f66c8c6f912d91f7396e7",
+ "vendored": "2026-11-14T17:17:02-0600",
+ "commit": "b5d424bfd72d7e3ec9bce4b2937ab84fb5268c2f",
  "owner_questions": [
   {
    "q": "Can a UWB board range a victim's phone over UWB at all?",

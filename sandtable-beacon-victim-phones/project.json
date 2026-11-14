@@ -62,7 +62,7 @@
       "Tenant roster against phones: accountability table, priorities, where the next puck goes; command agent and incident report",
       "Puck host for the UNO Q (python -m beacon.host): heartbeat, experimental debug-channel reader, optional Bluetooth device count; tested against stubs only",
       "Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md",
-      "Partly checked on the owner's UNO Q over SSH on 14 Nov (about ten minutes): Debian 13 with Python 3.13; a USB-C hub with two DWM3001CDK boards enumerates as two serial ports the arduino user can open; the requirements install without sudo in 83 s (plain 'python3 -m venv' fails there, hardware/UNO_Q.md gives the working commands); the puck host's --help runs. The test suite did not finish there and the server was not run there"
+      "Checked on the owner's UNO Q over SSH on 14 Nov: the requirements install without sudo in 83 s; the simulated walk-through runs to the end there (both simulated phones located; the server uses about half of one core); 257 of 261 tests pass there, the 4 failures being time limits written for a faster machine; a USB-C hub with two DWM3001CDK boards enumerates as two serial ports. Live mode and the puck host were not run there (hardware/UNO_Q.md, first section)"
     ],
     "left_software": [
       "Your first Xcode build of apps/ios will tell us what the syntax check could not: paste the compiler errors back (docs/IOS_BUILD.md section 11 lists the likeliest places)",
@@ -90,7 +90,7 @@
       "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
       "CoStar extract and sponsor keys have arrived and stay private: Beacon uses them only through the command board's private live bundle (BEACON_BUNDLE_DIR); nothing to do for Beacon"
     ],
-    "updated": "2026-11-14T16:48:39-06:00"
+    "updated": "2026-11-14T17:16:52-06:00"
   },
   "owner_questions": [
     {
@@ -199,7 +199,7 @@
     "Not a life-safety product.",
     "The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.",
     "The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.",
-    "UNO Q: only a ten-minute check over SSH so far (hardware/UNO_Q.md, first section). The test suite did not finish on it, the Beacon server and the puck host were not run on it, and which firmware the two attached boards carry is still unknown"
+    "UNO Q: simulation only so far. Live mode, the puck host and the RTT reader have not run on it, and 4 time-limit tests fail there. The two boards attached to it carry the owner's separate board-to-board ranging firmware, not the Nearby Interaction firmware, so an iPhone cannot range them until they are flashed again"
   ],
   "team": {
     "lead_model": "claude-fable-5-2",

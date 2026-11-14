@@ -192,7 +192,8 @@ bash run_demo.sh --source live --lan     # then scan the board's QR code with ea
 | Ranges and positions | **Simulated** (`beacon/sim.py`; noise model with sources in `beacon/models.py`) until real iPhones report. The board shows SIM, or LIVE in live mode |
 | Puck firmware | Qorvo's stock Nearby Interaction image. Not in this repository; the owner downloads it from Qorvo. Never flashed by us |
 | iOS app (`apps/ios`) | **Uncompiled Swift source**, modelled on Apple's accessory sample; syntax-parsed, never compiled, never run |
-| Puck host (`beacon/host`) | Tested against stubs; on the owner's UNO Q only its `--help` has run (`hardware/UNO_Q.md`, first section); the debug-channel reader's input format is unconfirmed |
+| Puck host (`beacon/host`) | Tested against stubs; on the owner's UNO Q only its `--help` has run; the debug-channel reader's input format is unconfirmed |
+| Server on the UNO Q | The simulated walk-through ran to the end there; 257 of 261 tests pass there, the 4 failures being time limits (`hardware/UNO_Q.md`, first section). Live mode not run there |
 | Building record | **Fixture: real public data, not CoStar**: a Los Angeles professional building from the county assessor and the city's business registrations; tenant names withheld. Head counts are estimates from floor area |
 | Twin | **Fixture: synthetic interior, not a Matterport scan**, fitted to the real footprint and numbered with the real suite numbers |
 | Agent decisions | Recorded real model output replayed, or a labelled deterministic fallback |

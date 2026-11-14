@@ -52,6 +52,8 @@ PARTS = [
      "python scripts/live_vexcel.py fetch --demo"),
     ("llm_cache", ["llm_cache/**/*"], "private recordings of real model runs made against the live data (replay with LLM_BACKEND=replay)",
      None),
+    ("beacon_story", ["beacon/story_*.json"], "the recorded simulated Beacon run on the live twin that the hands-free exercise replays (the private agent "
+     "recordings only match this exact file)", None),
     ("beacon_bundle", ["beacon_bundle/**/*"], "the Beacon module copy the launcher assembles on the live twin (re-assembled at every live start)",
      "python -m sandtable.demo (live mode assembles it)"),
 ]
@@ -206,9 +208,11 @@ def unpack(archive: Path, into: Path) -> dict:
 def missing_on_this_machine(into: Path) -> list[str]:
     """What the archive cannot carry: keys, the CoStar kit, the selections. Names only."""
     todo = []
-    for name in ("VEXCEL_API_KEY", "MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "MATTERPORT_SDK_KEY"):
+    for name in ("VEXCEL_API_KEY", "MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_SDK_KEY"):
         if not os.environ.get(name):
             todo.append(f"{name} is not set (put it in .env)")
+    if not (os.environ.get("MATTERPORT_MODEL_ID") or (_demo(into) or {}).get("model_id")):
+        todo.append("MATTERPORT_MODEL_ID (or data/live/demo_building.json with model_id)")
     from sandtable.adapters.costar_extract import default_kit_dir, is_kit
     kit = default_kit_dir()
     if not is_kit(kit):

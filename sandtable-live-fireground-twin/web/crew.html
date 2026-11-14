@@ -42,6 +42,9 @@ button.may { background: #ff3b30; border-color: #ff3b30; color: #fff; }
 .fi:first-of-type { border-top: 0; }
 .fi b { color: #ff8cc6; font-family: "Barlow Condensed", Arial, sans-serif; font-size: 20px; margin-right: 6px; }
 .fi small { display: block; color: #8d99a6; font-size: 13px; }
+.fi.out { color: #3fcf8e; font: 700 17px "Barlow Condensed", Arial, sans-serif; letter-spacing: .06em; }
+.fi.none { color: #8d99a6; font-size: 15px; }
+#live-private { margin: -14px -16px 0; }
 </style>
 </head>
 <body>
@@ -60,6 +63,7 @@ const color = { E1: "#ffc247", RIT: "#4fd1ff" }[unit] || "#fff";
 $("cs").textContent = unit; $("cs").style.color = color;
 let voice = false, live = false, wasMayday = false, beacons = null, assignment = null, feedOn = false, feedTimer = null;
 const esc = (t) => String(t ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+const nPeople = (n) => `${n} ${n === 1 ? "person" : "people"}`;
 const ago = (s) => (s == null ? "" : s < 1.5 ? "just now" : s < 90 ? `${Math.round(s)} s ago` : `${Math.round(s / 60)} min ago`);
 function geomWords(p) {
   if (p.geometry === "fix") return `Located in ${p.room_label || "the room"}, within ${(p.sigma_m ?? 0).toFixed(1)} m`;
@@ -76,7 +80,7 @@ function renderTarget() {
   if (!p) { box.hidden = true; return; }
   box.hidden = false;
   const r = p.report || {};
-  $("t-who").textContent = `${p.id}: ${r.status || "no status"}${r.people != null ? `, ${r.people} ${r.people === 1 ? "person" : "people"}` : ""}${r.can_move === false ? ", cannot move" : ""}`;
+  $("t-who").textContent = `${p.id}: ${r.status || "no status"}${r.people != null ? `, ${nPeople(r.people)}` : ""}${r.can_move === false ? ", cannot move" : ""}`;
   $("t-geo").textContent = geomWords(p);
   $("t-said").textContent = r.text ? `“${r.text}”` : "";
   $("t-meta").textContent = [r.battery_pct != null ? `battery ${r.battery_pct}%` : "", `heard ${ago(p.track?.last_seen_s ?? r.age_s)}`].filter(Boolean).join(" · ");
@@ -88,16 +92,20 @@ async function pollFeed() {
     const r = await fetch("/feed/scan.geojson", { cache: "no-store" });
     if (!r.ok) return;
     const g = await r.json();
-    const people = (g.features || []).filter((f) => ["victim", "phone", "phone-ring", "phone-candidate", "phone-zone"].includes(f.properties?.kind));
+    const all = (g.features || []).filter((f) => ["victim", "phone", "phone-ring", "phone-candidate", "phone-zone"].includes(f.properties?.kind));
+    // a person brought out (or safe outside) is no longer someone to find: listed apart, by the person's own status in the feed
+    const isOut = (q) => ["out", "safe-outside"].includes(q.target_status) || q.status === "out";
+    const people = all.filter((f) => !isOut(f.properties));
+    const outIds = [...new Set(all.filter((f) => isOut(f.properties)).map((f) => f.properties.id))];
     const box = document.getElementById("feed");
-    box.hidden = !people.length;
+    box.hidden = !all.length;
     const seen = new Set();
     $("feed-list").innerHTML = people.filter((f) => { const k = f.properties.id; if (seen.has(k)) return false; seen.add(k); return true; }).map((f) => {
       const q = f.properties, kind = q.kind === "victim" ? "radar" : "phone";
       const what = q.kind === "victim" ? `${q.state === "breathing" && q.breathing_bpm ? `breathing ${Math.round(q.breathing_bpm)}/min` : q.state || ""} · ±${q.uncertainty_m ?? "?"} m` :
-        q.kind === "phone" ? `${q.status || ""}${q.people != null ? `, ${q.people} people` : ""} · located ±${q.sigma_m ?? q.uncertainty_m ?? "?"} m` : q.kind === "phone-ring" ? `${q.status ? q.status + " · " : ""}ring only, ${q.r_m ?? "?"} m from ${q.puck || "a puck"}` : q.kind === "phone-candidate" ? `${q.status || ""} · one of ${q.of || "?"} places` : `${q.status || ""} · somewhere in the room`;
-      return `<div class="fi"><b>${esc(q.id)}</b>${esc([q.room_label, what].filter(Boolean).join(" · "))}<small>${esc(kind)}${q.status && q.kind === "victim" ? `, ${esc(q.status)}` : ""}${q.rescuer ? `, ${esc(q.rescuer)} sent` : ""}${q.simulated ? ", simulated" : ""}${q.sample ? ", sample" : ""}</small></div>`;
-    }).join("");
+        q.kind === "phone" ? `${q.status || ""}${q.people != null ? `, ${nPeople(q.people)}` : ""} · located ±${q.sigma_m ?? q.uncertainty_m ?? "?"} m` : q.kind === "phone-ring" ? `${q.status ? q.status + " · " : ""}ring only, ${q.r_m ?? "?"} m from ${q.puck || "a puck"}` : q.kind === "phone-candidate" ? `${q.status || ""} · one of ${q.of || "?"} places` : `${q.status || ""} · somewhere in the room`;
+      return `<div class="fi"><b>${esc(q.id)}</b>${esc([q.room_label, what].filter(Boolean).join(" · "))}<small>${esc(kind)}${q.status && q.kind === "victim" ? `, ${esc(q.status)}` : ""}${q.rescuer ? `, ${esc(q.rescuer)} sent` : ""}${q.target_status === "reached" ? ", reached" : ""}${q.simulated ? ", simulated" : ""}${q.sample ? ", sample" : ""}</small></div>`;
+    }).join("") + (outIds.length ? `<div class="fi out">Out: ${esc(outIds.join(", "))}</div>` : "") + (!people.length && all.length ? `<div class="fi none">Nobody left to find in the feed.</div>` : "");
     $("feed-src").textContent = `from the feed /feed/scan.geojson · ${(g.features || []).length} features`;
   } catch { /* the feed is optional */ }
 }

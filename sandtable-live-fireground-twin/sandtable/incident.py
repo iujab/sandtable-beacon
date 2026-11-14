@@ -97,10 +97,16 @@ class Incident:
             u["_still_ref"], u["_still_since"], u["_entered_t"], u["_was_interior"] = None, None, None, False
             u["still_s"], u["time_in_s"], u["air_pct"] = 0.0, 0.0, 100.0
             u["_trail"] = []
+            u["_rest"] = None
             if not u["physical"]:
                 self._set_position(u, at[0], at[1], self.clock(), None, None)
+                u["_rest"] = self.twin.locate(at[0], at[1]).get("node")
             elif self.drivable and self.registration and self.teleport:
                 self.teleport(u["tag"], *self.registration.invert(*at))
+                # Software parked this tag at a known spot. Its graph node is taken from that spot, not from the noisy tag
+                # readings: where two nodes are about equally near, noise would pick one or the other from run to run and the
+                # first route from staging (its length, its way) would differ. On real boards the tracked position counts.
+                u["_rest"] = self.twin.locate(at[0], at[1]).get("node")
 
     def reset(self) -> None:
         self._reset_state()
@@ -680,7 +686,11 @@ class Incident:
         return {h["ref"] for h in self.hazards}
 
     def _unit_node(self, u: dict) -> str | None:
-        return u["_logical"] if (u["_logical"] and (u["_follow"] is not None or not u["physical"] or self.drivable)) else u["node"]
+        if u["_logical"] and (u["_follow"] is not None or not u["physical"] or self.drivable):
+            return u["_logical"]
+        if u.get("_rest") and u["status"] == "staged" and (self.drivable or not u["physical"]):
+            return u["_rest"]                         # parked by software and not moved since (stage_units)
+        return u["node"]
 
     def _hazard_geometry(self, ref: str) -> tuple[str, dict]:
         tw = self.twin

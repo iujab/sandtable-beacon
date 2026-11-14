@@ -53,6 +53,14 @@ const isOut = (p) => ["out", "safe-outside"].includes(norm(p).prog) || num(p.out
 // Live reports may carry only the geometry's name: take the shape from the Beacon object the server relays (/api/beacons).
 function phoneFromBeacons(p) { return p.source === "phone" ? arr(aux.beacons?.phones).find((q) => q.id === p.id) || null : null; }
 function personGeom(p) {
+  // the report's own last geometry of the person: a fix with the ruled-out mirror place and its reason, candidates, a ring, a zone
+  const d = p.geometry_detail;
+  if (d && typeof d === "object" && (d.kind || d.type)) {
+    const kind = d.kind || d.type;
+    if (kind === "ring") { const rg = d.ring && typeof d.ring === "object" ? d.ring : {}; return { ...d, ...rg, kind: "ring", ring_kind: rg.kind ?? d.ring_kind, pruned: d.pruned }; }
+    if (kind === "zone" && d.zone && typeof d.zone === "object") return { ...d, ...d.zone, kind: "zone" };
+    return { ...d, kind };
+  }
   let g = p.geometry;
   if (g && typeof g === "object") return { ...g, kind: g.kind || g.type || "none" };
   const kind = typeof g === "string" ? g : null;
@@ -97,7 +105,7 @@ const srcBadge = (b) => {
 };
 
 // ------------------------------------------------------------------ state
-let bundle = null, bundleTried = false, last = null, lastKey = null, lastOk = null, timer = null, lastErr = null;
+let fontWait = false, bundle = null, bundleTried = false, last = null, lastKey = null, lastOk = null, timer = null, lastErr = null;
 const aux = { beacons: null, state: null }; // live only: what the report itself does not carry (positions)
 
 async function getJSON(url) {
@@ -147,11 +155,13 @@ function renderFatal(e) {
 
 // ------------------------------------------------------------------ the document
 function render(r) {
-  const parts = [header, summary, people, accountability, plan, crewsAndHazards, timeline, agent, limits, signoff, foot];
+  const parts = [header, summary, people, plan, accountability, crewsAndHazards, timeline, agent, limits, signoff, foot];
   const html = parts.map((f) => { try { return f(r); } catch (e) { console.error(e); return NONE("A section could not be drawn from the report data."); } });
   $("#report").innerHTML = html.join("");
   pageBoxes(r);
   feeds();
+  // the plan's labels are placed with measured text widths: draw once more when the web fonts have come in
+  if (document.fonts && document.fonts.status !== "loaded" && !fontWait) { fontWait = true; document.fonts.ready.then(() => { if (last) render(last); }); }
   document.title = `Incident report, ${addrLine(r).main || "Sandtable Beacon"}`;
 }
 
@@ -170,8 +180,32 @@ function addrLine(r) {
 function isSample(r) { return SAMPLE || r.sample === true || r.provenance?.beacon?.sample === true; }
 function isSim(r) { return r.simulated === true || Object.values(r.provenance || {}).some((v) => v && (v.status === "simulated" || v.simulated === true)); }
 
+// "terminated" says only that the incident ended: what is true at the end is the incident's own closing sentence (the timeline's par line)
 const PHASES = { standby: ["Standby", "ended"], preplan: ["Pre-plan", "active"], operations: ["Operations", "active"], mayday: ["Mayday", "alarm"], rescue: ["Rescue", "alarm"],
-  egress: ["Egress", "egress"], terminated: ["All out, ended", "ended"] };
+  egress: ["Egress", "egress"], terminated: ["Ended", "ended"] };
+const closingLine = (r) => [...arr(r.timeline)].reverse().find((e) => e && e.kind === "par" && e.text)?.text || null;
+
+// provenance words for a layer, from the report's provenance block and the bundle's labels; never a bare layer name
+const BRAND = { costar: "CoStar", matterport: "Matterport", vexcel: "Vexcel" };
+function layerWord(k, r) {
+  k = String(k).toLowerCase();
+  const pv = r?.provenance?.[k], lb = bundle?.labels?.[k];
+  const lab = { ...(lb && typeof lb === "object" ? lb : {}), ...(pv && typeof pv === "object" ? pv : {}) };
+  if (BRAND[k]) {
+    if (lab.mode === "live" || lab.real_sponsor_data === true) return `${BRAND[k]} (live)`;
+    const t = String(lab.text || ""), head = /^([^:]{2,40}):/.exec(t)?.[1], not = /\bNot [^.;]+/.exec(t)?.[0];
+    return `the stand-in ${head ? head.toLowerCase() : "layer"}${not ? ` (${not.charAt(0).toLowerCase()}${not.slice(1)})` : lab.mode ? ` (${lab.mode})` : ""}`;
+  }
+  if (k === "beacon") { const t = String(lab.text || "").replace(/^Phones:\s*/, ""); return `the phones${t ? ` (${t})` : lab.word ? ` (${lab.word})` : ""}`; }
+  if (k === "uwb") return `crew positions${lab.word ? ` (${lab.word})` : ""}`;
+  if (k === "scout") return `the radar scan${lab.word ? ` (${lab.word})` : ""}`;
+  return k;
+}
+function sourceWords(src, r) {
+  if (Array.isArray(src)) return src.map((k) => layerWord(k, r)).join(" and ");
+  return String(src ?? "").replace(/\b(costar|matterport|vexcel|beacon|uwb|scout)\b/gi, (m) => layerWord(m, r));
+}
+const anyLive = () => Object.keys(BRAND).some((k) => bundle?.labels?.[k]?.mode === "live");
 
 function header(r) {
   const inc = r.incident || {}, a = addrLine(r), b = r.building || {};
@@ -194,6 +228,7 @@ function header(r) {
       <div><dt>Report generated</dt><dd>${esc(gen || "Not recorded")}</dd></div>
       <div><dt>Mode</dt><dd>${esc(mode)}</dd></div>
     </dl>
+    ${closingLine(r) ? `<div class="closing"><div class="hk">At the end</div><p>${esc(closingLine(r))}</p></div>` : ""}
     ${record(r)}
     ${honesty(r)}
   </header>`;
@@ -224,18 +259,19 @@ function honesty(r) {
   for (const [k, v0] of Object.entries(prov || {})) {
     if (v0 === null || v0 === undefined) continue;
     const v = typeof v0 === "string" ? { status: v0 } : v0;
-    let st = String(v.status || v.mode || "").toLowerCase();
+    let st = String(v.status || v.mode || v.word || "").toLowerCase();
     if (v.sample || st === "sample") st = "sample";
-    else if (v.simulated === true && !["real", "fixture"].includes(st)) st = "simulated";
+    else if (k === "agent" || k === "llm") st = "agent";
+    else if (v.simulated === true && !["real", "fixture", "live"].includes(st)) st = "simulated";
     else if (st === "live" || v.real_sponsor_data === true) st = "real";
-    else if (k === "agent" || k === "llm" || ["replay", "fallback", "reflex-fallback", "anthropic", "claude-cli"].includes(st)) st = "agent";
+    else if (["replay", "recorded", "fallback", "reflex-fallback", "anthropic", "claude-cli"].includes(st)) st = "agent";
     const name = PROV_NAMES[k] || words(k);
     let text = v.text;
     if (!text && (k === "agent" || k === "llm")) text = BACKEND[v.backend || st]?.[1] || (v.backend ? `backend ${v.backend}` : null);
     if (!text && v.source) text = `source ${v.source}${v.connected === false ? ", Beacon server not connected" : ""}`;
-    // the text often starts with its own label ("Aerial: ..."); do not say it twice
-    const line = text ? (/^[^:]{2,32}:\s/.test(text) ? text : `${name}: ${text}`) : name;
-    (groups[st] || groups.other).push(/[.)]$/.test(line) ? line : line + ".");
+    // the text often starts with its own label ("Aerial: ...", "Crew positions from ..."); do not say it twice
+    const line = text ? (/^[^:]{2,32}:\s/.test(text) || String(text).toLowerCase().startsWith(name.toLowerCase()) ? text : `${name}: ${text}`) : name;
+    (groups[st] || groups.other).push(/[.!?]$/.test(line) ? line : line + ".");
   }
   const L = { real: "Real", fixture: "Fixture", simulated: "Simulated", sample: "Sample", agent: "Agent", other: "Other" };
   const rows = Object.entries(groups).filter(([, v]) => v.length).map(([k, v]) => `<li><b>${L[k]}.</b>${v.map(esc).join(" ")}</li>`).join("");
@@ -289,8 +325,9 @@ function foundBy(p) {
 function geomWords(p) {
   const g = personGeom(p);
   const s = (v) => (num(v) !== null ? `±${(+v).toFixed(1)} m` : "");
+  const ruled = arr(g.pruned).filter((q) => q && q.reason).map((q) => ruledWords(q.reason));
   switch (g.kind) {
-    case "fix": return [`Fix ${s(g.sigma_m)}`, "one point"];
+    case "fix": return [`Fix ${s(g.sigma_m)}`, p.how_found || ["one point", ...ruled].join("; ")];
     case "candidates": { const c = arr(g.candidates); return [`${c.length} candidates`, c.map((q) => `${q.room_label || "?"} ${num(q.weight) !== null ? Math.round(q.weight * 100) + " %" : ""}`).join(" or ")]; }
     case "ring": return [`Ring ${num(g.r_m) !== null ? (+g.r_m).toFixed(1) + " m" : ""} ${s(g.sigma_m)}`.trim(), `range from puck ${g.puck || "?"}${g.ring_kind === "ble" ? ", Bluetooth (wide)" : ""}; not a position`];
     case "zone": return ["Zone", `${g.room_label || "room"}${num(g.prob) !== null ? `, ${Math.round(g.prob * 100)} %` : ""}; room level only`];
@@ -300,6 +337,11 @@ function geomWords(p) {
   }
 }
 const STATE = { out: ["Out", "out"], "safe-outside": ["Safe outside", "safe-outside"], reached: ["Reached", "open"], assigned: ["Crew assigned", "open"], located: ["No crew yet", "open"], reported: ["Reported only", "open"] };
+// once the incident has ended, a person who did not come out is said as such (never "no crew yet" next to an ended incident)
+const STATE_ENDED = { reached: ["Reached, not out", "open"], assigned: ["Not reached", "open"], located: ["Not reached", "open"], reported: ["Not reached", "open"] };
+const stateOf = (p, r) => (ENDED.has(String(r?.incident?.phase || "")) && STATE_ENDED[norm(p).prog]) || STATE[norm(p).prog] || [words(norm(p).prog) || "Not recorded", "open"];
+const ruledWords = (t) => (/^ruled out/i.test(String(t)) ? String(t) : `ruled out: ${t}`);
+const nPeople = (n) => `${n} ${n === 1 ? "person" : "people"}`;
 function people(r) {
   return safe(() => {
     const ps = arr(r.people);
@@ -307,7 +349,7 @@ function people(r) {
     const rows = ps.map((p) => {
       const rep = reportOf(p), g = geomWords(p), w = p.where || {};
       const where = typeof w === "string" ? w : w.text || [w.room_label, w.suite ? `suite ${w.suite}` : null].filter(Boolean).join(", ");
-      const st = STATE[norm(p).prog] || [words(norm(p).prog) || "Not recorded", "open"];
+      const st = stateOf(p, r);
       const people_ = num(rep.people) !== null ? `${rep.people} ${rep.people === 1 ? "person" : "people"}` : "number unknown";
       const move = rep.can_move === true ? "can move" : rep.can_move === false ? "cannot move" : "mobility unknown";
       return `<tr>
@@ -328,14 +370,19 @@ function people(r) {
 }
 
 // ------------------------------------------------------------------ 3 accountability
-const ACC_STATE = { "people-reported": "people reported", "devices-heard": "devices heard only", silent: "silent (not proof of empty)", "vacant-on-record": "vacant on record", unscanned: "not searched" };
+const ACC_STATE = { "people-reported": "people reported", "devices-heard": "devices heard only", silent: "silent (not proof of empty)", "vacant-on-record": "vacant on record", unscanned: "not searched",
+  "against-record": "against the record", "not-covered": "no puck here: nobody accounted for" };
+const REC_STATUS = { tenant: "tenant", available: "available space", vacant: "vacant", unnamed: "no tenant named" };
 function accountability(r) {
   return safe(() => {
     const acc = r.accountability;
-    const note = `<p class="range-note">Unaccounted is a range, not a count: the building record's expected occupancy (an estimate from floor area) minus the people reported inside or safe outside. Devices are not people: watches and laptops advertise too, and some phones do not.</p>`;
-    if (!acc) return blk(3, "Accountability", "", `<div class="acc-off"><b>Beacon module not connected.</b> There is no accountability against the building record in this report: no phones were heard, so nobody can say how many people may still be inside. Use the radio roll call and the crews' searches.</div>`);
-    const rows = arr(acc.rows || acc.suites);
-    if (!rows.length) return blk(3, "Accountability", "", NONE("None recorded: the accountability table has no suites.") + note);
+    const note = `<p class="range-note">Unaccounted is a range, not a count: the building record's expected occupancy (an estimate${acc?.storey ? "" : " from floor area"}) minus the people reported inside or safe outside. Devices are not people: watches and laptops advertise too, and some phones do not.</p>`;
+    if (!acc) return blk(4, "Accountability", "", `<div class="acc-off"><b>Beacon module not connected.</b> There is no accountability against the building record in this report: no phones were heard, so nobody can say how many people may still be inside. Use the radio roll call and the crews' searches.</div>`);
+    const all = arr(acc.rows || acc.suites);
+    const headline = acc.headline ? `<p class="acc-headline">${esc(acc.headline)}</p>` : "";
+    if (!all.length) return blk(4, "Accountability", "", headline + NONE("None recorded: the accountability table has no suites.") + note);
+    // live record: the storey's other tenancies (scope "storey") are one group, not one row each
+    const rows = all.filter((x) => x.scope !== "storey"), storeyRows = all.filter((x) => x.scope === "storey");
     const maxHi = Math.max(1, ...rows.map((x) => rangeOf(x.expected)?.high || 0), ...rows.map((x) => rangeOf(x.unaccounted)?.high || 0));
     const bar = (u) => {
       if (!u) return `<span class="dim">–</span>`;
@@ -350,103 +397,195 @@ function accountability(r) {
       const e = rangeOf(x.expected), u = rangeOf(x.unaccounted), basis = x.expected?.basis;
       const crews = arr(x.crews).length ? arr(x.crews).join(", ") : x.assigned || "";
       const outcome = x.outcome || [x.reached ? "reached" : null, x.out ? "out" : null].filter(Boolean).join(", ") || x.why || (x.state === "unscanned" ? "not searched" : "");
-      const unsc = x.state === "unscanned";
-      const phones = unsc && !x.phones_opt_in && !x.cold_devices ? `<span class="dim">no puck in range</span>` : [num(x.phones_opt_in) !== null ? `${x.phones_opt_in} with the app` : null, num(x.cold_devices) !== null ? `${x.cold_devices}${x.cold_range ? ` (${x.cold_range[0]}–${x.cold_range[1]})` : ""} devices` : null].filter(Boolean).join("<br>");
-      const exp = e ? (num(x.expected?.people) !== null && e.low !== e.high ? `${x.expected.people} <span class="dim">(${e.low}–${e.high})</span>` : e.low === e.high ? `${e.low}` : `${e.low}–${e.high}`) : "–";
+      const unsc = x.state === "unscanned" || x.state === "not-covered";
+      const phoneBits = [num(x.phones_opt_in) !== null ? `${x.phones_opt_in} with the app` : null, num(x.cold_devices) !== null ? `${x.cold_devices}${arr(x.cold_range).length === 2 && x.cold_devices ? ` (${x.cold_range[0]}–${x.cold_range[1]})` : ""} devices` : null].filter(Boolean);
+      let phones = unsc && !x.phones_opt_in && !x.cold_devices ? `<span class="dim">no puck in range</span>` : phoneBits.join("<br>");
+      // live record: what the record says about the suite next to what the phones say
+      if (x.record && typeof x.record === "object") {
+        const ph = x.covered === false && !x.phones_opt_in && !x.cold_devices ? "no puck here, nothing heard"
+          : x.phones_opt_in ? `${x.phones_opt_in} ${x.phones_opt_in === 1 ? "phone" : "phones"} with the app${num(x.people_reported) !== null ? `, ${nPeople(x.people_reported)} reported` : ""}${x.cold_devices ? `; ${x.cold_devices} devices` : ""}`
+          : x.cold_devices ? `${x.cold_devices} devices heard (devices, not people)` : "a puck here, nothing heard";
+        phones = `<span class="rp"><b>Record:</b> ${x.record.status ? `<span class="rs ${esc(x.record.status)}">${esc(REC_STATUS[x.record.status] || x.record.status)}</span> ` : ""}${esc(x.record.text || "")}</span><span class="rp"><b>Phones:</b> ${esc(ph)}</span>`;
+      }
+      const exp = e ? (num(x.expected?.people) !== null && e.low !== e.high ? `${x.expected.people} <span class="dim">(${e.low}–${e.high})</span>` : e.low === e.high ? `${e.low}` : `${e.low}–${e.high}`) : `<span class="dim">not in the record</span>`;
       return `<tr class="${esc(x.state || "")}">
         <td><span class="suite">${esc(x.suite || x.room_label || "?")}</span></td>
         <td><span class="ten">${esc(x.tenant || (x.state === "vacant-on-record" ? "vacant on record" : "no tenant on record"))}</span>${x.life_hazard ? `<span class="lh">${esc(x.life_hazard)}</span>` : ""}</td>
         <td class="nw">${exp}${fn(basis)}</td>
-        <td>${phones || `<span class="dim">none heard</span>`}</td>
+        <td class="phones">${phones || `<span class="dim">none heard</span>`}</td>
         <td class="num">${num(x.people_reported) ?? "–"}</td>
         <td class="num">${num(x.located) ?? "–"}</td>
         <td>${bar(u)}<span class="basis">${esc(ACC_STATE[x.state] || words(x.state))}</span></td>
-        <td class="num">${num(x.priority) !== null ? `<span class="pri p${x.priority}">${x.priority}</span>` : `<span class="dim">–</span>`}</td>
+        <td class="num">${num(x.priority) !== null ? `<span class="pri p${x.priority}">#${x.priority}</span>` : `<span class="dim">–</span>`}</td>
         <td>${crews ? `<span class="cs">${esc(crews)}</span>` : `<span class="dim">none</span>`}</td>
-        <td>${esc(outcome)}</td></tr>`;
+        <td>${esc(outcome)}${x.state === "against-record" && x.why ? `<span class="basis">${esc(x.why)}</span>` : ""}</td></tr>`;
     }).join("");
+    // the storey's tenancies with no puck: one group with the storey summary, the suites listed under it
+    let storey = "";
+    if (storeyRows.length) {
+      const sm = acc.storey || {};
+      const n = num(sm.not_covered) ?? storeyRows.length;
+      const lo = num(sm.expected_low) ?? storeyRows.reduce((s, x) => s + (rangeOf(x.expected)?.low || 0), 0);
+      const hi = num(sm.expected_high) ?? storeyRows.reduce((s, x) => s + (rangeOf(x.expected)?.high || 0), 0);
+      const list = storeyRows.map((x) => { const e = rangeOf(x.expected); return `<li><b>${esc(x.suite || x.room_label || "?")}</b> ${esc(x.tenant || x.record?.text || "")}${e && e.high !== null ? ` <span class="dim">(${e.low}–${e.high})</span>` : ` <span class="dim">(head count not in the record)</span>`}</li>`; }).join("");
+      storey = `<tbody class="storey"><tr class="not-covered"><td colspan="10"><div class="storey-h">Same storey, no pucks there: ${n} ${n === 1 ? "tenancy" : "tenancies"}, ${hi ? `about ${lo} to ${hi} people on record` : "head counts not in the record"}</div><ul class="storey-list">${list}</ul></td></tr></tbody>`;
+    }
     const t = acc.totals || {};
     const tu = rangeOf(t.unaccounted ?? (t.unaccounted_low !== undefined ? { low: t.unaccounted_low, high: t.unaccounted_high } : null)) || sumRows(acc);
     const te = rangeOf(t.expected ?? (t.expected_low !== undefined ? { low: t.expected_low, high: t.expected_high } : t.expected_people));
-    const foot = `<tfoot><tr><td>Floor</td><td>${rows.length} suites</td><td>${fmtR(te)}</td><td>${num(t.phones_opt_in) ?? "–"} with the app${num(t.cold_devices) !== null ? `<br>${t.cold_devices} devices` : ""}</td><td class="num">${num(t.people_reported) ?? "–"}</td><td class="num">${num(t.located) ?? "–"}</td><td>${fmtR(tu)}</td><td></td><td></td><td>${num(t.safe_outside) ? `${t.safe_outside} safe outside (self-reported)` : ""}${num(t.found_by_crews) ? `${num(t.safe_outside) ? "; " : ""}${t.found_by_crews} found by crews outside any suite` : ""}</td></tr></tfoot>`;
-    const head = `<tr><th>Suite</th><th>Tenant on record, life hazard</th><th>Expected</th><th>Phones heard</th><th class="num">People reported</th><th class="num">Located</th><th>Unaccounted</th><th class="num">Priority</th><th>Crew</th><th>Outcome</th></tr>`;
+    const suitesWord = `${rows.length} ${rows.length === 1 ? "suite" : "suites"}${storeyRows.length ? ` + ${storeyRows.length} on the storey` : ""}`;
+    const foot = `<tfoot><tr><td>${storeyRows.length ? "Storey" : "Floor"}</td><td>${suitesWord}</td><td>${fmtR(te)}</td><td>${num(t.phones_opt_in) ?? "–"} with the app${num(t.cold_devices) !== null ? `<br>${t.cold_devices} devices` : ""}</td><td class="num">${num(t.people_reported) ?? "–"}</td><td class="num">${num(t.located) ?? "–"}</td><td>${fmtR(tu)}</td><td></td><td></td><td>${num(t.safe_outside) ? `${t.safe_outside} safe outside (self-reported)` : ""}${num(t.found_by_crews) ? `${num(t.safe_outside) ? "; " : ""}${t.found_by_crews} found by crews outside any suite` : ""}</td></tr></tfoot>`;
+    const head = `<tr><th>Suite</th><th>Tenant on record, life hazard</th><th>Expected</th><th>${rows.some((x) => x.record) ? "Record and phones" : "Phones heard"}</th><th class="num">People reported</th><th class="num">Located</th><th>Unaccounted</th><th class="num">Priority</th><th>Crew</th><th>Outcome</th></tr>`;
     const src = acc.source?.text ? esc(acc.source.text) : "";
     const notes = bases.length ? `<ol class="bases">${bases.map((b, i) => `<li><sup class="fn">${String.fromCharCode(97 + i)}</sup>${esc(b)}</li>`).join("")}</ol>` : "";
-    return blk(3, "Accountability", `Floor ${esc(acc.floor_label || floorLabelOf(acc.floor) || "?")}, suite by suite. ${src}`,
-      `<div class="tbl-scroll"><table class="tbl acc-tbl"><thead>${head}</thead><tbody>${body}</tbody>${foot}</table></div>${note}${notes}`);
+    return blk(4, "Accountability", `Floor ${esc(acc.floor_label || floorLabelOf(acc.floor) || acc.storey?.label || "?")}, suite by suite. ${src}`,
+      `${headline}<div class="tbl-scroll"><table class="tbl acc-tbl"><thead>${head}</thead><tbody>${body}</tbody>${storey}${foot}</table></div>${note}${notes}`);
   });
 }
 const fmtR = (u) => (!u ? "–" : u.low === u.high ? `${u.low}` : `${u.low}–${u.high}`);
 const floorLabelOf = (id) => (bundle?.twin?.floors || []).find((f) => f.id === id)?.label;
 
-// ------------------------------------------------------------------ 4 plan
+// ------------------------------------------------------------------ 3 plan
+// Two drawings: a close-up of the room with the pucks, where the measurement tells its own story (each person's last place,
+// the ruled-out mirror place crossed out with the report's reason, the pucks and the line through them), and the whole floor
+// for context (crews, paths walked, suites not searched, hazards, sides). Everything is drawn where the report puts it.
 function plan(r) {
   return safe(() => {
     const tw = bundle?.twin;
-    if (!tw) return blk(4, "Plan of the floor", "", NONE("Plan unavailable: the floor geometry comes from /api/bundle, which did not answer."), "plan-blk");
+    if (!tw) return blk(3, "Plan of the floor", "", NONE("Plan unavailable: the floor geometry comes from /api/bundle, which did not answer."), "plan-blk");
     const fid = r.incident?.floor || r.accountability?.floor || tw.exercise_floor;
     const floor = tw.floors.find((f) => f.id === fid) || tw.floors.find((f) => f.id === tw.exercise_floor);
-    const { svg, drawn, notDrawn } = planSVG(r, tw, floor);
-    const sw = (inner) => `<svg viewBox="-1.5 -1 3 2">${inner}</svg>`;
+    const M = planModel(r, tw, floor);
+    const close = M.focus ? closeSVG(r, M) : "";
+    const whole = floorSVG(r, M);
+    const K = M.present;
+    const sw = (inner) => `<svg viewBox="-1.5 -1 3 2" aria-hidden="true">${inner}</svg>`;
+    const X = (s) => `<path d="M${-s} ${-s} L${s} ${s} M${-s} ${s} L${s} ${-s}" class="pl-x" stroke-width=".14"/>`;
+    const pk = {};
+    for (const p of M.pucks) { const w = puckWords(p); (pk[w] = pk[w] || []).push(p.id); }
     const legend = [
-      [sw(`<circle cx="0" cy="0" r=".55" class="pl-pers-ring" stroke-width=".12" stroke-dasharray=".25 .15"/><circle cx="0" cy="0" r=".26" class="pl-pers"/>`), "<b>Fix</b>: one point, circle = 1σ uncertainty"],
-      [sw(`<circle cx="-.8" cy="0" r=".4" class="pl-cand"/><circle cx=".8" cy="0" r=".4" class="pl-cand"/><line x1="-.4" y1="0" x2=".4" y2="0" class="pl-cand-link"/>`), "<b>Candidates</b>: two possible places with their weights; the phone is at one, not between"],
-      [sw(`<path d="M-1.3 .7 A1.6 1.6 0 0 1 1.3 .7" class="pl-ring-band" stroke-width=".55"/><path d="M-1.3 .7 A1.6 1.6 0 0 1 1.3 .7" class="pl-ring-line"/>`), "<b>Ring</b>: a range from one puck; the person is somewhere on the band. Dashed: ruled out by the building"],
-      [sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-zone"/>`), "<b>Zone</b>: room level only"],
-      [sw(`<path d="M0 -.6 L.6 .5 L-.6 .5 Z" class="pl-pers"/>`), "<b>Crew find</b>: where the crew reported the person"],
-      [sw(`<path d="M-.4 -.4 L.4 .4 M-.4 .4 L.4 -.4" class="pl-ghost"/>`), "Position ruled out (pruned)"],
-      [sw(`<path d="M0 -.45 L.45 0 L0 .45 L-.45 0 Z" class="pl-puck"/>`), "Puck thrown into the room"],
-      [sw(`<circle cx="0" cy="0" r=".55" fill="var(--e1)" class="pl-crew"/>`), "Crew: last known position; dashed line = path walked"],
-      [sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-haz-room"/>`), "Hazard: fire or smoke reported"],
-      [sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-diff"/>`), "Differs from the twin or the record"],
-      [sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" fill="var(--p-suite)" stroke="var(--p-wall)" stroke-width=".06"/><rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-uns"/>`), "Suite not searched (no puck in range)"],
-      [sw(`<circle cx="0" cy="0" r=".6" fill="#ffdd00"/><text x="0" y=".05" font-size=".8" text-anchor="middle" dominant-baseline="central" font-weight="700" fill="#111">A</text>`), "Building side (A = address side, then clockwise)"],
-    ].map(([s, t]) => `<li>${s}<span>${t}</span></li>`).join("");
-    const drawnList = drawn.length ? `<ul>${drawn.map((d) => `<li><span class="cs" style="color:var(--person)">${esc(d.id)}</span><span>${esc(d.text)}</span></li>`).join("")}</ul>` : NONE("No person has a position to draw.");
-    const nd = notDrawn.length ? `<p class="notdrawn">Not drawn: ${notDrawn.map((d) => `${esc(d.id)} (${esc(d.why)})`).join("; ")}.</p>` : "";
+      [K.fix, sw(`<circle cx="0" cy="0" r=".55" class="pl-pers-ring" stroke-width=".12" stroke-dasharray=".25 .15"/><circle cx="0" cy="0" r=".26" class="pl-pers"/>`), "<b>Fix</b>: the person's last place; circle = 1σ uncertainty"],
+      [K.cand, sw(`<circle cx="-.8" cy="0" r=".4" class="pl-cand"/><circle cx=".8" cy="0" r=".4" class="pl-cand"/><line x1="-.4" y1="0" x2=".4" y2="0" class="pl-cand-link"/>`), "<b>Two places</b>: the phone is at one of them, not between; weights shown"],
+      [K.ruled, sw(`<circle cx="0" cy="0" r=".6" class="pl-ruled-ring" stroke-width=".09" stroke-dasharray=".22 .14"/>${X(.42)}`), "<b>Ruled out</b>: the other place, crossed out, with the reason the report gives"],
+      [K.link, sw(`<circle cx="-.9" cy="0" r=".22" class="pl-pers"/><line x1="-.9" y1="0" x2=".9" y2="0" class="pl-mirror" stroke-width=".09" stroke-dasharray=".1 .2"/>${`<g transform="translate(.9 0)">${X(.3)}</g>`}`), "Dotted: a place and its ruled-out mirror"],
+      [K.line, sw(`<line x1="-1.5" y1="0" x2="1.5" y2="0" class="pl-pline" stroke-width=".08" stroke-dasharray=".3 .15"/><line x1="-.7" y1="0" x2=".7" y2="0" class="pl-pline seg" stroke-width=".12"/><path d="M-.7 -.3 L-.4 0 L-.7 .3 L-1 0 Z" class="pl-puck"/><path d="M.7 -.3 L1 0 L.7 .3 L.4 0 Z" class="pl-puck"/>`), "<b>Line through the two pucks</b>: two ranges give two places, mirror images across this line"],
+      ...Object.entries(pk).map(([w, ids]) => [true, sw(`<path d="M0 -.45 L.45 0 L0 .45 L-.45 0 Z" class="pl-puck"/>`), `<b>Puck ${esc(ids.join(", "))}</b>: ${esc(w)}`]),
+      [K.ring, sw(`<path d="M-1.3 .7 A1.6 1.6 0 0 1 1.3 .7" class="pl-ring-band" stroke-width=".55"/><path d="M-1.3 .7 A1.6 1.6 0 0 1 1.3 .7" class="pl-ring-line"/>`), "<b>Ring</b>: a range from one puck; the person is somewhere on the band. Dashed: ruled out by the building"],
+      [K.zone, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-zone"/>`), "<b>Zone</b>: room level only"],
+      [K.point, sw(`<path d="M0 -.6 L.6 .5 L-.6 .5 Z" class="pl-pers"/>`), "<b>Crew find</b>: where the crew reported the person"],
+      [K.crew, sw(`<circle cx="0" cy="0" r=".55" fill="var(--e1)" class="pl-crew"/>`), `Crew: last known position${K.track ? "; dashed line = path walked" : ""}`],
+      [K.haz, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-haz-room"/>`), "Hazard: fire or smoke reported"],
+      [K.diff, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-diff"/>`), "Differs from the twin or the record"],
+      [K.uns, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" fill="var(--p-suite)" stroke="var(--p-wall)" stroke-width=".06"/><rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-uns"/>`), "Suite not searched (no puck in range)"],
+      [K.outside, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-outside" stroke="var(--p-wall)" stroke-width=".06"/>`), "Outside the building"],
+      [K.focus, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-focus"/>`), "Frame of the close-up"],
+      [K.side, sw(`<circle cx="0" cy="0" r=".6" fill="#ffdd00"/><text x="0" y=".05" font-size=".8" text-anchor="middle" dominant-baseline="central" font-weight="700" fill="#111">A</text>`), "Building side (A = address side, then clockwise)"],
+    ].filter((x) => x[0]).map(([, s, t]) => `<li>${s}<span>${t}</span></li>`).join("");
+    const drawnList = M.drawn.length ? `<ul class="who">${M.drawn.map((d) => `<li><span class="cs" style="color:var(--person)">${esc(d.id)}</span><span>${esc(d.text)}${d.sub ? `<small>${esc(d.sub)}</small>` : ""}</span></li>`).join("")}</ul>` : NONE("No person has a position to draw.");
+    const nd = M.notDrawn.length ? `<p class="notdrawn">Not drawn: ${M.notDrawn.map((d) => `${esc(d.id)} (${esc(d.why)})`).join("; ")}.</p>` : "";
     const twinNote = tw.source?.synthetic ? "Interior: synthetic twin fitted to the real footprint, not a survey of this floor." : "";
-    return blk(4, "Plan of the floor", `Floor ${esc(floor.label)}, everything at the position the report gives it. ${esc(twinNote)}`,
-      `<div class="plan-wrap"><figure class="plan-fig">${svg}<figcaption>North is up; scale bar 10 m. Positions in the building frame of the twin.</figcaption></figure>
-       <div><div class="key"><h3>People on this plan</h3>${drawnList}${nd}</div><div class="key"><h3>Key</h3><ul>${legend}</ul></div></div></div>`, "plan-blk");
+    const where = M.focus ? M.focus.rooms.map((q) => q.label).filter(Boolean).join(", ") : "";
+    const placedLine = Object.entries(pk).map(([w, ids]) => `${ids.length === 1 ? "Puck" : "Pucks"} ${ids.join(" and ")}: ${w}.`).join(" ");
+    const figClose = close ? `<figure class="plan-fig close"><div class="fig-h">Close-up${where ? `: ${esc(where)}` : ""}</div>${close}<figcaption>${esc(placedLine)}${M.present.line ? " Two ranges from two pucks give two places, mirror images across the line through the pucks; the building or a crew's search rules one out." : ""}</figcaption></figure>` : "";
+    const figWhole = `<figure class="plan-fig whole"><div class="fig-h">Floor ${esc(floor.label)}</div>${whole}<figcaption>North is up; scale bar 10 m. ${M.focus ? "The frame is the close-up. " : ""}Positions in the building frame of the twin.</figcaption></figure>`;
+    return blk(3, "Plan of the floor", `Floor ${esc(floor.label)}, everything at the position the report gives it. ${esc(twinNote)}`,
+      `${planDefs(M)}<div class="plan-grid${close ? " two" : ""}">${figClose}${figWhole}</div>
+       <div class="plan-keys"><div class="key"><h3>People on this plan</h3>${drawnList}${nd}</div><div class="key"><h3>Key</h3><ul class="legend">${legend}</ul></div></div>`, "plan-blk");
   });
 }
+// patterns and clips used by both drawings (one copy in the page)
+const planDefs = (M) => `<svg class="pl-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+  <clipPath id="pl-clip-floor"><polygon points="${M.pts(M.floor.outline)}"/></clipPath>
+  <pattern id="pl-hatch-uns" width="1" height="1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1" stroke="var(--p-unscanned)" stroke-width=".42"/></pattern>
+  <pattern id="pl-hatch-haz" width=".9" height=".9" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2=".9" stroke="var(--alarm)" stroke-opacity=".45" stroke-width=".22"/></pattern>
+  <pattern id="pl-hatch-person" width=".8" height=".8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2=".8" stroke="var(--person)" stroke-opacity=".5" stroke-width=".16"/></pattern>
+  <pattern id="pl-hatch-out" width=".7" height=".7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width=".7" height=".7" fill="var(--p-out-bg)"/><line x1="0" y1="0" x2="0" y2=".7" stroke="var(--p-out-line)" stroke-width=".09"/></pattern>
+</defs></svg>`;
+const PUCK_SRC = { beacon: "Beacon module", scout: "radar scan", hand: "Beacon module" };
+function puckWords(p) {
+  const pl = p.placed ? (/^by /.test(p.placed) ? `placed ${p.placed}` : String(p.placed)) : null;
+  const src = p.source ? PUCK_SRC[p.source] || layerWord(p.source, last) : null;
+  return [pl, src ? `position from the ${src}` : null].filter(Boolean).join(", ") || "position from the report";
+}
 
-function planSVG(r, tw, floor) {
+const insidePoly = (pt, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) c = !c; } return c; };
+const f2 = (v) => (+v).toFixed(2);
+
+// text widths in the page's own fonts (a canvas measure), so labels can be placed without overlapping
+const FAM = { cond: '"Barlow Condensed", "Arial Narrow", Arial, sans-serif', sans: 'Barlow, "Helvetica Neue", Arial, sans-serif', mono: '"JetBrains Mono", Menlo, Consolas, monospace' };
+let mctx = null;
+function textW(t, size, fam = "sans", weight = 500) {
+  try { mctx = mctx || document.createElement("canvas").getContext("2d"); mctx.font = `${weight} 100px ${FAM[fam]}`; return (mctx.measureText(String(t)).width / 100) * size; }
+  catch { return String(t).length * size * 0.52; }
+}
+// greedy label placement: try the spots around an anchor and keep the one that covers the least of what is already drawn
+function placer(bounds) {
+  const boxes = [];
+  const ov = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const cost = (a) => { let c = ((a[2] - a[0]) * (a[3] - a[1]) - ov(a, bounds)) * 6; for (const q of boxes) c += ov(a, q); return c; };
+  const add = (b) => boxes.push(b);
+  const addPt = (x, y, rr) => boxes.push([x - rr, y - rr, x + rr, y + rr]);
+  function measure(lines) { return [Math.max(...lines.map((l) => textW(l.t, l.size, l.fam, l.weight))), lines.reduce((s, l) => s + l.size * 1.12, 0)]; }
+  // rr: radius of the mark; returns {x, y0, anchor, box, c}
+  function place(ax, ay, rr, lines, gap, order = ["r", "l", "a", "b", "ar", "al", "br", "bl"], commit = true) {
+    const [w, h] = measure(lines), d = rr + gap, e = d * 0.72, pad = lines[0].size * 0.12;
+    const spots = { r: [ax + d, ay - h / 2, "start"], l: [ax - d, ay - h / 2, "end"], a: [ax, ay - d - h, "middle"], b: [ax, ay + d, "middle"],
+      ar: [ax + e, ay - e - h, "start"], al: [ax - e, ay - e - h, "end"], br: [ax + e, ay + e, "start"], bl: [ax - e, ay + e, "end"] };
+    let best = null;
+    order.forEach((k, i) => {
+      const [x, y0, anchor] = spots[k], x0 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      const box = [x0 - pad, y0, x0 + w + pad, y0 + h], c = cost(box) + i * 1e-4;
+      if (!best || c < best.c) best = { c, x, y0, anchor, box };
+    });
+    if (commit) boxes.push(best.box);
+    return best;
+  }
+  // a label at a fixed spot (anchor middle), only measured and registered
+  function at(x, y0, lines, anchor = "middle") {
+    const [w, h] = measure(lines), x0 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+    const box = [x0, y0, x0 + w, y0 + h]; return { x, y0, anchor, box, c: cost(box) };
+  }
+  return { add, addPt, place, at, boxes };
+}
+function labelSVG(pl, lines) {
+  let y = pl.y0;
+  return lines.map((l) => { y += l.size * 1.12; return `<text x="${f2(pl.x)}" y="${f2(y - l.size * 0.26)}" class="${l.cls}" style="text-anchor:${pl.anchor};font-size:${f2(l.size)}px;stroke-width:${f2(l.size * 0.26)}px">${esc(l.t)}</text>`; }).join("");
+}
+// wrap a reason into short lines (it must stay readable in the drawing)
+function wrapWords(t, n = 26) {
+  const out = []; let cur = "";
+  for (const w of String(t).split(/\s+/)) { if (cur && (cur + " " + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + " " + w : w; }
+  if (cur) out.push(cur);
+  return out;
+}
+
+// the drawing frame shared by both views: north up, the building frame rotated by the twin's bearing
+function planModel(r, tw, floor) {
   const fid = floor.id;
   const xs = floor.outline.map((p) => p[0]), ys = floor.outline.map((p) => p[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   const pad = 4.2;
-  // rotate the drawing so north is up: the twin's +x axis has compass bearing b
   const b = (tw.georef?.bearing_deg ?? 90) * Math.PI / 180;
-  const rot = Math.PI / 2 - b; // angle to rotate building frame so that north points to +y (up)
+  const rot = Math.PI / 2 - b;                       // rotate the building frame so that north points up
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   const R = ([x, y]) => { const dx = x - cx, dy = y - cy; return [cx + dx * Math.cos(rot) - dy * Math.sin(rot), cy + dx * Math.sin(rot) + dy * Math.cos(rot)]; };
-  // bounds after rotation
   const corners = floor.outline.map(R);
   const X0 = Math.min(...corners.map((p) => p[0])) - pad, X1 = Math.max(...corners.map((p) => p[0])) + pad;
   const Y0 = Math.min(...corners.map((p) => p[1])) - pad, Y1 = Math.max(...corners.map((p) => p[1])) + pad + 1.6;
   const P = (p) => { const q = R(p); return [+(q[0]).toFixed(3), +(Y1 + Y0 - q[1]).toFixed(3)]; }; // flip y for SVG
   const pts = (poly) => poly.map((q) => P(q).join(",")).join(" ");
-  const f = (v) => (+v).toFixed(2);
-  const o = [];
-  const site = bundle?.site || {};
-  const floorNo = Number(floor.label);
-  const tenants = arr(site.tenants).filter((t) => t.floor === floorNo);
-  const accRows = arr(r.accountability?.rows || r.accountability?.suites);
-  const unscanned = new Set(accRows.filter((x) => x.state === "unscanned").map((x) => x.room || tw.rooms.find((q) => q.suite === x.suite)?.id));
-  o.push(`<defs>
-    <pattern id="pl-hatch-uns" width="1" height="1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="1" stroke="var(--p-unscanned)" stroke-width=".42"/></pattern>
-    <pattern id="pl-hatch-haz" width=".9" height=".9" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2=".9" stroke="var(--alarm)" stroke-opacity=".45" stroke-width=".22"/></pattern>
-    <clipPath id="pl-clip-floor"><polygon points="${pts(floor.outline)}"/></clipPath>
-    <pattern id="pl-hatch-person" width=".8" height=".8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2=".8" stroke="var(--person)" stroke-opacity=".5" stroke-width=".16"/></pattern>
-  </defs>`);
   const rooms = tw.rooms.filter((q) => q.floor === fid);
+  const accRows = arr(r.accountability?.rows || r.accountability?.suites);
+  const unscanned = new Set(accRows.filter((x) => x.state === "unscanned" || (x.state === "not-covered" && x.scope !== "storey"))
+    .flatMap((x) => (arr(x.rooms).length ? x.rooms : [x.room || rooms.find((q) => q.suite === x.suite)?.id])));
+  const present = {};
+  // the plan itself: rooms, suites not searched, rooms on fire, walls, doors, the outline
+  const o = [];
   for (const rm of rooms) o.push(`<polygon points="${pts(rm.polygon)}" class="pl-r ${esc(rm.kind)}"/>`);
-  for (const rm of rooms) if (unscanned.has(rm.id)) o.push(`<polygon points="${pts(rm.polygon)}" class="pl-uns"/>`);
-  // hazards (under walls)
+  for (const rm of rooms) if (unscanned.has(rm.id)) { o.push(`<polygon points="${pts(rm.polygon)}" class="pl-uns"/>`); present.uns = true; }
   for (const h of arr(r.hazards)) {
     const g = h.geometry || {};
-    if (g.kind === "room" && g.polygon) o.push(`<polygon points="${pts(g.polygon)}" class="pl-haz-room"><title>${esc(h.label)}: ${esc(h.kind)}</title></polygon>`);
+    if (g.kind === "room" && g.polygon) { o.push(`<polygon points="${pts(g.polygon)}" class="pl-haz-room"><title>${esc(h.label)}: ${esc(h.kind)}</title></polygon>`); present.haz = true; }
   }
   for (const w of arr(tw.walls).filter((q) => q.floor === fid)) { const a = P(w.a), c = P(w.b); o.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-wall"/>`); }
   for (const d of arr(tw.doors).filter((q) => q.floor === fid)) {
@@ -454,151 +593,312 @@ function planSVG(r, tw, floor) {
     o.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-door" stroke="var(--p-${d.rooms?.some((id) => rooms.find((q) => q.id === id)?.kind === "corridor") ? "corr" : "suite"})"/>`);
   }
   o.push(`<polygon points="${pts(floor.outline)}" class="pl-out"/>`);
-  // labels; a suite with people, pucks or crews drawn in it keeps only its number, in the corner farthest from them
+  const ppl = arr(r.people).map((p) => ({ p, g: personGeom(p), rep: reportOf(p) }));
+  const pucks = pucksOf(r).filter((pk) => num(pk.x) !== null);
+  const ptsOf = (g) => {
+    const q = [];
+    if ((g.kind === "fix" || g.kind === "point") && num(g.x) !== null) q.push([g.x, g.y]);
+    for (const s of arr(g.pruned)) if (num(s?.x) !== null) q.push([s.x, s.y]);
+    if (g.kind === "candidates") for (const s of arr(g.candidates)) if (num(s?.x) !== null) q.push([s.x, s.y]);
+    if (g.kind === "ring" && num(g.cx ?? g.x) !== null) q.push([g.cx ?? g.x, g.cy ?? g.y]);
+    return q;
+  };
+  // the close-up: the room(s) the pucks stand in, and every place a person is drawn or ruled out near them
+  let focus = null;
+  const fp = pucks.map((pk) => [pk.x, pk.y]).concat(...ppl.map((e) => ptsOf(e.g)));
+  if (fp.length) {
+    let fr = rooms.filter((rm) => rm.kind !== "corridor" && pucks.some((pk) => insidePoly([pk.x, pk.y], rm.polygon)));
+    if (!fr.length) fr = rooms.filter((rm) => rm.kind !== "corridor" && fp.some((q) => insidePoly(q, rm.polygon)));
+    let bx = fp.map((q) => q[0]), by = fp.map((q) => q[1]);
+    for (const rm of fr) { bx = bx.concat(rm.polygon.map((q) => q[0])); by = by.concat(rm.polygon.map((q) => q[1])); }
+    let [a0, a1, b0, b1] = [Math.min(...bx) - 1.6, Math.max(...bx) + 1.6, Math.min(...by) - 1.6, Math.max(...by) + 1.6];
+    const grow = (lo, hi, min) => (hi - lo >= min ? [lo, hi] : [(lo + hi) / 2 - min / 2, (lo + hi) / 2 + min / 2]);
+    [a0, a1] = grow(a0, a1, 9); [b0, b1] = grow(b0, b1, 9);
+    if (!((a1 - a0) > 0.62 * (x1 - x0) && (b1 - b0) > 0.62 * (y1 - y0))) {
+      const cs = [[a0, b0], [a1, b0], [a1, b1], [a0, b1]].map(P);
+      focus = { box: [a0, b0, a1, b1], rooms: fr, svg: [Math.min(...cs.map((q) => q[0])), Math.min(...cs.map((q) => q[1])), Math.max(...cs.map((q) => q[0])), Math.max(...cs.map((q) => q[1]))] };
+    }
+  }
+  const inFocus = (g) => !!focus && ptsOf(g).length > 0 && ptsOf(g).every((q) => q[0] >= focus.box[0] && q[0] <= focus.box[2] && q[1] >= focus.box[1] && q[1] <= focus.box[3]);
+  // the people list beside the drawings
+  const drawn = [], notDrawn = [];
+  for (const { p, g, rep } of ppl) {
+    const n = num(rep.people), st = stateOf(p, r)[0].toLowerCase();
+    const who = [n !== null ? nPeople(n) : null, rep.status].filter(Boolean).join(", ");
+    const rl = p.room_label || (typeof p.where === "object" ? p.where?.room_label : null);
+    const sg = (v) => (num(v) !== null ? ` ±${(+v).toFixed(1)} m` : "");
+    const ruled = arr(g.pruned).filter((q) => q?.reason).map((q) => ruledWords(q.reason)).join("; ");
+    let text = null;
+    if (g.kind === "fix" && num(g.x) !== null) text = `fix${sg(g.sigma_m)}${rl ? ` in ${rl}` : ""}`;
+    else if (g.kind === "candidates" && arr(g.candidates).some((q) => num(q?.x) !== null)) text = `${arr(g.candidates).length} possible places (${arr(g.candidates).map((q) => `${q.room_label || "?"}${num(q.weight) !== null ? ` ${Math.round(q.weight * 100)} %` : ""}`).join(" or ")})`;
+    else if (g.kind === "ring" && num(g.r_m) !== null) text = `ring ${(+g.r_m).toFixed(1)} m${sg(g.sigma_m)} from ${g.puck || "a puck"}; not a position`;
+    else if (g.kind === "zone" && (g.polygon || rooms.find((q) => q.id === g.room))) text = `zone: ${g.room_label || rooms.find((q) => q.id === g.room)?.label || "room"}, room level only`;
+    else if (g.kind === "point" && num(g.x) !== null) text = `crew find, ${g.basis || "reported position"}`;
+    if (text) drawn.push({ id: p.id, text: `${who ? who + ": " : ""}${text}; ${st}`, sub: p.how_found || ruled || null });
+    else notDrawn.push({ id: p.id, why: norm(p).prog === "safe-outside" ? "safe outside, self-reported" : g.kind === "none" ? "no position in the report" : `geometry "${g.kind}" without coordinates` });
+  }
+  return { r, tw, floor, rooms, P, pts, R, b, cx, cy, x0, x1, y0, y1, X0, X1, Y0, Y1, base: o.join(""), ppl, pucks, focus, inFocus, present, drawn, notDrawn, unscanned };
+}
+
+// marks for one person (shared by both drawings); sizes in metres of the drawing; returns label requests
+function personMarks(M, e, o, pl, z, withLabels) {
+  const { P, pts } = M, { p, g, rep } = e, K = M.present, L = [];
+  const n = num(rep.people), st = stateOf(p, M.r)[0].toLowerCase();
+  const head = `${p.id}${n !== null ? ` · ${nPeople(n)}` : ""}`;
+  const X = (a, s) => `<path d="M${f2(a[0] - s)} ${f2(a[1] - s)} L${f2(a[0] + s)} ${f2(a[1] + s)} M${f2(a[0] - s)} ${f2(a[1] + s)} L${f2(a[0] + s)} ${f2(a[1] - s)}" class="pl-x" style="stroke-width:${f2(s * 0.34)}px"/>`;
+  const ruledOut = (from) => {
+    for (const q of arr(g.pruned)) {
+      if (num(q?.x) === null) continue;
+      const a = P([q.x, q.y]), s = z.x;
+      if (from) { o.push(`<line x1="${from[0]}" y1="${from[1]}" x2="${a[0]}" y2="${a[1]}" class="pl-mirror" style="stroke-width:${f2(z.lw)}px;stroke-dasharray:${f2(z.lw * 1.2)} ${f2(z.lw * 2.6)}"/>`); K.link = true; }
+      o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f2(s * 1.15)}" class="pl-ruled-ring" style="stroke-width:${f2(z.lw)}px;stroke-dasharray:${f2(z.lw * 2.5)} ${f2(z.lw * 1.6)}"/>${X(a, s)}`);
+      pl.addPt(a[0], a[1], s * 1.2); K.ruled = true;
+      if (withLabels) L.push({ at: a, rr: s * 1.2, order: ["r", "l", "b", "a", "br", "bl", "ar", "al"], lines: [{ t: `${p.id}: ruled out`, size: z.lab * 0.92, fam: "cond", weight: 700, cls: "pl-gt-h" }, ...wrapWords(q.reason || "no reason given", z.wrap).map((t) => ({ t, size: z.sub, fam: "sans", weight: 500, cls: "pl-gt" }))] });
+    }
+  };
+  if (g.kind === "fix" && num(g.x) !== null) {
+    const a = P([g.x, g.y]), s = Math.max(z.dot * 1.3, num(g.sigma_m) ?? 0.5);
+    ruledOut(a);
+    o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f2(s)}" class="pl-pers-ring" style="stroke-width:${f2(z.lw * 1.2)}px;stroke-dasharray:${f2(z.lw * 2.5)} ${f2(z.lw * 1.5)}"/><circle cx="${a[0]}" cy="${a[1]}" r="${f2(z.dot)}" class="pl-pers"/>`);
+    pl.addPt(a[0], a[1], s); K.fix = true;
+    if (withLabels) L.push({ at: a, rr: s, lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `fix${num(g.sigma_m) !== null ? ` ±${(+g.sigma_m).toFixed(1)} m` : ""} · ${st}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+  } else if (g.kind === "candidates" && arr(g.candidates).length) {
+    const cs = arr(g.candidates).filter((q) => num(q?.x) !== null);
+    ruledOut(null);
+    for (let i = 1; i < cs.length; i++) { const a = P([cs[0].x, cs[0].y]), c = P([cs[i].x, cs[i].y]); o.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-cand-link" style="stroke-width:${f2(z.lw)}px;stroke-dasharray:${f2(z.lw * 3)} ${f2(z.lw * 3)}"/>`); }
+    cs.forEach((q, i) => {
+      const a = P([q.x, q.y]), s = Math.max(z.dot * 1.4, num(q.sigma_m) ?? 0.4);
+      o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f2(s)}" class="pl-cand" style="stroke-width:${f2(z.lw * 1.4)}px"/><circle cx="${a[0]}" cy="${a[1]}" r="${f2(z.dot * 0.45)}" class="pl-pers"/>`);
+      pl.addPt(a[0], a[1], s);
+      if (withLabels) L.push({ at: a, rr: s, lines: [{ t: i === 0 ? head : p.id, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `${num(q.weight) !== null ? `${Math.round(q.weight * 100)} %` : "one of two"}${i === 0 ? ` · ${st}` : ""}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+    });
+    K.cand = true;
+  } else if (g.kind === "ring" && num(g.r_m) !== null) {
+    const cxr = g.cx ?? g.x, cyr = g.cy ?? g.y, rr = g.r_m, sg = num(g.sigma_m) ?? 0.1;
+    const arcs = arr(g.arcs).length ? g.arcs : [[0, 360]];
+    const arcPts = (a0, a1) => { const k = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 3)); const out = []; for (let i = 0; i <= k; i++) { const t = (a0 + (a1 - a0) * i / k) * Math.PI / 180; out.push(P([cxr + rr * Math.cos(t), cyr + rr * Math.sin(t)])); } return out.map((q) => q.join(",")).join(" "); };
+    const sorted = [...arcs].sort((u, v) => u[0] - v[0]); let prev = sorted[sorted.length - 1][1] - 360;
+    for (const [a0, a1] of sorted) { if (a0 - prev > 0.5) o.push(`<polyline points="${arcPts(prev, a0)}" class="pl-ring-off"/>`); prev = a1; }
+    // the band is clipped to the building: the twin says nobody is outside it
+    for (const [a0, a1] of arcs) o.push(`<g clip-path="url(#pl-clip-floor)"><polyline points="${arcPts(a0, a1)}" class="pl-ring-band" stroke-width="${f2(Math.max(0.25, 2 * sg))}"/></g><polyline points="${arcPts(a0, a1)}" class="pl-ring-line"/>`);
+    K.ring = true;
+    if (withLabels) { const a = P(ringLabelAt(g)); L.push({ at: a, rr: 0.3, lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: "somewhere on this ring", size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] }); }
+  } else if (g.kind === "zone") {
+    const rm = g.polygon ? null : M.rooms.find((q) => q.id === g.room);
+    const poly = g.polygon || rm?.polygon;
+    if (poly) {
+      o.push(`<polygon points="${pts(poly)}" class="pl-zone"/>`); K.zone = true;
+      const c = P([poly.reduce((s, q) => s + q[0], 0) / poly.length, poly.reduce((s, q) => s + q[1], 0) / poly.length]);
+      if (withLabels) L.push({ at: c, rr: 0, order: ["b", "a", "r", "l"], lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: "somewhere in this room", size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+    }
+  } else if (g.kind === "point" && num(g.x) !== null) {
+    const a = P([g.x, g.y]), s = z.dot * 1.8;
+    o.push(`<path d="M${f2(a[0])} ${f2(a[1] - s)} L${f2(a[0] + s * .9)} ${f2(a[1] + s * .7)} L${f2(a[0] - s * .9)} ${f2(a[1] + s * .7)} Z" class="pl-pers"/>`);
+    pl.addPt(a[0], a[1], s); K.point = true;
+    if (withLabels) L.push({ at: a, rr: s, lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: st, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+  }
+  return L;
+}
+function puckMarks(M, o, pl, z) {
+  const L = [];
+  for (const pk of M.pucks) {
+    const a = P2(M, pk), s = z.puck;
+    o.push(`<path d="M${f2(a[0])} ${f2(a[1] - s)} L${f2(a[0] + s)} ${f2(a[1])} L${f2(a[0])} ${f2(a[1] + s)} L${f2(a[0] - s)} ${f2(a[1])} Z" class="pl-puck" style="stroke-width:${f2(s * 0.2)}px"><title>${esc(pk.id)}: ${esc(puckWords(pk))}</title></path>`);
+    pl.addPt(a[0], a[1], s * 1.05);
+    L.push({ at: a, rr: s, order: ["br", "bl", "ar", "al", "r", "l", "b", "a"], lines: [{ t: pk.id, size: z.puckT, fam: "mono", weight: 400, cls: "pl-puck-t" }] });
+  }
+  return L;
+}
+const P2 = (M, pk) => M.P([pk.x, pk.y]);
+
+// the whole floor, for context
+function floorSVG(r, M) {
+  const { P, pts, rooms, floor, tw, X0, X1, Y0, Y1, focus } = M, K = M.present;
+  const o = [M.base], L = [];
+  const pl = placer([X0, Y0, X1, Y1]);
+  const site = bundle?.site || {};
+  const tenants = arr(site.tenants).filter((t) => t.floor === Number(floor.label));
   const centre = (poly) => [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
-  const inside = (pt, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  // where things are drawn: a suite with something in it keeps only its number, in the corner farthest from them
   const items = [];
-  for (const p of arr(r.people)) {
-    const g = personGeom(p);
+  for (const e of M.ppl) {
+    const g = e.g;
     if ((g.kind === "fix" || g.kind === "point") && num(g.x) !== null) items.push([g.x, g.y], [g.x, g.y + 1.0]);
-    if (g.kind === "candidates") for (const q of arr(g.candidates)) if (num(q.x) !== null) items.push([q.x, q.y], [q.x, q.y + 1.0], [q.x, q.y - 1.0]);
+    for (const q of arr(g.pruned)) if (num(q?.x) !== null) items.push([q.x, q.y]);
+    if (g.kind === "candidates") for (const q of arr(g.candidates)) if (num(q?.x) !== null) items.push([q.x, q.y], [q.x, q.y + 1.0], [q.x, q.y - 1.0]);
     if (g.kind === "zone") { const zr = rooms.find((q) => q.id === g.room); if (zr) items.push(centre(zr.polygon)); }
   }
   for (const d of arr(r.differences)) if (d.at) items.push(d.at); else if (d.room) { const dr = rooms.find((q) => q.id === d.room); if (dr) items.push(dLabelAt(dr)); }
-  // labels for rings and zones go where nothing else is drawn
-  const labelAt = {};
-  for (const p of arr(r.people)) {
-    const g = personGeom(p);
-    if (g.kind === "ring" && num(g.r_m) !== null) {
-      const cands = []; for (const [a0, a1] of (arr(g.arcs).length ? g.arcs : [[0, 360]])) for (let a = a0 + 8; a <= a1 - 8; a += 6) { const t = a * Math.PI / 180, q = [(g.cx ?? g.x) + g.r_m * Math.cos(t), (g.cy ?? g.y) + g.r_m * Math.sin(t)]; if (inside(q, floor.outline)) cands.push(q); }
-      labelAt[p.id] = freeSpot(cands.length ? cands : [ringLabelAt(g)], items); items.push(labelAt[p.id]);
-    } else if (g.kind === "zone") {
-      const zr = rooms.find((q) => q.id === g.room); const poly = g.polygon || zr?.polygon; if (!poly) continue;
-      const zx = poly.map((q) => q[0]), zy = poly.map((q) => q[1]), cands = [];
-      for (let x = Math.min(...zx) + 1.6; x <= Math.max(...zx) - 1.6; x += 0.5) for (let y = Math.min(...zy) + 1; y <= Math.max(...zy) - 1; y += 0.5) cands.push([x, y]);
-      labelAt[p.id] = freeSpot(cands.length ? cands : [centre(poly)], items); items.push(labelAt[p.id]);
-    }
-  }
-  for (const pk of pucksOf(r)) if (num(pk.x) !== null) items.push([pk.x, pk.y]);
+  for (const pk of M.pucks) items.push([pk.x, pk.y]);
   for (const c of arr(r.crews)) { const l = crewPos(c); if (l) items.push(l); }
+  const txt = (x, y, s, cls, size, fam, weight) => { o.push(`<text x="${f2(x)}" y="${f2(y)}" class="${cls}" style="font-size:${f2(size)}px">${esc(s)}</text>`); const w = textW(s, size, fam, weight); pl.add([x - w / 2, y - size * 0.8, x + w / 2, y + size * 0.2]); };
   for (const rm of rooms) {
     const c = P(centre(rm.polygon));
     if (rm.kind === "suite") {
       const ten = tenants.filter((t) => t.suite === rm.suite);
       const cat = ten.length ? shortCat(ten[0].industry) : (rm.registered === false ? "no registration" : "");
       const lh = ten.some((t) => t.life_hazard && !/staff only/.test(t.life_hazard));
-      const here = items.filter((q) => inside(q, rm.polygon));
-      if (here.length) {
+      if (items.some((q) => insidePoly(q, rm.polygon))) {
         const rx = rm.polygon.map((q) => q[0]), ry = rm.polygon.map((q) => q[1]), ins = 1.5;
         const [ax, bx, ay, by] = [Math.min(...rx) + ins, Math.max(...rx) - ins, Math.min(...ry) + ins, Math.max(...ry) - ins];
-        const best = freeSpot([[ax, by], [bx, by], [ax, ay], [bx, ay], [(ax + bx) / 2, by], [(ax + bx) / 2, ay], [ax, (ay + by) / 2], [bx, (ay + by) / 2]], items);
-        const a = P(best);
-        o.push(`<text x="${f(a[0])}" y="${f(a[1] + 0.5)}" class="pl-sn" style="font-size:1.3px">${esc(rm.suite)}</text>`);
+        const a = P(freeSpot([[ax, by], [bx, by], [ax, ay], [bx, ay], [(ax + bx) / 2, by], [(ax + bx) / 2, ay], [ax, (ay + by) / 2], [bx, (ay + by) / 2]], items));
+        txt(a[0], a[1] + 0.5, rm.suite, "pl-sn", 1.3, "cond", 700);
         continue;
       }
-      o.push(`<text x="${f(c[0])}" y="${f(c[1] - 0.6)}" class="pl-sn">${esc(rm.suite)}</text>`);
-      if (cat) o.push(`<text x="${f(c[0])}" y="${f(c[1] + 0.55)}" class="pl-ten">${esc(cat)}</text>`);
-      if (lh) o.push(`<text x="${f(c[0])}" y="${f(c[1] + 1.5)}" class="pl-lh">life hazard</text>`);
+      txt(c[0], c[1] - 0.6, rm.suite, "pl-sn", 1.55, "cond", 700);
+      if (cat) txt(c[0], c[1] + 0.55, cat, "pl-ten", 0.78, "sans", 500);
+      if (lh) txt(c[0], c[1] + 1.5, "life hazard", "pl-lh", 0.74, "sans", 600);
     } else if (rm.kind === "stair") {
       const st = arr(tw.stairs).find((s) => s.room === rm.id);
-      o.push(`<text x="${f(c[0])}" y="${f(c[1] - 0.1)}" class="pl-core" style="font-weight:700">${esc(rm.label)}</text>`);
-      if (st) o.push(`<text x="${f(c[0])}" y="${f(c[1] + 0.9)}" class="pl-core" style="font-weight:500">${esc([st.standpipe ? "standpipe" : null, st.discharge ? `to ${st.discharge.replace(/\s*\(.*\)/, "")}` : null].filter(Boolean).join(", "))}</text>`);
-    } else if (rm.kind !== "corridor") o.push(`<text x="${f(c[0])}" y="${f(c[1] + 0.3)}" class="pl-core">${esc(rm.label)}</text>`);
+      txt(c[0], c[1] - 0.1, rm.label, "pl-core b", 0.82, "sans", 700);
+      if (st) txt(c[0], c[1] + 0.9, [st.standpipe ? "standpipe" : null, st.discharge ? `to ${st.discharge.replace(/\s*\(.*\)/, "")}` : null].filter(Boolean).join(", "), "pl-core", 0.82, "sans", 600);
+    } else if (rm.kind !== "corridor") txt(c[0], c[1] + 0.3, rm.label, "pl-core", 0.82, "sans", 600);
   }
   // hazards on edges and points
   for (const h of arr(r.hazards)) {
     const g = h.geometry || {};
     if (g.kind === "edge" && g.polyline?.length >= 2) {
       const a = P(g.polyline[0]), c = P(g.polyline[g.polyline.length - 1]), m = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
-      o.push(`<g><line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-haz-edge"/><path d="M${f(m[0] - .55)} ${f(m[1] - .55)} L${f(m[0] + .55)} ${f(m[1] + .55)} M${f(m[0] - .55)} ${f(m[1] + .55)} L${f(m[0] + .55)} ${f(m[1] - .55)}" class="pl-haz-x" stroke="var(--p-halo)" stroke-width=".55"/><path d="M${f(m[0] - .55)} ${f(m[1] - .55)} L${f(m[0] + .55)} ${f(m[1] + .55)} M${f(m[0] - .55)} ${f(m[1] + .55)} L${f(m[0] + .55)} ${f(m[1] - .55)}" class="pl-haz-x"/><title>${esc(h.label)}: ${esc(h.kind)}</title></g>`);
-    } else if (g.at || g.kind === "point") { const p = P(g.at || [g.x, g.y]); o.push(`<circle cx="${p[0]}" cy="${p[1]}" r="1" class="pl-haz-room"/>`); }
+      const xp = `M${f2(m[0] - .55)} ${f2(m[1] - .55)} L${f2(m[0] + .55)} ${f2(m[1] + .55)} M${f2(m[0] - .55)} ${f2(m[1] + .55)} L${f2(m[0] + .55)} ${f2(m[1] - .55)}`;
+      o.push(`<g><line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-haz-edge"/><path d="${xp}" class="pl-haz-x" stroke="var(--p-halo)" stroke-width=".55"/><path d="${xp}" class="pl-haz-x"/><title>${esc(h.label)}: ${esc(h.kind)}</title></g>`);
+      K.haz = true;
+    } else if (g.at || g.kind === "point") { const p = P(g.at || [g.x, g.y]); o.push(`<circle cx="${p[0]}" cy="${p[1]}" r="1" class="pl-haz-room"/>`); K.haz = true; }
   }
   // differences from the twin or record
   for (const d of arr(r.differences)) {
-    if (d.room) { const rm = rooms.find((q) => q.id === d.room); if (rm) { const c = P(dLabelAt(rm)); o.push(`<polygon points="${pts(rm.polygon)}" class="pl-diff"/><text x="${f(c[0])}" y="${f(c[1] + .3)}" class="pl-diff-t" text-anchor="middle">${esc(d.id)}</text>`); } }
-    else if (d.at) { const p = P(d.at); o.push(`<path d="M${f(p[0])} ${f(p[1] - .55)} L${f(p[0] + .55)} ${f(p[1])} L${f(p[0])} ${f(p[1] + .55)} L${f(p[0] - .55)} ${f(p[1])} Z" class="pl-diff-m"/><text x="${f(p[0] + .8)}" y="${f(p[1] + .3)}" class="pl-diff-t">${esc(d.id)}</text>`); }
+    if (d.room) { const rm = rooms.find((q) => q.id === d.room); if (rm) { const c = P(dLabelAt(rm)); o.push(`<polygon points="${pts(rm.polygon)}" class="pl-diff"/><text x="${f2(c[0])}" y="${f2(c[1] + .3)}" class="pl-diff-t" text-anchor="middle">${esc(d.id)}</text>`); pl.add([c[0] - 2, c[1] - .6, c[0] + 2, c[1] + .5]); K.diff = true; } }
+    else if (d.at) { const p = P(d.at); o.push(`<path d="M${f2(p[0])} ${f2(p[1] - .55)} L${f2(p[0] + .55)} ${f2(p[1])} L${f2(p[0])} ${f2(p[1] + .55)} L${f2(p[0] - .55)} ${f2(p[1])} Z" class="pl-diff-m"/><text x="${f2(p[0] + .8)}" y="${f2(p[1] + .3)}" class="pl-diff-t">${esc(d.id)}</text>`); K.diff = true; }
   }
-  // crews: track then last position
+  // the close-up's frame
+  if (focus) {
+    const [a, b0, c, d] = focus.svg;
+    o.push(`<rect x="${f2(a)}" y="${f2(b0)}" width="${f2(c - a)}" height="${f2(d - b0)}" class="pl-focus"/>`); K.focus = true;
+  }
+  // crews: the path walked (the report's path is [t, x, y]), then the last position
   const crewColor = (c) => (c.id === "E1" || c.kind === "engine" ? "var(--e1)" : c.id === "RIT" || c.kind === "rit" ? "var(--rit)" : "var(--p-ink)");
-  for (const c of arr(r.crews)) if (arr(c.track).length > 1) o.push(`<polyline points="${pts(c.track)}" class="pl-track" stroke="${crewColor(c)}"/>`);
-  // pucks
-  for (const pk of pucksOf(r)) {
-    if (num(pk.x) === null) continue; const p = P([pk.x, pk.y]);
-    o.push(`<path d="M${f(p[0])} ${f(p[1] - .42)} L${f(p[0] + .42)} ${f(p[1])} L${f(p[0])} ${f(p[1] + .42)} L${f(p[0] - .42)} ${f(p[1])} Z" class="pl-puck"/><text x="${f(p[0] + .55)}" y="${f(p[1] + .75)}" class="pl-puck-t">${esc(pk.id)}</text>`);
+  for (const c of arr(r.crews)) {
+    const tr = arr(c.track).length > 1 ? c.track : arr(c.path).filter((q) => Array.isArray(q) && q.length >= 3).map((q) => [q[1], q[2]]);
+    if (tr.length > 1) { o.push(`<polyline points="${pts(tr)}" class="pl-track" stroke="${crewColor(c)}"/>`); K.track = true; }
   }
-  // people
-  const drawn = [], notDrawn = [];
-  const label = (p, at, dy = -1.0) => {
-    const rep = reportOf(p), n = num(rep.people);
-    o.push(`<text x="${f(at[0])}" y="${f(at[1] + dy)}" class="pl-pt" text-anchor="middle">${esc(p.id)}${n !== null ? ` · ${n}` : ""}</text>`);
-  };
-  for (const p of arr(r.people)) {
-    const g = personGeom(p);
-    const ghost = (list) => { for (const q of arr(list)) { if (num(q.x) === null) continue; const a = P([q.x, q.y]); o.push(`<path d="M${f(a[0] - .4)} ${f(a[1] - .4)} L${f(a[0] + .4)} ${f(a[1] + .4)} M${f(a[0] - .4)} ${f(a[1] + .4)} L${f(a[0] + .4)} ${f(a[1] - .4)}" class="pl-ghost"/><text x="${f(a[0])}" y="${f(a[1] + 1.05)}" class="pl-gt" text-anchor="middle">${esc(p.id)} ruled out</text>`); } };
-    if (g.kind === "fix" && num(g.x) !== null) {
-      const a = P([g.x, g.y]), s = Math.max(0.35, num(g.sigma_m) ?? 0.5);
-      ghost(g.pruned);
-      o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f(s)}" class="pl-pers-ring" stroke-width=".1" stroke-dasharray=".25 .15"/><circle cx="${a[0]}" cy="${a[1]}" r=".28" class="pl-pers"/>`);
-      label(p, a, -s - 0.35);
-      drawn.push({ id: p.id, text: `fix, ±${(num(g.sigma_m) ?? 0).toFixed(1)} m${g.from ? `; position from ${g.from}` : ""}` });
-    } else if (g.kind === "candidates" && arr(g.candidates).length) {
-      const cs = arr(g.candidates).filter((q) => num(q.x) !== null);
-      ghost(g.pruned);
-      for (let i = 1; i < cs.length; i++) { const a = P([cs[0].x, cs[0].y]), c = P([cs[i].x, cs[i].y]); o.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-cand-link"/>`); }
-      cs.forEach((q, i) => {
-        const a = P([q.x, q.y]), s = Math.max(0.4, num(q.sigma_m) ?? 0.4);
-        o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f(s)}" class="pl-cand"/><circle cx="${a[0]}" cy="${a[1]}" r=".12" class="pl-pers"/>`);
-        o.push(`<text x="${f(a[0])}" y="${f(a[1] - s - 0.35)}" class="pl-pt" text-anchor="middle">${esc(p.id)}${i === 0 ? ` · ${num(reportOf(p).people) ?? "?"}` : ""}</text>`);
-        if (num(q.weight) !== null) o.push(`<text x="${f(a[0])}" y="${f(a[1] + s + 0.75)}" class="pl-ps" text-anchor="middle">${Math.round(q.weight * 100)} %</text>`);
-      });
-      drawn.push({ id: p.id, text: `${cs.length} candidates (${cs.map((q) => `${q.room_label || "?"} ${num(q.weight) !== null ? Math.round(q.weight * 100) + " %" : ""}`).join(" or ")})${g.from ? `; from ${g.from}` : ""}` });
-    } else if (g.kind === "ring" && num(g.r_m) !== null) {
-      const cxr = g.cx ?? g.x, cyr = g.cy ?? g.y, rr = g.r_m, sg = num(g.sigma_m) ?? 0.1;
-      const arcs = arr(g.arcs).length ? g.arcs : [[0, 360]];
-      const arcPts = (a0, a1) => { const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 3)); const out = []; for (let i = 0; i <= n; i++) { const t = (a0 + (a1 - a0) * i / n) * Math.PI / 180; out.push(P([cxr + rr * Math.cos(t), cyr + rr * Math.sin(t)])); } return out.map((q) => q.join(",")).join(" "); };
-      // the excluded part of the circle, faint dashed
-      const sorted = [...arcs].sort((u, v) => u[0] - v[0]); let prev = sorted[sorted.length - 1][1] - 360;
-      for (const [a0, a1] of sorted) { if (a0 - prev > 0.5) o.push(`<polyline points="${arcPts(prev, a0)}" class="pl-ring-off"/>`); prev = a1; }
-      // the band is clipped to the building: the twin says nobody is outside it
-      for (const [a0, a1] of arcs) o.push(`<g clip-path="url(#pl-clip-floor)"><polyline points="${arcPts(a0, a1)}" class="pl-ring-band" stroke-width="${f(Math.max(0.25, 2 * sg))}"/></g><polyline points="${arcPts(a0, a1)}" class="pl-ring-line"/>`);
-      const at = P(labelAt[p.id] || ringLabelAt(g));
-      o.push(`<text x="${f(at[0])}" y="${f(at[1] - 0.2)}" class="pl-pt" text-anchor="middle">${esc(p.id)} · ${num(reportOf(p).people) ?? "?"}</text><text x="${f(at[0])}" y="${f(at[1] + 0.75)}" class="pl-ps" text-anchor="middle">somewhere on this ring</text>`);
-      drawn.push({ id: p.id, text: `ring ${(+rr).toFixed(1)} m ±${sg.toFixed(1)} m from ${g.puck || "a puck"}${g.ring_kind === "ble" ? " (Bluetooth)" : ""}; not a position${g.from ? `; shape from ${g.from}` : ""}` });
-    } else if (g.kind === "zone") {
-      const rm = g.polygon ? null : rooms.find((q) => q.id === g.room);
-      const poly = g.polygon || rm?.polygon;
-      if (poly) { o.push(`<polygon points="${pts(poly)}" class="pl-zone"/>`); const c = P(labelAt[p.id] || centre(poly)); label(p, c, 0.35); drawn.push({ id: p.id, text: `zone: ${g.room_label || rm?.label || "room"}, room level only${g.inferred ? " (room from the report)" : ""}` }); }
-      else notDrawn.push({ id: p.id, why: "zone without a room" });
-    } else if (g.kind === "point" && num(g.x) !== null) {
-      const a = P([g.x, g.y]);
-      o.push(`<path d="M${f(a[0])} ${f(a[1] - .55)} L${f(a[0] + .5)} ${f(a[1] + .4)} L${f(a[0] - .5)} ${f(a[1] + .4)} Z" class="pl-pers"/>`);
-      label(p, a, -0.85);
-      drawn.push({ id: p.id, text: `crew find, ${g.basis || "reported position"}` });
-    } else notDrawn.push({ id: p.id, why: p.state === "safe-outside" ? "safe outside, self-reported" : "no position in the report" });
-  }
-  const placed = [];
+  // pucks and people: inside the close-up's frame only the marks (the close-up carries their words)
+  const z = { dot: 0.28, x: 0.42, lw: 0.1, lab: 1.05, sub: 0.72, wrap: 22, puck: 0.42, puckT: 0.7 };
+  const pL = puckMarks(M, o, pl, z);
+  if (!focus) L.push(...pL);
+  for (const e of M.ppl) L.push(...personMarks(M, e, o, pl, z, !M.inFocus(e.g)));
   for (const c of arr(r.crews)) {
     const l = crewPos(c); if (!l) continue; const a = P(l);
-    const near = placed.filter((q) => Math.hypot(q[0] - a[0], q[1] - a[1]) < 2.2).length;
-    const lx = a[0] + (near ? 1.1 : -1.1), anchor = near ? "start" : "end";
-    o.push(`<circle cx="${a[0]}" cy="${a[1]}" r=".62" fill="${crewColor(c)}" class="pl-crew"/><text x="${f(lx)}" y="${f(a[1] + .35)}" class="pl-crew-t" fill="${crewColor(c)}" text-anchor="${anchor}">${esc(c.id)}</text>`);
-    placed.push(a);
+    o.push(`<circle cx="${a[0]}" cy="${a[1]}" r=".62" fill="${crewColor(c)}" class="pl-crew"/>`); pl.addPt(a[0], a[1], .7); K.crew = true;
+    L.push({ at: a, rr: .62, order: ["l", "r", "a", "b", "al", "ar", "bl", "br"], lines: [{ t: c.id, size: .95, fam: "cond", weight: 700, cls: "pl-crew-t", fill: crewColor(c) }] });
   }
   // sides A-D and north
+  const b = M.b, cx = M.cx, cy = M.cy;
   const dirOf = (brg) => { const t = brg * Math.PI / 180, e = Math.sin(t), n = Math.cos(t); return [e * Math.sin(b) + n * Math.cos(b), -e * Math.cos(b) + n * Math.sin(b)]; };
   for (const [k, s] of Object.entries(site.sides || {})) {
-    const d = dirOf(s.bearing_deg), hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
+    const d = dirOf(s.bearing_deg), hx = (M.x1 - M.x0) / 2, hy = (M.y1 - M.y0) / 2;
     const t = Math.min(Math.abs(d[0]) > 1e-3 ? hx / Math.abs(d[0]) : 1e9, Math.abs(d[1]) > 1e-3 ? hy / Math.abs(d[1]) : 1e9) + 1.7;
     const at = P([cx + d[0] * t, cy + d[1] * t]);
-    o.push(`<g class="pl-side"><circle cx="${f(at[0])}" cy="${f(at[1])}" r=".95"/><text x="${f(at[0])}" y="${f(at[1] + .05)}">${esc(k)}</text></g>`);
-    if (s.street) { const t2 = t + 1.9; const st = P([cx + d[0] * t2, cy + d[1] * t2]); o.push(`<text x="${f(st[0])}" y="${f(st[1] + .3)}" class="pl-street">${esc(s.street)}</text>`); }
+    o.push(`<g class="pl-side"><circle cx="${f2(at[0])}" cy="${f2(at[1])}" r=".95"/><text x="${f2(at[0])}" y="${f2(at[1] + .05)}">${esc(k)}</text></g>`); pl.addPt(at[0], at[1], 1); K.side = true;
+    if (s.street) { const t2 = t + 1.9; const st = P([cx + d[0] * t2, cy + d[1] * t2]); o.push(`<text x="${f2(st[0])}" y="${f2(st[1] + .3)}" class="pl-street">${esc(s.street)}</text>`); }
   }
   const nx = X0 + 1.6, ny = Y0 + 2.6;
-  o.push(`<g class="pl-north" transform="translate(${f(nx)} ${f(ny)})"><path d="M0 -1.2 L.6 .75 L0 .38 L-.6 .75 Z"/><text x="0" y="-1.65">N</text></g>`);
-  const sx = X0 + 1.0, sy = Y1 - 1.1;
-  o.push(`<g class="pl-scale"><rect x="${f(sx)}" y="${f(sy - .18)}" width="5" height=".36"/><rect x="${f(sx + 5)}" y="${f(sy - .18)}" width="5" height=".36" fill="none" stroke="var(--p-ink)" stroke-width=".08"/><text x="${f(sx)}" y="${f(sy - .55)}">0</text><text x="${f(sx + 10)}" y="${f(sy - .55)}" text-anchor="end">10 m</text></g>`);
-  const svg = `<svg viewBox="${f(X0)} ${f(Y0)} ${f(X1 - X0)} ${f(Y1 - Y0)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan of floor ${esc(floor.label)} with the people, crews and hazards of the report" preserveAspectRatio="xMidYMid meet">${o.join("")}</svg>`;
-  return { svg, drawn, notDrawn };
+  o.push(`<g class="pl-north" transform="translate(${f2(nx)} ${f2(ny)})"><path d="M0 -1.2 L.6 .75 L0 .38 L-.6 .75 Z"/><text x="0" y="-1.65">N</text></g>`);
+  const sx = X1 - 11.0, sy = Y1 - 1.1; // bottom right: the bottom left is where a ruled-out place outside the building tends to fall
+  o.push(`<g class="pl-scale"><rect x="${f2(sx)}" y="${f2(sy - .18)}" width="5" height=".36"/><rect x="${f2(sx + 5)}" y="${f2(sy - .18)}" width="5" height=".36" fill="none" stroke="var(--p-ink)" stroke-width=".08"/><text x="${f2(sx)}" y="${f2(sy - .55)}">0</text><text x="${f2(sx + 10)}" y="${f2(sy - .55)}" text-anchor="end">10 m</text></g>`);
+  pl.add([sx, sy - 1.4, sx + 10, sy + .3]); pl.add([nx - .8, ny - 2.6, nx + .8, ny + 1]);
+  for (const q of L) { const s = pl.place(q.at[0], q.at[1], q.rr, q.lines, 0.25, q.order); o.push(q.lines[0].fill ? labelSVG(s, q.lines).replace("<text ", `<text fill="${q.lines[0].fill}" `) : labelSVG(s, q.lines)); }
+  return `<svg viewBox="${f2(X0)} ${f2(Y0)} ${f2(X1 - X0)} ${f2(Y1 - Y0)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan of floor ${esc(floor.label)} with the people, crews and hazards of the report" preserveAspectRatio="xMidYMid meet">${o.join("")}</svg>`;
+}
+
+// the close-up of the room with the pucks: the measurement's story at a readable scale
+function closeSVG(r, M) {
+  const { P, pts, rooms, floor, focus } = M, K = M.present;
+  const [vx0, vy0, vx1, vy1] = focus.svg, W = vx1 - vx0, H = vy1 - vy0;
+  const u = Math.max(W, H) / 29;                               // the font unit of this drawing
+  const z = { dot: u * 0.42, x: u * 0.62, lw: u * 0.11, lab: u * 1.12, sub: u * 0.82, wrap: 24, puck: u * 0.62, puckT: u * 0.86 };
+  const pl = placer([vx0, vy0, vx1, vy1]);
+  const o = [], L = [];
+  const outline = floor.outline.map(P);
+  // outside the building, then the plan
+  const anyOutside = [[vx0, vy0], [vx1, vy0], [vx1, vy1], [vx0, vy1]].some((q) => !insidePoly(q, outline));
+  if (anyOutside) { o.push(`<rect x="${f2(vx0)}" y="${f2(vy0)}" width="${f2(W)}" height="${f2(H)}" class="pl-outside"/><polygon points="${pts(floor.outline)}" class="pl-floor"/>`); K.outside = true; }
+  o.push(M.base);
+  // the line through the pucks: two ranges cannot tell one side of it from the other
+  const pk2 = [...M.pucks].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  let line = null;
+  if (pk2.length === 2) {
+    const a = P2(M, pk2[0]), c = P2(M, pk2[1]), dx = c[0] - a[0], dy = c[1] - a[1], len = Math.hypot(dx, dy);
+    if (len > 0.2) {
+      const ux = dx / len, uy = dy / len, E = 3 * Math.max(W, H);
+      o.push(`<line x1="${f2(a[0] - ux * E)}" y1="${f2(a[1] - uy * E)}" x2="${f2(c[0] + ux * E)}" y2="${f2(c[1] + uy * E)}" class="pl-pline" style="stroke-width:${f2(z.lw * 1.1)}px;stroke-dasharray:${f2(z.lw * 6)} ${f2(z.lw * 3)}"/>`);
+      o.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" class="pl-pline seg" style="stroke-width:${f2(z.lw * 1.6)}px"/>`);
+      line = { a, c, ux, uy, len }; K.line = true;
+    }
+  }
+  // marks first (the labels then avoid them), people before pucks so a puck stays visible on top
+  const people = M.ppl.filter((e) => M.inFocus(e.g));
+  for (const e of people) L.push(...personMarks(M, e, o, pl, z, true));
+  const pL = puckMarks(M, o, pl, z);
+  // north and the scale bar, in the corners
+  const sc = [1, 2, 5, 10].filter((v) => v <= W / 3.5).pop() || 1;
+  const sx = vx0 + u * 1.2, sy = vy1 - u * 1.3;
+  o.push(`<g class="pl-scale"><rect x="${f2(sx)}" y="${f2(sy - u * .14)}" width="${f2(sc / 2)}" height="${f2(u * .28)}"/><rect x="${f2(sx + sc / 2)}" y="${f2(sy - u * .14)}" width="${f2(sc / 2)}" height="${f2(u * .28)}" fill="none" stroke="var(--p-ink)" stroke-width="${f2(u * .06)}"/><text x="${f2(sx)}" y="${f2(sy - u * .45)}" style="font-size:${f2(u * .7)}px">0</text><text x="${f2(sx + sc)}" y="${f2(sy - u * .45)}" text-anchor="end" style="font-size:${f2(u * .7)}px">${sc} m</text></g>`);
+  pl.add([sx - u * .3, sy - u * 1.3, sx + sc + u * .3, sy + u * .4]);
+  const nx = vx1 - u * 1.4, ny = vy0 + u * 2.4;
+  o.push(`<g class="pl-north" transform="translate(${f2(nx)} ${f2(ny)}) scale(${f2(u * .8)})"><path d="M0 -1.2 L.6 .75 L0 .38 L-.6 .75 Z"/><text x="0" y="-1.65">N</text></g>`);
+  pl.add([nx - u, ny - u * 2.4, nx + u, ny + u]);
+  // labels: people and what was ruled out first, then the pucks, then the line, then the rooms and the outside
+  const T = [];
+  for (const q of L) { const s = pl.place(q.at[0], q.at[1], q.rr, q.lines, u * 0.3, q.order); T.push(labelSVG(s, q.lines)); }
+  for (const q of pL) { const s = pl.place(q.at[0], q.at[1], q.rr, q.lines, u * 0.15, q.order); T.push(labelSVG(s, q.lines)); }
+  if (line) {
+    const ids = pk2.map((p) => p.id).join(" and ");
+    const lines = [{ t: `line through ${ids}`, size: u * 0.78, fam: "sans", weight: 600, cls: "pl-pl-t" }];
+    let ang = Math.atan2(line.uy, line.ux) * 180 / Math.PI; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180;
+    const w = textW(lines[0].t, lines[0].size, "sans", 600);
+    let best = null;
+    for (let t = -2 * Math.max(W, H); t <= 2 * Math.max(W, H); t += u * 0.5) {
+      const m = [line.a[0] + line.ux * t, line.a[1] + line.uy * t];
+      if (m[0] - w / 2 < vx0 + u * .3 || m[0] + w / 2 > vx1 - u * .3 || m[1] < vy0 + u || m[1] > vy1 - u) continue;
+      if (t > -w / 2 - u && t < line.len + w / 2 + u) continue; // not between or over the pucks
+      for (const side of [-1, 1]) {
+        const y0 = side < 0 ? m[1] - u * 0.25 - lines[0].size * 1.12 : m[1] + u * 0.25;
+        const s = pl.at(m[0], y0, lines); if (!best || s.c < best.c) best = { ...s, m, side };
+      }
+    }
+    if (best) {
+      pl.add(best.box);
+      const ty = best.side < 0 ? -u * 0.38 : lines[0].size * 0.95;
+      T.push(`<text transform="translate(${f2(best.m[0])} ${f2(best.m[1])}) rotate(${f2(Math.abs(ang) < 35 ? ang : 0)})" x="0" y="${f2(ty)}" class="pl-pl-t" text-anchor="middle" style="font-size:${f2(lines[0].size)}px;stroke-width:${f2(lines[0].size * 0.26)}px">${esc(lines[0].t)}</text>`);
+    }
+  }
+  // room names in a free corner of the part of each room that is in view
+  const site = bundle?.site || {};
+  const tenants = arr(site.tenants).filter((t) => t.floor === Number(floor.label));
+  for (const rm of rooms) {
+    const q = rm.polygon.map(P), rx0 = Math.max(vx0, Math.min(...q.map((s) => s[0]))), rx1 = Math.min(vx1, Math.max(...q.map((s) => s[0])));
+    const ry0 = Math.max(vy0, Math.min(...q.map((s) => s[1]))), ry1 = Math.min(vy1, Math.max(...q.map((s) => s[1])));
+    if (rx1 - rx0 < u * 3 || ry1 - ry0 < u * 1.6) continue;
+    const main = focus.rooms.includes(rm);
+    const ten = rm.kind === "suite" ? tenants.filter((t) => t.suite === rm.suite) : [];
+    const lines = [{ t: rm.label || rm.suite || "", size: main ? u * 1.05 : u * 0.8, fam: "cond", weight: 700, cls: main ? "pl-rn" : "pl-rn dim" }];
+    if (main && ten.length) lines.push({ t: shortCat(ten[0].industry), size: u * 0.72, fam: "sans", weight: 500, cls: "pl-ten" });
+    const ins = u * 0.45, cands = [];
+    for (const [x, anchor] of [[rx0 + ins, "start"], [rx1 - ins, "end"], [(rx0 + rx1) / 2, "middle"]]) for (const y0 of [ry0 + ins, ry1 - ins - lines.reduce((s, l) => s + l.size * 1.12, 0)]) cands.push(pl.at(x, y0, lines, anchor));
+    const best = cands.sort((a, b) => a.c - b.c)[0];
+    if (best && (main || best.c < u * u * 0.05) && best.box[2] - best.box[0] < rx1 - rx0) { pl.add(best.box); T.push(labelSVG(best, lines)); }
+  }
+  if (anyOutside) {
+    const lines = [{ t: "outside the building", size: u * 0.8, fam: "sans", weight: 600, cls: "pl-outside-t" }];
+    const cands = [];
+    for (let x = vx0 + u * 4; x <= vx1 - u * 4; x += u) for (let y = vy0 + u; y <= vy1 - u * 2; y += u * 0.5) {
+      const s = pl.at(x, y, lines);
+      if ([[s.box[0], s.box[1]], [s.box[2], s.box[1]], [s.box[0], s.box[3]], [s.box[2], s.box[3]]].every((c) => !insidePoly(c, outline))) cands.push(s);
+    }
+    const best = cands.sort((a, b) => a.c - b.c)[0];
+    if (best && best.c < u * u * 0.2) { pl.add(best.box); T.push(labelSVG(best, lines)); }
+  }
+  o.push(...T);
+  return `<svg viewBox="${f2(vx0)} ${f2(vy0)} ${f2(W)} ${f2(H)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Close-up of ${esc(focus.rooms.map((q) => q.label).join(", ") || "the pucks' room")}: each person's place, the ruled-out places with their reasons, the pucks and the line through them" preserveAspectRatio="xMidYMid meet">${o.join("")}</svg>`;
 }
 // the candidate spot farthest from everything already drawn (x weighted: labels are wider than tall)
 function freeSpot(cands, avoid) {
@@ -657,7 +957,7 @@ function crewsAndHazards(r) {
   const hz = safe(() => {
     const hs = arr(r.hazards), ds = arr(r.differences || r.twin_differences);
     const h = hs.length ? `<ul class="items">${hs.map((x) => `<li><span class="k haz">${esc(x.id || "")}</span><div>${esc(words(x.kind))}: ${esc(x.label || x.ref || "")}${x.note ? `, ${esc(x.note)}` : ""}<small>${esc([x.source ? `reported by ${x.source}` : null, num(x.t_rel) !== null ? `T+${clock(x.t_rel)}` : null].filter(Boolean).join(", "))}</small></div></li>`).join("")}</ul>` : NONE("No hazards recorded.");
-    const d = ds.length ? `<ul class="items">${ds.map((x) => `<li><span class="k diff">${esc(x.id || "")}</span><div>${esc(x.text || x.label || "")}<small>${esc([x.kind === "twin" ? "against the twin" : x.kind === "record" ? "against the building record" : x.kind, x.source ? `source: ${x.source}` : null, num(x.t_rel) !== null ? `T+${clock(x.t_rel)}` : null].filter(Boolean).join(", "))}</small></div></li>`).join("")}</ul>` : NONE("No differences from the twin or the record recorded.");
+    const d = ds.length ? `<ul class="items">${ds.map((x) => `<li><span class="k diff">${esc(x.id || "")}</span><div>${esc(x.text || x.label || "")}<small>${esc([x.kind === "twin" ? "against the twin" : x.kind === "record" ? "against the building record" : x.kind === "record_vs_phones" ? "the record against the phones" : x.kind, has(x.source) ? `source: ${sourceWords(x.source, r)}` : null, num(x.t_rel) !== null ? `T+${clock(x.t_rel)}` : null].filter(Boolean).join(", "))}</small></div></li>`).join("")}</ul>` : NONE("No differences from the twin or the record recorded.");
     return `<h3 class="sub-h">Hazards</h3>${h}<h3 class="sub-h" style="margin-top:12px">Differences from the twin and the record</h3>${d}`;
   });
   return blk(5, "Crews, hazards and differences", "Crew positions and air are as the board last knew them.", `<div class="cols"><div><h3 class="sub-h">Crews</h3>${crews}</div><div>${hz}</div></div>`);
@@ -713,7 +1013,8 @@ function foot(r) {
 // ------------------------------------------------------------------ paper: running header and footer on every page
 function pageBoxes(r) {
   const css = (s) => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
-  const marks = [isSample(r) ? "SAMPLE" : null, isSim(r) ? "SIMULATED" : null].filter(Boolean).join("  ·  ") || "LIVE DATA";
+  // live sponsor data: every printed page says so, beside the banner live_marker.js puts on the first page
+  const marks = [anyLive() ? "LIVE SPONSOR DATA, PRIVATE" : null, isSample(r) ? "SAMPLE" : null, isSim(r) ? "SIMULATED" : null].filter(Boolean).join("  ·  ") || "LIVE DATA";
   const a = addrLine(r);
   $("#page-boxes").textContent = `@page { size: letter; margin: 15mm 13mm 16mm 13mm;
     @top-left { content: ${css("Sandtable Beacon incident report")}; font: 600 8pt Barlow, Arial, sans-serif; color: #333; }
@@ -729,6 +1030,7 @@ function feeds() {
 }
 
 $("#btn-print").addEventListener("click", () => window.print());
+
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !SAMPLE) tick(); });
 feeds();
 tick();

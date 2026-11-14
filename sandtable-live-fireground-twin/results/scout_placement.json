@@ -1,0 +1,1872 @@
+{
+ "schema": "sandtable.scout_placement/1",
+ "simulated": true,
+ "crew_advice": "Throw so that one puck lands deep, within about 4 m of the far corners: with 5 pucks the victim was reported in 39 of 46 scans (85%) when a puck lay within 4 m of them and in 12 of 28 (43%) beyond, while the spread and roundness of the constellation made no clear difference.",
+ "what": "Detection and location error against where the breathing victim lies relative to the thrown pucks. Pools the 'reach' and 'natural' scenes of scout_ablation.json (the detector does not know which rule placed the victim). Distances use the true puck positions.",
+ "room": {
+  "id": "r310",
+  "label": "Suite 310",
+  "polygon": [
+   [
+    9.5,
+    0.0
+   ],
+   [
+    9.5,
+    8.65
+   ],
+   [
+    0.0,
+    8.65
+   ],
+   [
+    0.0,
+    0.0
+   ]
+  ],
+  "door": [
+   9.5,
+   7.2
+  ],
+  "door_id": "d310",
+  "chosen_by": "sandtable.scout.session.fire_room (same rule as Director._fire_room)"
+ },
+ "seeds": [
+  1000,
+  1059
+ ],
+ "n_seeds": 60,
+ "generated": "2026-11-14T12:34:26-06:00",
+ "command": ".venv/bin/python scripts/eval_scout.py",
+ "per_pucks": {
+  "3": {
+   "scans": 82,
+   "by_distance_to_nearest_puck": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 12,
+     "reported": {
+      "k": 7,
+      "n": 12,
+      "rate": 0.583,
+      "ci95": [
+       0.32,
+       0.807
+      ]
+     },
+     "within_1.0m": {
+      "k": 5,
+      "n": 12,
+      "rate": 0.417,
+      "ci95": [
+       0.193,
+       0.68
+      ]
+     },
+     "error_m": {
+      "n": 7,
+      "median": 0.285,
+      "p90": 4.867,
+      "max": 6.188
+     }
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 9,
+     "reported": {
+      "k": 6,
+      "n": 9,
+      "rate": 0.667,
+      "ci95": [
+       0.354,
+       0.879
+      ]
+     },
+     "within_1.0m": {
+      "k": 3,
+      "n": 9,
+      "rate": 0.333,
+      "ci95": [
+       0.121,
+       0.646
+      ]
+     },
+     "error_m": {
+      "n": 6,
+      "median": 0.692,
+      "p90": 6.641,
+      "max": 6.773
+     }
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 27,
+     "reported": {
+      "k": 12,
+      "n": 27,
+      "rate": 0.444,
+      "ci95": [
+       0.276,
+       0.627
+      ]
+     },
+     "within_1.0m": {
+      "k": 9,
+      "n": 27,
+      "rate": 0.333,
+      "ci95": [
+       0.186,
+       0.522
+      ]
+     },
+     "error_m": {
+      "n": 12,
+      "median": 0.632,
+      "p90": 2.454,
+      "max": 4.552
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 20,
+     "reported": {
+      "k": 6,
+      "n": 20,
+      "rate": 0.3,
+      "ci95": [
+       0.145,
+       0.519
+      ]
+     },
+     "within_1.0m": {
+      "k": 5,
+      "n": 20,
+      "rate": 0.25,
+      "ci95": [
+       0.112,
+       0.469
+      ]
+     },
+     "error_m": {
+      "n": 6,
+      "median": 0.207,
+      "p90": 4.808,
+      "max": 9.026
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 13,
+     "reported": {
+      "k": 1,
+      "n": 13,
+      "rate": 0.077,
+      "ci95": [
+       0.014,
+       0.333
+      ]
+     },
+     "within_1.0m": {
+      "k": 1,
+      "n": 13,
+      "rate": 0.077,
+      "ci95": [
+       0.014,
+       0.333
+      ]
+     },
+     "error_m": {
+      "n": 1,
+      "median": 0.747,
+      "p90": 0.747,
+      "max": 0.747
+     }
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 1,
+     "reported": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.793
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.793
+      ]
+     },
+     "error_m": null
+    }
+   ],
+   "by_distance_to_puck_centroid": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 4,
+     "reported": {
+      "k": 3,
+      "n": 4,
+      "rate": 0.75,
+      "ci95": [
+       0.301,
+       0.954
+      ]
+     },
+     "within_1.0m": {
+      "k": 1,
+      "n": 4,
+      "rate": 0.25,
+      "ci95": [
+       0.046,
+       0.699
+      ]
+     },
+     "error_m": {
+      "n": 3,
+      "median": 3.987,
+      "p90": 5.748,
+      "max": 6.188
+     }
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 18,
+     "reported": {
+      "k": 10,
+      "n": 18,
+      "rate": 0.556,
+      "ci95": [
+       0.337,
+       0.754
+      ]
+     },
+     "within_1.0m": {
+      "k": 6,
+      "n": 18,
+      "rate": 0.333,
+      "ci95": [
+       0.163,
+       0.563
+      ]
+     },
+     "error_m": {
+      "n": 10,
+      "median": 0.306,
+      "p90": 6.535,
+      "max": 6.773
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 27,
+     "reported": {
+      "k": 12,
+      "n": 27,
+      "rate": 0.444,
+      "ci95": [
+       0.276,
+       0.627
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 27,
+      "rate": 0.37,
+      "ci95": [
+       0.215,
+       0.558
+      ]
+     },
+     "error_m": {
+      "n": 12,
+      "median": 0.44,
+      "p90": 1.142,
+      "max": 2.592
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 19,
+     "reported": {
+      "k": 5,
+      "n": 19,
+      "rate": 0.263,
+      "ci95": [
+       0.118,
+       0.488
+      ]
+     },
+     "within_1.0m": {
+      "k": 4,
+      "n": 19,
+      "rate": 0.211,
+      "ci95": [
+       0.085,
+       0.433
+      ]
+     },
+     "error_m": {
+      "n": 5,
+      "median": 0.566,
+      "p90": 5.685,
+      "max": 9.026
+     }
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 14,
+     "reported": {
+      "k": 2,
+      "n": 14,
+      "rate": 0.143,
+      "ci95": [
+       0.04,
+       0.399
+      ]
+     },
+     "within_1.0m": {
+      "k": 2,
+      "n": 14,
+      "rate": 0.143,
+      "ci95": [
+       0.04,
+       0.399
+      ]
+     },
+     "error_m": {
+      "n": 2,
+      "median": 0.497,
+      "p90": 0.697,
+      "max": 0.747
+     }
+    }
+   ],
+   "by_hull_area": [
+    {
+     "bin": "< 1.9 m2 (smallest third)",
+     "lo": 0.0,
+     "hi": 1.93,
+     "scans": 25,
+     "reported": {
+      "k": 11,
+      "n": 25,
+      "rate": 0.44,
+      "ci95": [
+       0.267,
+       0.629
+      ]
+     },
+     "within_1.0m": {
+      "k": 8,
+      "n": 25,
+      "rate": 0.32,
+      "ci95": [
+       0.172,
+       0.516
+      ]
+     },
+     "error_m": {
+      "n": 11,
+      "median": 0.59,
+      "p90": 6.509,
+      "max": 6.773
+     }
+    },
+    {
+     "bin": "1.9-3.7 m2",
+     "lo": 1.93,
+     "hi": 3.66,
+     "scans": 29,
+     "reported": {
+      "k": 13,
+      "n": 29,
+      "rate": 0.448,
+      "ci95": [
+       0.284,
+       0.625
+      ]
+     },
+     "within_1.0m": {
+      "k": 9,
+      "n": 29,
+      "rate": 0.31,
+      "ci95": [
+       0.173,
+       0.492
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.673,
+      "p90": 3.708,
+      "max": 9.026
+     }
+    },
+    {
+     "bin": ">= 3.7 m2 (largest third)",
+     "lo": 3.66,
+     "hi": null,
+     "scans": 28,
+     "reported": {
+      "k": 8,
+      "n": 28,
+      "rate": 0.286,
+      "ci95": [
+       0.153,
+       0.471
+      ]
+     },
+     "within_1.0m": {
+      "k": 6,
+      "n": 28,
+      "rate": 0.214,
+      "ci95": [
+       0.102,
+       0.395
+      ]
+     },
+     "error_m": {
+      "n": 8,
+      "median": 0.234,
+      "p90": 2.671,
+      "max": 6.188
+     }
+    }
+   ],
+   "by_flatness": [
+    {
+     "bin": "< 0.35 (near-collinear)",
+     "lo": 0.0,
+     "hi": 0.35,
+     "scans": 31,
+     "reported": {
+      "k": 13,
+      "n": 31,
+      "rate": 0.419,
+      "ci95": [
+       0.264,
+       0.592
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 31,
+      "rate": 0.323,
+      "ci95": [
+       0.186,
+       0.499
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.264,
+      "p90": 3.708,
+      "max": 6.509
+     }
+    },
+    {
+     "bin": "0.35-0.6",
+     "lo": 0.35,
+     "hi": 0.6,
+     "scans": 33,
+     "reported": {
+      "k": 13,
+      "n": 33,
+      "rate": 0.394,
+      "ci95": [
+       0.247,
+       0.563
+      ]
+     },
+     "within_1.0m": {
+      "k": 7,
+      "n": 33,
+      "rate": 0.212,
+      "ci95": [
+       0.107,
+       0.378
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.942,
+      "p90": 6.656,
+      "max": 9.026
+     }
+    },
+    {
+     "bin": ">= 0.6 (round)",
+     "lo": 0.6,
+     "hi": null,
+     "scans": 18,
+     "reported": {
+      "k": 6,
+      "n": 18,
+      "rate": 0.333,
+      "ci95": [
+       0.163,
+       0.563
+      ]
+     },
+     "within_1.0m": {
+      "k": 6,
+      "n": 18,
+      "rate": 0.333,
+      "ci95": [
+       0.163,
+       0.563
+      ]
+     },
+     "error_m": {
+      "n": 6,
+      "median": 0.306,
+      "p90": 0.619,
+      "max": 0.673
+     }
+    }
+   ],
+   "by_victim_in_hull": [
+    {
+     "bin": "inside the pucks' hull",
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "outside",
+     "scans": 82,
+     "reported": {
+      "k": 32,
+      "n": 82,
+      "rate": 0.39,
+      "ci95": [
+       0.292,
+       0.498
+      ]
+     },
+     "error_m": {
+      "n": 32,
+      "median": 0.447,
+      "p90": 6.024,
+      "max": 9.026
+     }
+    }
+   ],
+   "d_nearest_of_reported": {
+    "n": 32,
+    "median": 3.12,
+    "p90": 4.379,
+    "max": 5.66
+   },
+   "d_nearest_of_missed": {
+    "n": 50,
+    "median": 4.08,
+    "p90": 5.243,
+    "max": 6.69
+   },
+   "flatness_range": [
+    0.183,
+    0.875
+   ],
+   "duplicates_dropped": 38,
+   "nearest_puck_under_4m": {
+    "k": 25,
+    "n": 48,
+    "rate": 0.521,
+    "ci95": [
+     0.383,
+     0.655
+    ]
+   },
+   "nearest_puck_4m_or_more": {
+    "k": 7,
+    "n": 34,
+    "rate": 0.206,
+    "ci95": [
+     0.103,
+     0.368
+    ]
+   }
+  },
+  "4": {
+   "scans": 78,
+   "by_distance_to_nearest_puck": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 9,
+     "reported": {
+      "k": 7,
+      "n": 9,
+      "rate": 0.778,
+      "ci95": [
+       0.453,
+       0.937
+      ]
+     },
+     "within_1.0m": {
+      "k": 7,
+      "n": 9,
+      "rate": 0.778,
+      "ci95": [
+       0.453,
+       0.937
+      ]
+     },
+     "error_m": {
+      "n": 7,
+      "median": 0.12,
+      "p90": 0.419,
+      "max": 0.739
+     }
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 16,
+     "reported": {
+      "k": 10,
+      "n": 16,
+      "rate": 0.625,
+      "ci95": [
+       0.386,
+       0.815
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 16,
+      "rate": 0.625,
+      "ci95": [
+       0.386,
+       0.815
+      ]
+     },
+     "error_m": {
+      "n": 10,
+      "median": 0.12,
+      "p90": 0.639,
+      "max": 0.647
+     }
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 22,
+     "reported": {
+      "k": 13,
+      "n": 22,
+      "rate": 0.591,
+      "ci95": [
+       0.387,
+       0.767
+      ]
+     },
+     "within_1.0m": {
+      "k": 13,
+      "n": 22,
+      "rate": 0.591,
+      "ci95": [
+       0.387,
+       0.767
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.165,
+      "p90": 0.324,
+      "max": 0.896
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 21,
+     "reported": {
+      "k": 8,
+      "n": 21,
+      "rate": 0.381,
+      "ci95": [
+       0.208,
+       0.591
+      ]
+     },
+     "within_1.0m": {
+      "k": 7,
+      "n": 21,
+      "rate": 0.333,
+      "ci95": [
+       0.172,
+       0.546
+      ]
+     },
+     "error_m": {
+      "n": 8,
+      "median": 0.202,
+      "p90": 0.647,
+      "max": 1.077
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 8,
+     "reported": {
+      "k": 0,
+      "n": 8,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.324
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 8,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.324
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 2,
+     "reported": {
+      "k": 0,
+      "n": 2,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.658
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 2,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.658
+      ]
+     },
+     "error_m": null
+    }
+   ],
+   "by_distance_to_puck_centroid": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 1,
+     "reported": {
+      "k": 1,
+      "n": 1,
+      "rate": 1.0,
+      "ci95": [
+       0.207,
+       1.0
+      ]
+     },
+     "within_1.0m": {
+      "k": 1,
+      "n": 1,
+      "rate": 1.0,
+      "ci95": [
+       0.207,
+       1.0
+      ]
+     },
+     "error_m": {
+      "n": 1,
+      "median": 0.054,
+      "p90": 0.054,
+      "max": 0.054
+     }
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 17,
+     "reported": {
+      "k": 10,
+      "n": 17,
+      "rate": 0.588,
+      "ci95": [
+       0.36,
+       0.784
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 17,
+      "rate": 0.588,
+      "ci95": [
+       0.36,
+       0.784
+      ]
+     },
+     "error_m": {
+      "n": 10,
+      "median": 0.118,
+      "p90": 0.148,
+      "max": 0.201
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 26,
+     "reported": {
+      "k": 15,
+      "n": 26,
+      "rate": 0.577,
+      "ci95": [
+       0.389,
+       0.745
+      ]
+     },
+     "within_1.0m": {
+      "k": 15,
+      "n": 26,
+      "rate": 0.577,
+      "ci95": [
+       0.389,
+       0.745
+      ]
+     },
+     "error_m": {
+      "n": 15,
+      "median": 0.187,
+      "p90": 0.519,
+      "max": 0.739
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 21,
+     "reported": {
+      "k": 11,
+      "n": 21,
+      "rate": 0.524,
+      "ci95": [
+       0.324,
+       0.717
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 21,
+      "rate": 0.476,
+      "ci95": [
+       0.283,
+       0.676
+      ]
+     },
+     "error_m": {
+      "n": 11,
+      "median": 0.262,
+      "p90": 0.896,
+      "max": 1.077
+     }
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 13,
+     "reported": {
+      "k": 1,
+      "n": 13,
+      "rate": 0.077,
+      "ci95": [
+       0.014,
+       0.333
+      ]
+     },
+     "within_1.0m": {
+      "k": 1,
+      "n": 13,
+      "rate": 0.077,
+      "ci95": [
+       0.014,
+       0.333
+      ]
+     },
+     "error_m": {
+      "n": 1,
+      "median": 0.204,
+      "p90": 0.204,
+      "max": 0.204
+     }
+    }
+   ],
+   "by_hull_area": [
+    {
+     "bin": "< 4.0 m2 (smallest third)",
+     "lo": 0.0,
+     "hi": 3.99,
+     "scans": 25,
+     "reported": {
+      "k": 13,
+      "n": 25,
+      "rate": 0.52,
+      "ci95": [
+       0.335,
+       0.7
+      ]
+     },
+     "within_1.0m": {
+      "k": 13,
+      "n": 25,
+      "rate": 0.52,
+      "ci95": [
+       0.335,
+       0.7
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.165,
+      "p90": 0.202,
+      "max": 0.34
+     }
+    },
+    {
+     "bin": "4.0-6.3 m2",
+     "lo": 3.99,
+     "hi": 6.25,
+     "scans": 27,
+     "reported": {
+      "k": 12,
+      "n": 27,
+      "rate": 0.444,
+      "ci95": [
+       0.276,
+       0.627
+      ]
+     },
+     "within_1.0m": {
+      "k": 12,
+      "n": 27,
+      "rate": 0.444,
+      "ci95": [
+       0.276,
+       0.627
+      ]
+     },
+     "error_m": {
+      "n": 12,
+      "median": 0.169,
+      "p90": 0.646,
+      "max": 0.896
+     }
+    },
+    {
+     "bin": ">= 6.3 m2 (largest third)",
+     "lo": 6.25,
+     "hi": null,
+     "scans": 26,
+     "reported": {
+      "k": 13,
+      "n": 26,
+      "rate": 0.5,
+      "ci95": [
+       0.321,
+       0.679
+      ]
+     },
+     "within_1.0m": {
+      "k": 12,
+      "n": 26,
+      "rate": 0.462,
+      "ci95": [
+       0.288,
+       0.645
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.201,
+      "p90": 0.684,
+      "max": 1.077
+     }
+    }
+   ],
+   "by_flatness": [
+    {
+     "bin": "< 0.35 (near-collinear)",
+     "lo": 0.0,
+     "hi": 0.35,
+     "scans": 18,
+     "reported": {
+      "k": 10,
+      "n": 18,
+      "rate": 0.556,
+      "ci95": [
+       0.337,
+       0.754
+      ]
+     },
+     "within_1.0m": {
+      "k": 9,
+      "n": 18,
+      "rate": 0.5,
+      "ci95": [
+       0.29,
+       0.71
+      ]
+     },
+     "error_m": {
+      "n": 10,
+      "median": 0.186,
+      "p90": 0.414,
+      "max": 1.077
+     }
+    },
+    {
+     "bin": "0.35-0.6",
+     "lo": 0.35,
+     "hi": 0.6,
+     "scans": 39,
+     "reported": {
+      "k": 20,
+      "n": 39,
+      "rate": 0.513,
+      "ci95": [
+       0.362,
+       0.661
+      ]
+     },
+     "within_1.0m": {
+      "k": 20,
+      "n": 39,
+      "rate": 0.513,
+      "ci95": [
+       0.362,
+       0.661
+      ]
+     },
+     "error_m": {
+      "n": 20,
+      "median": 0.16,
+      "p90": 0.639,
+      "max": 0.739
+     }
+    },
+    {
+     "bin": ">= 0.6 (round)",
+     "lo": 0.6,
+     "hi": null,
+     "scans": 21,
+     "reported": {
+      "k": 8,
+      "n": 21,
+      "rate": 0.381,
+      "ci95": [
+       0.208,
+       0.591
+      ]
+     },
+     "within_1.0m": {
+      "k": 8,
+      "n": 21,
+      "rate": 0.381,
+      "ci95": [
+       0.208,
+       0.591
+      ]
+     },
+     "error_m": {
+      "n": 8,
+      "median": 0.158,
+      "p90": 0.593,
+      "max": 0.896
+     }
+    }
+   ],
+   "by_victim_in_hull": [
+    {
+     "bin": "inside the pucks' hull",
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "outside",
+     "scans": 78,
+     "reported": {
+      "k": 38,
+      "n": 78,
+      "rate": 0.487,
+      "ci95": [
+       0.379,
+       0.596
+      ]
+     },
+     "error_m": {
+      "n": 38,
+      "median": 0.168,
+      "p90": 0.641,
+      "max": 1.077
+     }
+    }
+   ],
+   "d_nearest_of_reported": {
+    "n": 38,
+    "median": 3.13,
+    "p90": 4.362,
+    "max": 4.9
+   },
+   "d_nearest_of_missed": {
+    "n": 40,
+    "median": 4.31,
+    "p90": 5.363,
+    "max": 6.64
+   },
+   "flatness_range": [
+    0.222,
+    0.918
+   ],
+   "duplicates_dropped": 42,
+   "nearest_puck_under_4m": {
+    "k": 30,
+    "n": 47,
+    "rate": 0.638,
+    "ci95": [
+     0.495,
+     0.76
+    ]
+   },
+   "nearest_puck_4m_or_more": {
+    "k": 8,
+    "n": 31,
+    "rate": 0.258,
+    "ci95": [
+     0.137,
+     0.432
+    ]
+   }
+  },
+  "5": {
+   "scans": 74,
+   "by_distance_to_nearest_puck": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 16,
+     "reported": {
+      "k": 14,
+      "n": 16,
+      "rate": 0.875,
+      "ci95": [
+       0.64,
+       0.965
+      ]
+     },
+     "within_1.0m": {
+      "k": 13,
+      "n": 16,
+      "rate": 0.812,
+      "ci95": [
+       0.57,
+       0.934
+      ]
+     },
+     "error_m": {
+      "n": 14,
+      "median": 0.131,
+      "p90": 0.277,
+      "max": 4.085
+     }
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 14,
+     "reported": {
+      "k": 12,
+      "n": 14,
+      "rate": 0.857,
+      "ci95": [
+       0.601,
+       0.96
+      ]
+     },
+     "within_1.0m": {
+      "k": 11,
+      "n": 14,
+      "rate": 0.786,
+      "ci95": [
+       0.524,
+       0.924
+      ]
+     },
+     "error_m": {
+      "n": 12,
+      "median": 0.065,
+      "p90": 0.361,
+      "max": 1.434
+     }
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 16,
+     "reported": {
+      "k": 13,
+      "n": 16,
+      "rate": 0.812,
+      "ci95": [
+       0.57,
+       0.934
+      ]
+     },
+     "within_1.0m": {
+      "k": 13,
+      "n": 16,
+      "rate": 0.812,
+      "ci95": [
+       0.57,
+       0.934
+      ]
+     },
+     "error_m": {
+      "n": 13,
+      "median": 0.112,
+      "p90": 0.201,
+      "max": 0.219
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 19,
+     "reported": {
+      "k": 10,
+      "n": 19,
+      "rate": 0.526,
+      "ci95": [
+       0.317,
+       0.727
+      ]
+     },
+     "within_1.0m": {
+      "k": 10,
+      "n": 19,
+      "rate": 0.526,
+      "ci95": [
+       0.317,
+       0.727
+      ]
+     },
+     "error_m": {
+      "n": 10,
+      "median": 0.072,
+      "p90": 0.34,
+      "max": 0.423
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 8,
+     "reported": {
+      "k": 2,
+      "n": 8,
+      "rate": 0.25,
+      "ci95": [
+       0.071,
+       0.591
+      ]
+     },
+     "within_1.0m": {
+      "k": 2,
+      "n": 8,
+      "rate": 0.25,
+      "ci95": [
+       0.071,
+       0.591
+      ]
+     },
+     "error_m": {
+      "n": 2,
+      "median": 0.2,
+      "p90": 0.299,
+      "max": 0.324
+     }
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 1,
+     "reported": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.793
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.793
+      ]
+     },
+     "error_m": null
+    }
+   ],
+   "by_distance_to_puck_centroid": [
+    {
+     "bin": "< 2 m",
+     "lo": 0.0,
+     "hi": 2.0,
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "within_1.0m": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "2-3 m",
+     "lo": 2.0,
+     "hi": 3.0,
+     "scans": 1,
+     "reported": {
+      "k": 1,
+      "n": 1,
+      "rate": 1.0,
+      "ci95": [
+       0.207,
+       1.0
+      ]
+     },
+     "within_1.0m": {
+      "k": 1,
+      "n": 1,
+      "rate": 1.0,
+      "ci95": [
+       0.207,
+       1.0
+      ]
+     },
+     "error_m": {
+      "n": 1,
+      "median": 0.278,
+      "p90": 0.278,
+      "max": 0.278
+     }
+    },
+    {
+     "bin": "3-4 m",
+     "lo": 3.0,
+     "hi": 4.0,
+     "scans": 21,
+     "reported": {
+      "k": 19,
+      "n": 21,
+      "rate": 0.905,
+      "ci95": [
+       0.711,
+       0.973
+      ]
+     },
+     "within_1.0m": {
+      "k": 18,
+      "n": 21,
+      "rate": 0.857,
+      "ci95": [
+       0.654,
+       0.95
+      ]
+     },
+     "error_m": {
+      "n": 19,
+      "median": 0.053,
+      "p90": 0.219,
+      "max": 4.085
+     }
+    },
+    {
+     "bin": "4-5 m",
+     "lo": 4.0,
+     "hi": 5.0,
+     "scans": 16,
+     "reported": {
+      "k": 12,
+      "n": 16,
+      "rate": 0.75,
+      "ci95": [
+       0.505,
+       0.898
+      ]
+     },
+     "within_1.0m": {
+      "k": 11,
+      "n": 16,
+      "rate": 0.688,
+      "ci95": [
+       0.444,
+       0.858
+      ]
+     },
+     "error_m": {
+      "n": 12,
+      "median": 0.088,
+      "p90": 0.365,
+      "max": 1.434
+     }
+    },
+    {
+     "bin": "5-6 m",
+     "lo": 5.0,
+     "hi": 6.0,
+     "scans": 25,
+     "reported": {
+      "k": 17,
+      "n": 25,
+      "rate": 0.68,
+      "ci95": [
+       0.484,
+       0.828
+      ]
+     },
+     "within_1.0m": {
+      "k": 17,
+      "n": 25,
+      "rate": 0.68,
+      "ci95": [
+       0.484,
+       0.828
+      ]
+     },
+     "error_m": {
+      "n": 17,
+      "median": 0.112,
+      "p90": 0.281,
+      "max": 0.423
+     }
+    },
+    {
+     "bin": ">= 6 m",
+     "lo": 6.0,
+     "hi": null,
+     "scans": 11,
+     "reported": {
+      "k": 2,
+      "n": 11,
+      "rate": 0.182,
+      "ci95": [
+       0.051,
+       0.477
+      ]
+     },
+     "within_1.0m": {
+      "k": 2,
+      "n": 11,
+      "rate": 0.182,
+      "ci95": [
+       0.051,
+       0.477
+      ]
+     },
+     "error_m": {
+      "n": 2,
+      "median": 0.2,
+      "p90": 0.299,
+      "max": 0.324
+     }
+    }
+   ],
+   "by_hull_area": [
+    {
+     "bin": "< 6.0 m2 (smallest third)",
+     "lo": 0.0,
+     "hi": 6.0,
+     "scans": 24,
+     "reported": {
+      "k": 18,
+      "n": 24,
+      "rate": 0.75,
+      "ci95": [
+       0.551,
+       0.88
+      ]
+     },
+     "within_1.0m": {
+      "k": 17,
+      "n": 24,
+      "rate": 0.708,
+      "ci95": [
+       0.508,
+       0.851
+      ]
+     },
+     "error_m": {
+      "n": 18,
+      "median": 0.069,
+      "p90": 0.341,
+      "max": 1.434
+     }
+    },
+    {
+     "bin": "6.0-8.1 m2",
+     "lo": 6.0,
+     "hi": 8.08,
+     "scans": 25,
+     "reported": {
+      "k": 17,
+      "n": 25,
+      "rate": 0.68,
+      "ci95": [
+       0.484,
+       0.828
+      ]
+     },
+     "within_1.0m": {
+      "k": 16,
+      "n": 25,
+      "rate": 0.64,
+      "ci95": [
+       0.445,
+       0.798
+      ]
+     },
+     "error_m": {
+      "n": 17,
+      "median": 0.074,
+      "p90": 0.368,
+      "max": 4.085
+     }
+    },
+    {
+     "bin": ">= 8.1 m2 (largest third)",
+     "lo": 8.08,
+     "hi": null,
+     "scans": 25,
+     "reported": {
+      "k": 16,
+      "n": 25,
+      "rate": 0.64,
+      "ci95": [
+       0.445,
+       0.798
+      ]
+     },
+     "within_1.0m": {
+      "k": 16,
+      "n": 25,
+      "rate": 0.64,
+      "ci95": [
+       0.445,
+       0.798
+      ]
+     },
+     "error_m": {
+      "n": 16,
+      "median": 0.102,
+      "p90": 0.212,
+      "max": 0.273
+     }
+    }
+   ],
+   "by_flatness": [
+    {
+     "bin": "< 0.35 (near-collinear)",
+     "lo": 0.0,
+     "hi": 0.35,
+     "scans": 9,
+     "reported": {
+      "k": 7,
+      "n": 9,
+      "rate": 0.778,
+      "ci95": [
+       0.453,
+       0.937
+      ]
+     },
+     "within_1.0m": {
+      "k": 7,
+      "n": 9,
+      "rate": 0.778,
+      "ci95": [
+       0.453,
+       0.937
+      ]
+     },
+     "error_m": {
+      "n": 7,
+      "median": 0.076,
+      "p90": 0.25,
+      "max": 0.381
+     }
+    },
+    {
+     "bin": "0.35-0.6",
+     "lo": 0.35,
+     "hi": 0.6,
+     "scans": 31,
+     "reported": {
+      "k": 20,
+      "n": 31,
+      "rate": 0.645,
+      "ci95": [
+       0.469,
+       0.789
+      ]
+     },
+     "within_1.0m": {
+      "k": 18,
+      "n": 31,
+      "rate": 0.581,
+      "ci95": [
+       0.408,
+       0.736
+      ]
+     },
+     "error_m": {
+      "n": 20,
+      "median": 0.076,
+      "p90": 0.394,
+      "max": 4.085
+     }
+    },
+    {
+     "bin": ">= 0.6 (round)",
+     "lo": 0.6,
+     "hi": null,
+     "scans": 34,
+     "reported": {
+      "k": 24,
+      "n": 34,
+      "rate": 0.706,
+      "ci95": [
+       0.538,
+       0.832
+      ]
+     },
+     "within_1.0m": {
+      "k": 24,
+      "n": 34,
+      "rate": 0.706,
+      "ci95": [
+       0.538,
+       0.832
+      ]
+     },
+     "error_m": {
+      "n": 24,
+      "median": 0.116,
+      "p90": 0.309,
+      "max": 0.423
+     }
+    }
+   ],
+   "by_victim_in_hull": [
+    {
+     "bin": "inside the pucks' hull",
+     "scans": 0,
+     "reported": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+       null,
+       null
+      ]
+     },
+     "error_m": null
+    },
+    {
+     "bin": "outside",
+     "scans": 74,
+     "reported": {
+      "k": 51,
+      "n": 74,
+      "rate": 0.689,
+      "ci95": [
+       0.577,
+       0.783
+      ]
+     },
+     "error_m": {
+      "n": 51,
+      "median": 0.077,
+      "p90": 0.324,
+      "max": 4.085
+     }
+    }
+   ],
+   "d_nearest_of_reported": {
+    "n": 51,
+    "median": 2.92,
+    "p90": 4.39,
+    "max": 5.27
+   },
+   "d_nearest_of_missed": {
+    "n": 23,
+    "median": 4.37,
+    "p90": 5.304,
+    "max": 6.64
+   },
+   "flatness_range": [
+    0.262,
+    0.941
+   ],
+   "duplicates_dropped": 46,
+   "nearest_puck_under_4m": {
+    "k": 39,
+    "n": 46,
+    "rate": 0.848,
+    "ci95": [
+     0.718,
+     0.924
+    ]
+   },
+   "nearest_puck_4m_or_more": {
+    "k": 12,
+    "n": 28,
+    "rate": 0.429,
+    "ci95": [
+     0.265,
+     0.609
+    ]
+   }
+  }
+ },
+ "note": "The scene generator never put the victim inside the convex hull of the pucks (victim in the far part of the room, pucks scattered from the door), so 'by_victim_in_hull' has no inside cases and the link-shadow rung, which only sees a body on a puck-to-puck line, cannot fire in these scenes. Flatness = second / first singular value of the centred puck positions (scene.py rejects throws below 0.18)."
+}

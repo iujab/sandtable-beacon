@@ -1,0 +1,322 @@
+{
+ "simulated": true,
+ "what": "rung 2 link-shadow locator (no baseline: cross-link fit) on builder R1's scout simulator, Suite 310, 5 pucks; victims moved into the hull for the in-hull cases",
+ "noise": "R1 sim noise model (sandtable/scout/sim.py NOISE: knife-edge body shadow, rssi/fp/los as the kit)",
+ "victim_in_hull": {
+  "n": 14,
+  "detected": 14,
+  "err_median_m": 0.58,
+  "err_p90_m": 0.841,
+  "err_max_m": 1.05
+ },
+ "victim_outside_hull_as_thrown": {
+  "n": 8,
+  "reported_present": 0
+ },
+ "no_victim": {
+  "n": 8,
+  "false_alarms": 0
+ },
+ "rows": [
+  {
+   "seed": 310,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 310,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.37,
+   "sigma_m": 0.5,
+   "confidence": 0.71,
+   "links_down": 3
+  },
+  {
+   "seed": 310,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.73,
+   "sigma_m": 0.5,
+   "confidence": 0.58,
+   "links_down": 4
+  },
+  {
+   "seed": 310,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 311,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 311,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.52,
+   "sigma_m": 0.5,
+   "confidence": 0.77,
+   "links_down": 4
+  },
+  {
+   "seed": 311,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.74,
+   "sigma_m": 0.5,
+   "confidence": 0.77,
+   "links_down": 4
+  },
+  {
+   "seed": 311,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 312,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 312,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.43,
+   "sigma_m": 0.5,
+   "confidence": 0.71,
+   "links_down": 3
+  },
+  {
+   "seed": 312,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.58,
+   "sigma_m": 0.5,
+   "confidence": 0.76,
+   "links_down": 4
+  },
+  {
+   "seed": 312,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 313,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 313,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.28,
+   "sigma_m": 0.5,
+   "confidence": 0.71,
+   "links_down": 3
+  },
+  {
+   "seed": 313,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.36,
+   "sigma_m": 0.5,
+   "confidence": 0.47,
+   "links_down": 3
+  },
+  {
+   "seed": 313,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 314,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 314,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.67,
+   "sigma_m": 0.64,
+   "confidence": 0.58,
+   "links_down": 4
+  },
+  {
+   "seed": 314,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 1.05,
+   "sigma_m": 0.51,
+   "confidence": 0.75,
+   "links_down": 4
+  },
+  {
+   "seed": 314,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 7,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 7,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.31,
+   "sigma_m": 0.5,
+   "confidence": 0.71,
+   "links_down": 3
+  },
+  {
+   "seed": 7,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 21,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 21,
+   "case": "in-hull-crossing",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.58,
+   "sigma_m": 0.55,
+   "confidence": 0.58,
+   "links_down": 4
+  },
+  {
+   "seed": 21,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.82,
+   "sigma_m": 0.69,
+   "confidence": 0.58,
+   "links_down": 4
+  },
+  {
+   "seed": 21,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 99,
+   "case": "as-thrown",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  },
+  {
+   "seed": 99,
+   "case": "in-hull-centroid",
+   "victim_in_hull": true,
+   "present": true,
+   "err_m": 0.85,
+   "sigma_m": 0.71,
+   "confidence": 0.58,
+   "links_down": 4
+  },
+  {
+   "seed": 99,
+   "case": "no-victim",
+   "victim_in_hull": false,
+   "present": false,
+   "err_m": null,
+   "sigma_m": null,
+   "confidence": 0.0,
+   "links_down": 0
+  }
+ ]
+}

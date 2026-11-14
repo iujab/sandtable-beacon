@@ -1,0 +1,35 @@
+{
+  "name": "cube-3d",
+  "description": "3-D tracking in a 4 x 4 x 3 m space: 4 non-coplanar anchors (two low at 0.3 m, two high at 2.5 m) and a hand-carried tag that climbs from 0.6 m to 2.2 m and back along a smooth loop.",
+  "dims": 3,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [4, 0], [4, 4], [0, 4]],
+    "height": 3.0,
+    "walls": [],
+    "labels": [{"name": "shelf (high)", "at": [3.0, 3.0]}, {"name": "floor bin (low)", "at": [2.0, 2.0]}]
+  },
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 0.3},
+    "A2": {"x": 4.0, "y": 0.0, "z": 2.5},
+    "A3": {"x": 4.0, "y": 4.0, "z": 0.3},
+    "A4": {"x": 0.0, "y": 4.0, "z": 2.5}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "wand", "z": 1.0, "path_mode": "spline", "jitter_m": 0.01,
+      "path": [
+        {"at": [1.0, 1.0, 0.8], "t": 0},
+        {"at": [3.0, 1.0, 1.4], "speed": 0.7},
+        {"at": [3.0, 3.0, 2.2], "speed": 0.7, "hold_s": 1.5},
+        {"at": [1.0, 3.0, 1.6], "speed": 0.7},
+        {"at": [2.0, 2.0, 0.6], "speed": 0.6}
+      ],
+      "speed": 0.6
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 19
+}

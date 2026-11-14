@@ -1,0 +1,7 @@
+{"device": {"eid": "a3f19c02", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+ "obs": [
+  {"kind": "uwb",     "t": 1794679200.5, "accessory": "DWM3001CDK (1A2B3C4D)", "d_m": 2.31},
+  {"kind": "sos",     "t": 1794679200.5, "accessory": "DWM3001CDK (1A2B3C4D)", "rssi": -61.0},
+  {"kind": "bearing", "t": 1794679200.5, "accessory": "DWM3001CDK (1A2B3C4D)", "to_puck_compass_deg": 32.0, "sigma_deg": 20.0, "source": "ni-direction+compass"},
+  {"kind": "report",  "t": 1794679200.5, "prev_eid": null, "report": {"status": "trapped", "people": 2, "can_move": false, "battery_pct": 41, "floor_reported": 3, "baro_hpa": 1002.31, "still": true, "still_s": 42, "home_suite": "310", "safe_outside": false, "text": "..."}}
+ ]}

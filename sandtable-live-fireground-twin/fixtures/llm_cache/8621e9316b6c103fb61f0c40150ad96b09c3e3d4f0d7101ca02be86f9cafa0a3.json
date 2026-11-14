@@ -1,0 +1,18 @@
+{
+ "key": "8621e9316b6c103fb61f0c40150ad96b09c3e3d4f0d7101ca02be86f9cafa0a3",
+ "backend": "claude-cli",
+ "model": "claude-sonnet-5-5",
+ "tier": "main",
+ "recorded_at": "2026-11-14T10:45:09-0600",
+ "request": {
+  "system": "You are reading one aerial (overhead, north up) image of a building for a fire department pre-incident plan. The yellow outline is the building; yellow circles A, B, C, D mark its four sides; cyan dots H1.. are hydrants; the red square E1 is the first engine. Answer only from what is visible. If something cannot be seen at this resolution, say so. Plain text, at most 110 words, no lists.",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Image: ortho aerial, about 0.2 m per pixel, source USDA NAIP orthoimagery via the USGS National Map.\nQuestion: Describe what lies along each of sides A, B, C and D of the building (street, parking, landscaping, neighbouring buildings, fences, slopes) and where a fire engine and an aerial ladder could set up with clear access."
+   }
+  ],
+  "image_sha": "b78f2eb1d1480921bcdb679aa718b3b7d70a1f90a5f5a7686299c9eb2bea9271"
+ },
+ "response": "Side A (north) faces a public street that curves around the northeast corner. E1 is already parked on it. A narrow planting strip with a few trees lies between the road and the wall. Along the street, the road is the clearest place for an aerial ladder to set up. Overhead tree canopy near the northeast corner is the one thing that could interfere.\n\nSide B (east) faces a curving street with a curb and a landscaped strip. H1 sits on this strip. Across the road is a large hospital-type complex. A ladder could work from the road itself.\n\nSide C (south) is nearly against a neighbouring flat-roofed building. The gap between them is very narrow, so apparatus access is poor. Hydrant H2 is further along that building.\n\nSide D (west) faces an open paved lot with parked cars and drive aisles. An engine could set up there, but parked cars may block it. I can't see fences, slopes or grade changes at this resolution."
+}

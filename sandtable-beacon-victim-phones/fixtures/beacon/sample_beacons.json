@@ -1,0 +1,1246 @@
+{
+ "type": "beacons",
+ "schema": "sandtable.beacons/1",
+ "sample": true,
+ "sample_note": "Hand-made sample in the exact shape of docs/BEACON_FEED.md (schema by example). Not a result, not a measurement. Coordinates are in the building frame of fixtures/building/twin.json (floor f3, fire room r310); geo computed through the twin's georeference.",
+ "seq": 412,
+ "t": 1794679200.5,
+ "simulated": true,
+ "source": "sim",
+ "floor": "f3",
+ "room": "r310",
+ "room_label": "Suite 310",
+ "rungs": {
+  "cold": true,
+  "ble": true,
+  "uwb": true,
+  "bearing": true
+ },
+ "rig": {
+  "scale": 1.0
+ },
+ "pucks": [
+  {
+   "id": "P1",
+   "x": 7.9,
+   "y": 6.7,
+   "floor": "f3",
+   "sigma_m": 0.08,
+   "room": "r310",
+   "radios": [
+    "ble",
+    "uwb"
+   ],
+   "geo": {
+    "lat": 34.2032738,
+    "lon": -118.6299361
+   },
+   "accessory": null,
+   "host": "uno-q",
+   "simulated": true,
+   "sample": true,
+   "host_seen_s": 2.1
+  },
+  {
+   "id": "P2",
+   "x": 5.0,
+   "y": 5.0,
+   "floor": "f3",
+   "sigma_m": 0.08,
+   "room": "r310",
+   "radios": [
+    "ble",
+    "uwb"
+   ],
+   "geo": {
+    "lat": 34.2032584,
+    "lon": -118.6299675
+   },
+   "accessory": null,
+   "host": null,
+   "simulated": true,
+   "sample": true
+  },
+  {
+   "id": "P3",
+   "x": 8.3,
+   "y": 2.2,
+   "floor": "f3",
+   "sigma_m": 0.08,
+   "room": "r310",
+   "radios": [
+    "ble",
+    "uwb"
+   ],
+   "geo": {
+    "lat": 34.2032334,
+    "lon": -118.6299315
+   },
+   "accessory": null,
+   "host": null,
+   "simulated": true,
+   "sample": true
+  }
+ ],
+ "unplaced_pucks": [
+  {
+   "accessory": "DWM3001CDK (9F8E7D6C)",
+   "suggested_id": "P4",
+   "heard_by": 1,
+   "last_seen_s": 0.4
+  }
+ ],
+ "phones": [
+  {
+   "id": "B1",
+   "eid": "a3f19c02",
+   "opt_in": true,
+   "simulated": true,
+   "sample": true,
+   "method": "uwb-twr",
+   "geometry": "fix",
+   "x": 2.4,
+   "y": 2.1,
+   "floor": "f3",
+   "floor_source": "barometer",
+   "sigma_m": 0.31,
+   "cov": [
+    0.09,
+    0.01,
+    0.08
+   ],
+   "confidence": 0.86,
+   "room": "r310",
+   "room_label": "Suite 310",
+   "room_prob": 0.97,
+   "node": "n044",
+   "geo": {
+    "lat": 34.2032323,
+    "lon": -118.6299956
+   },
+   "ring": null,
+   "candidates": [],
+   "pruned": [
+    {
+     "x": 14.1,
+     "y": 3.1,
+     "reason": "in Suite 311 behind the wall, but the links to P1 and P3 are line of sight (same room as the pucks)"
+    }
+   ],
+   "zone": null,
+   "ranges": [
+    {
+     "puck": "P1",
+     "kind": "uwb",
+     "d_m": 7.17,
+     "sigma_m": 0.1,
+     "rssi": -74.5,
+     "los": 0.9,
+     "age_s": 0.2
+    },
+    {
+     "puck": "P2",
+     "kind": "uwb",
+     "d_m": 3.89,
+     "sigma_m": 0.1,
+     "rssi": -69.0,
+     "los": 0.9,
+     "age_s": 0.3
+    },
+    {
+     "puck": "P3",
+     "kind": "uwb",
+     "d_m": 5.9,
+     "sigma_m": 0.1,
+     "rssi": -72.0,
+     "los": 0.8,
+     "age_s": 0.2
+    }
+   ],
+   "bearing": null,
+   "report": {
+    "status": "trapped",
+    "text": "Two of us in the back office, smoke under the door",
+    "people": 2,
+    "can_move": false,
+    "battery_pct": 41,
+    "floor_reported": 3,
+    "baro_hpa": 1002.31,
+    "still": true,
+    "still_s": 42,
+    "platform": "ios",
+    "app": "0.1",
+    "home_suite": "310",
+    "safe_outside": false,
+    "age_s": 1.2,
+    "model": "iPhone 14",
+    "chip": "U1",
+    "network": "wifi"
+   },
+   "track": {
+    "first_seen_s": 34.0,
+    "last_seen_s": 0.2,
+    "updates": 120,
+    "moving": false,
+    "speed": 0.0
+   },
+   "stale": false,
+   "text": "Phone B1: 2 people, cannot move, trapped. UWB fix in Suite 310, 2 m from the south wall and 2.5 m from the west wall, within 0.5 m"
+  },
+  {
+   "id": "B2",
+   "eid": "5c0e7a11",
+   "opt_in": true,
+   "simulated": true,
+   "sample": true,
+   "method": "uwb-twr",
+   "geometry": "ring",
+   "x": null,
+   "y": null,
+   "sigma_m": null,
+   "cov": null,
+   "geo": null,
+   "node": null,
+   "floor": "f3",
+   "floor_source": "self-report",
+   "confidence": 0.9,
+   "room": null,
+   "room_label": null,
+   "room_prob": null,
+   "ring": {
+    "puck": "P1",
+    "cx": 7.9,
+    "cy": 6.7,
+    "r_m": 4.9,
+    "sigma_m": 0.12,
+    "arcs": [
+     [
+      157.0,
+      289.0
+     ]
+    ],
+    "kind": "uwb",
+    "geo": {
+     "lat": 34.2032738,
+     "lon": -118.6299361
+    }
+   },
+   "candidates": [],
+   "pruned": [],
+   "zone": null,
+   "ranges": [
+    {
+     "puck": "P1",
+     "kind": "uwb",
+     "d_m": 4.9,
+     "sigma_m": 0.12,
+     "rssi": -70.0,
+     "los": 0.9,
+     "age_s": 0.4
+    }
+   ],
+   "bearing": null,
+   "report": {
+    "status": "injured",
+    "text": "Leg hurt, behind the reception desk",
+    "people": 1,
+    "can_move": false,
+    "battery_pct": 63,
+    "floor_reported": 3,
+    "baro_hpa": null,
+    "still": true,
+    "still_s": 12,
+    "platform": "ios",
+    "app": "0.1",
+    "home_suite": "310",
+    "safe_outside": false,
+    "age_s": 2.0,
+    "model": "iPhone 15",
+    "chip": "U2",
+    "network": "wifi"
+   },
+   "track": {
+    "first_seen_s": 3.0,
+    "last_seen_s": 0.4,
+    "updates": 9,
+    "moving": false,
+    "speed": 0.0
+   },
+   "stale": false,
+   "text": "Phone B2: 1 person, cannot move, injured. UWB range only: 5 m from puck P1, on the part of that circle the twin leaves possible; no position yet"
+  },
+  {
+   "id": "B3",
+   "eid": "e81d4f60",
+   "opt_in": true,
+   "simulated": true,
+   "sample": true,
+   "method": "uwb-twr",
+   "geometry": "candidates",
+   "x": null,
+   "y": null,
+   "sigma_m": null,
+   "cov": null,
+   "geo": null,
+   "node": null,
+   "floor": "f3",
+   "floor_source": "puck",
+   "confidence": 0.8,
+   "room": "r310",
+   "room_label": "Suite 310",
+   "room_prob": 0.95,
+   "ring": null,
+   "candidates": [
+    {
+     "x": 2.4,
+     "y": 6.0,
+     "sigma_m": 0.3,
+     "weight": 0.55,
+     "room": "r310",
+     "room_label": "Suite 310",
+     "geo": {
+      "lat": 34.2032673,
+      "lon": -118.6299958
+     }
+    },
+    {
+     "x": 4.6,
+     "y": 2.2,
+     "sigma_m": 0.3,
+     "weight": 0.45,
+     "room": "r310",
+     "room_label": "Suite 310",
+     "geo": {
+      "lat": 34.2032332,
+      "lon": -118.6299717
+     }
+    }
+   ],
+   "pruned": [],
+   "zone": null,
+   "ranges": [
+    {
+     "puck": "P1",
+     "kind": "uwb",
+     "d_m": 5.54,
+     "sigma_m": 0.1,
+     "rssi": -73.0,
+     "los": 0.9,
+     "age_s": 0.3
+    },
+    {
+     "puck": "P2",
+     "kind": "uwb",
+     "d_m": 2.79,
+     "sigma_m": 0.1,
+     "rssi": -66.5,
+     "los": 0.95,
+     "age_s": 0.2
+    }
+   ],
+   "bearing": null,
+   "report": {
+    "status": "trapped",
+    "text": null,
+    "people": 1,
+    "can_move": null,
+    "battery_pct": 18,
+    "floor_reported": null,
+    "baro_hpa": null,
+    "still": false,
+    "still_s": 0,
+    "platform": "ios",
+    "app": "0.1",
+    "home_suite": "310",
+    "safe_outside": false,
+    "age_s": 4.5,
+    "model": "iPhone 14",
+    "chip": "U1"
+   },
+   "track": {
+    "first_seen_s": 21.0,
+    "last_seen_s": 0.2,
+    "updates": 64,
+    "moving": false,
+    "speed": 0.1
+   },
+   "stale": false,
+   "text": "Phone B3: 1 person, trapped. Two possible spots: in Suite 310, 2.5 m from the west wall and 2.5 m from the north wall; or in Suite 310, 2 m from the south wall and 4.5 m from the west wall"
+  },
+  {
+   "id": "B4",
+   "eid": "70b2c9d3",
+   "opt_in": true,
+   "simulated": true,
+   "sample": true,
+   "method": "ble-rssi",
+   "geometry": "zone",
+   "x": null,
+   "y": null,
+   "sigma_m": null,
+   "cov": null,
+   "geo": null,
+   "node": null,
+   "floor": "f3",
+   "floor_source": "self-report",
+   "confidence": 0.7,
+   "room": "r310",
+   "room_label": "Suite 310",
+   "room_prob": 0.7,
+   "ring": null,
+   "candidates": [],
+   "pruned": [],
+   "zone": {
+    "room": "r310",
+    "room_label": "Suite 310",
+    "prob": 0.7,
+    "band": "mid",
+    "puck": "P1",
+    "r_min_m": 2.0,
+    "r_max_m": 6.0,
+    "polygon": [
+     [
+      9.5,
+      0.0
+     ],
+     [
+      9.5,
+      8.65
+     ],
+     [
+      0.0,
+      8.65
+     ],
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    "geo": {
+     "lat": 34.2032523,
+     "lon": -118.6299702
+    }
+   },
+   "ranges": [
+    {
+     "puck": "P1",
+     "kind": "ble",
+     "d_m": 3.6,
+     "sigma_m": 2.2,
+     "rssi": -70.0,
+     "los": null,
+     "age_s": 0.6
+    },
+    {
+     "puck": "P2",
+     "kind": "ble",
+     "d_m": 4.1,
+     "sigma_m": 2.5,
+     "rssi": -72.0,
+     "los": null,
+     "age_s": 0.9
+    }
+   ],
+   "bearing": null,
+   "report": {
+    "status": "sheltering",
+    "text": "Under the desk by the window",
+    "people": 1,
+    "can_move": true,
+    "battery_pct": 77,
+    "floor_reported": 3,
+    "baro_hpa": null,
+    "still": true,
+    "still_s": 80,
+    "platform": "web",
+    "app": "0.1",
+    "home_suite": "310",
+    "safe_outside": false,
+    "age_s": 3.1,
+    "model": null,
+    "chip": null
+   },
+   "track": {
+    "first_seen_s": 40.0,
+    "last_seen_s": 0.6,
+    "updates": 80,
+    "moving": false,
+    "speed": 0.0
+   },
+   "stale": false,
+   "text": "Phone B4: 1 person, can move, sheltering. Bluetooth only: in Suite 310 (probability 0.7), 2 to 6 m from puck P1"
+  },
+  {
+   "id": "B5",
+   "eid": "1f9a03be",
+   "opt_in": true,
+   "simulated": true,
+   "sample": true,
+   "method": "ble-presence",
+   "geometry": "none",
+   "x": null,
+   "y": null,
+   "sigma_m": null,
+   "cov": null,
+   "geo": null,
+   "node": null,
+   "floor": null,
+   "floor_source": null,
+   "confidence": null,
+   "room": null,
+   "room_label": null,
+   "room_prob": null,
+   "ring": null,
+   "candidates": [],
+   "pruned": [],
+   "zone": null,
+   "ranges": [],
+   "bearing": null,
+   "report": {
+    "status": "ok",
+    "text": "I am out, at the assembly point",
+    "people": 1,
+    "can_move": true,
+    "battery_pct": 88,
+    "floor_reported": null,
+    "baro_hpa": null,
+    "still": null,
+    "still_s": null,
+    "platform": "ios",
+    "app": "0.1",
+    "home_suite": "310",
+    "safe_outside": true,
+    "age_s": 6.0,
+    "model": "iPhone 15",
+    "chip": "U2",
+    "network": "cell"
+   },
+   "track": {
+    "first_seen_s": 55.0,
+    "last_seen_s": 6.0,
+    "updates": 12,
+    "moving": false,
+    "speed": 0.0
+   },
+   "stale": false,
+   "text": "Phone B5: says safe outside (I am out). Accounted for, not a victim"
+  }
+ ],
+ "presence": [
+  {
+   "id": "C1",
+   "method": "ble-presence",
+   "opt_in": false,
+   "simulated": true,
+   "sample": true,
+   "puck": "P1",
+   "floor": "f3",
+   "room": "r310",
+   "room_label": "Suite 310",
+   "count": 5,
+   "count_range": [
+    3,
+    7
+   ],
+   "zones": {
+    "near": 3,
+    "mid": 2,
+    "far": 4
+   },
+   "window_s": 30,
+   "confidence": 0.5,
+   "geo": {
+    "lat": 34.2032523,
+    "lon": -118.6299702
+   },
+   "text": "About 5 devices advertising within about 3.5 m of puck P1 in Suite 310 (between 3 and 7); 4 more farther away or through a wall. Devices, not people; no identities kept"
+  },
+  {
+   "id": "C2",
+   "method": "ble-presence",
+   "opt_in": false,
+   "simulated": true,
+   "sample": true,
+   "puck": "P2",
+   "floor": "f3",
+   "room": "r310",
+   "room_label": "Suite 310",
+   "count": 5,
+   "count_range": [
+    3,
+    7
+   ],
+   "zones": {
+    "near": 4,
+    "mid": 1,
+    "far": 3
+   },
+   "window_s": 30,
+   "confidence": 0.5,
+   "geo": {
+    "lat": 34.2032523,
+    "lon": -118.6299702
+   },
+   "text": "About 5 devices advertising within about 3.5 m of puck P2 in Suite 310 (between 3 and 7); 3 more farther away or through a wall. Devices, not people; no identities kept"
+  },
+  {
+   "id": "C3",
+   "method": "ble-presence",
+   "opt_in": false,
+   "simulated": true,
+   "sample": true,
+   "puck": "P3",
+   "floor": "f3",
+   "room": "r310",
+   "room_label": "Suite 310",
+   "count": 4,
+   "count_range": [
+    3,
+    7
+   ],
+   "zones": {
+    "near": 2,
+    "mid": 2,
+    "far": 5
+   },
+   "window_s": 30,
+   "confidence": 0.5,
+   "geo": {
+    "lat": 34.2032523,
+    "lon": -118.6299702
+   },
+   "text": "About 4 devices advertising within about 3.5 m of puck P3 in Suite 310 (between 3 and 7); 5 more farther away or through a wall. Devices, not people; no identities kept"
+  }
+ ],
+ "accountability": {
+  "source": {
+   "costar_mode": "fixture",
+   "real_sponsor_data": false,
+   "text": "Building record: public open data with named sources; CoStar-only fields are empty. Tenant names withheld. Not CoStar data."
+  },
+  "floor": "f3",
+  "suites": [
+   {
+    "suite": "300",
+    "room": "r300",
+    "room_label": "Suite 300",
+    "tenant": "Medical & diagnostic laboratories (name withheld)",
+    "tenants": 1,
+    "industry": "Medical & diagnostic laboratories",
+    "naics": [
+     "621510"
+    ],
+    "vacant": false,
+    "life_hazard": "few occupants; staff only",
+    "hazmat": "laboratory reagents, biological samples, compressed gases likely",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (few occupants; staff only)",
+    "priority": 7
+   },
+   {
+    "suite": "301",
+    "room": "r301",
+    "room_label": "Suite 301",
+    "tenant": "Hospitals (name withheld)",
+    "tenants": 1,
+    "industry": "Hospitals",
+    "naics": [
+     "622000"
+    ],
+    "vacant": false,
+    "life_hazard": "hospital outpatient department: patients may be non-ambulatory or under treatment",
+    "hazmat": "medical gases, sharps and biohazard waste likely",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment)",
+    "priority": 2
+   },
+   {
+    "suite": "302",
+    "room": "r302",
+    "room_label": "Suite 302",
+    "tenant": "Physicians (name withheld)",
+    "tenants": 1,
+    "industry": "Offices of physicians (except mental health specialists)",
+    "naics": [
+     "621111"
+    ],
+    "vacant": false,
+    "life_hazard": "medical patients, some with limited mobility",
+    "hazmat": "medical oxygen possible",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility)",
+    "priority": 4
+   },
+   {
+    "suite": "303",
+    "room": "r303",
+    "room_label": "Suite 303",
+    "tenant": null,
+    "tenants": 0,
+    "industry": null,
+    "naics": [],
+    "vacant": true,
+    "life_hazard": null,
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": null,
+    "synthetic": false,
+    "expected": {
+     "people": 0,
+     "low": 0,
+     "high": 0,
+     "basis": "no tenant on record for this suite (fixture: no active business registration); estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "vacant-on-record",
+    "unaccounted": {
+     "low": 0,
+     "high": 0
+    },
+    "why": null,
+    "priority": null
+   },
+   {
+    "suite": "304",
+    "room": "r304",
+    "room_label": "Suite 304",
+    "tenant": "Physical, occupational & speech therapists, & audiologists (name withheld); Physicians (name withheld)",
+    "tenants": 2,
+    "industry": "Offices of physical, occupational & speech therapists, & audiologists; Offices of physicians (except mental health specialists)",
+    "naics": [
+     "621340",
+     "621111"
+    ],
+    "vacant": false,
+    "life_hazard": "therapy patients with limited mobility; medical patients, some with limited mobility",
+    "hazmat": "medical oxygen possible",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (therapy patients with limited mobility; medical patients, some with limited mobility)",
+    "priority": 6
+   },
+   {
+    "suite": "305",
+    "room": "r305",
+    "room_label": "Suite 305",
+    "tenant": "Other accounting services (name withheld)",
+    "tenants": 1,
+    "industry": "Other accounting services",
+    "naics": [
+     "541219"
+    ],
+    "vacant": false,
+    "life_hazard": null,
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 1,
+     "high": 7,
+     "basis": "1,040 sf (twin room area) at 150 sf per person (business load factor, building-code maximum 7), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 1,
+     "high": 7
+    },
+    "why": "no puck in range yet; the record expects about 4 people",
+    "priority": 8
+   },
+   {
+    "suite": "306",
+    "room": "r306",
+    "room_label": "Suite 306",
+    "tenant": "Physicians (name withheld); All other miscellaneous health practitioners (name withheld)",
+    "tenants": 2,
+    "industry": "Offices of physicians (except mental health specialists); Offices of all other miscellaneous health practitioners",
+    "naics": [
+     "621111",
+     "621399"
+    ],
+    "vacant": false,
+    "life_hazard": "medical patients, some with limited mobility; patients with limited mobility possible",
+    "hazmat": "medical oxygen possible",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility; patients with limited mobility possible)",
+    "priority": 5
+   },
+   {
+    "suite": "307",
+    "room": "r307",
+    "room_label": "Suite 307",
+    "tenant": "Podiatrists (name withheld)",
+    "tenants": 1,
+    "industry": "Offices of podiatrists",
+    "naics": [
+     "621391"
+    ],
+    "vacant": false,
+    "life_hazard": "patients with limited mobility possible",
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "unscanned",
+    "unaccounted": {
+     "low": 2,
+     "high": 9
+    },
+    "why": "no puck in range yet; the record expects about 4 people (patients with limited mobility possible)",
+    "priority": 3
+   },
+   {
+    "suite": "308",
+    "room": "r308",
+    "room_label": "Suite 308",
+    "tenant": null,
+    "tenants": 0,
+    "industry": null,
+    "naics": [],
+    "vacant": true,
+    "life_hazard": null,
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": null,
+    "synthetic": false,
+    "expected": {
+     "people": 0,
+     "low": 0,
+     "high": 0,
+     "basis": "no tenant on record for this suite (fixture: no active business registration); estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "vacant-on-record",
+    "unaccounted": {
+     "low": 0,
+     "high": 0
+    },
+    "why": null,
+    "priority": null
+   },
+   {
+    "suite": "309",
+    "room": "r309",
+    "room_label": "Suite 309",
+    "tenant": null,
+    "tenants": 0,
+    "industry": null,
+    "naics": [],
+    "vacant": true,
+    "life_hazard": null,
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": null,
+    "synthetic": false,
+    "expected": {
+     "people": 0,
+     "low": 0,
+     "high": 0,
+     "basis": "no tenant on record for this suite (fixture: no active business registration); estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "vacant-on-record",
+    "unaccounted": {
+     "low": 0,
+     "high": 0
+    },
+    "why": null,
+    "priority": null
+   },
+   {
+    "suite": "310",
+    "room": "r310",
+    "room_label": "Suite 310",
+    "tenant": "Dentists (name withheld)",
+    "tenants": 1,
+    "industry": "Offices of dentists",
+    "naics": [
+     "621210"
+    ],
+    "vacant": false,
+    "life_hazard": "dental patients may be sedated or mid-procedure",
+    "hazmat": "medical oxygen and nitrous oxide cylinders likely",
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": "City of Los Angeles, Listing of Active Businesses",
+    "synthetic": false,
+    "expected": {
+     "people": 4,
+     "low": 2,
+     "high": 9,
+     "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate"
+    },
+    "app_registered": 5,
+    "safe_outside": 1,
+    "phones_opt_in": 4,
+    "people_reported": 5,
+    "located": 1,
+    "cold_devices": 5,
+    "cold_range": [
+     3,
+     7
+    ],
+    "cannot_move": 2,
+    "state": "people-reported",
+    "unaccounted": {
+     "low": 0,
+     "high": 3
+    },
+    "why": "5 people reported by 4 phones, 2 cannot move, 1 located; tenant: dental patients may be sedated or mid-procedure",
+    "priority": 1
+   },
+   {
+    "suite": "311",
+    "room": "r311",
+    "room_label": "Suite 311",
+    "tenant": null,
+    "tenants": 0,
+    "industry": null,
+    "naics": [],
+    "vacant": true,
+    "life_hazard": null,
+    "hazmat": null,
+    "sf": null,
+    "sf_source": "twin room area",
+    "record_source": null,
+    "synthetic": false,
+    "expected": {
+     "people": 0,
+     "low": 0,
+     "high": 0,
+     "basis": "no tenant on record for this suite (fixture: no active business registration); estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": 0,
+    "cold_range": [
+     0,
+     0
+    ],
+    "cannot_move": 0,
+    "state": "vacant-on-record",
+    "unaccounted": {
+     "low": 0,
+     "high": 0
+    },
+    "why": null,
+    "priority": null
+   }
+  ],
+  "totals": {
+   "suites": 12,
+   "suites_vacant_on_record": 4,
+   "expected_people": 32,
+   "expected_high": 70,
+   "app_registered": 5,
+   "safe_outside": 1,
+   "phones_opt_in": 4,
+   "people_reported": 5,
+   "located": 1,
+   "cold_devices": 5,
+   "suites_unscanned": 7,
+   "unaccounted_low": 13,
+   "unaccounted_high": 64
+  },
+  "priorities": [
+   {
+    "rank": 1,
+    "suite": "310",
+    "room": "r310",
+    "action": "rescue",
+    "target": "B1",
+    "text": "Rescue Suite 310: 5 people reported by 4 phones, 2 cannot move, 1 located; tenant: dental patients may be sedated or mid-procedure"
+   },
+   {
+    "rank": 2,
+    "suite": "301",
+    "room": "r301",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 301: no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment)"
+   },
+   {
+    "rank": 3,
+    "suite": "307",
+    "room": "r307",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 307: no puck in range yet; the record expects about 4 people (patients with limited mobility possible)"
+   },
+   {
+    "rank": 4,
+    "suite": "302",
+    "room": "r302",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 302: no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility)"
+   },
+   {
+    "rank": 5,
+    "suite": "306",
+    "room": "r306",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 306: no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility; patients with limited mobility possible)"
+   },
+   {
+    "rank": 6,
+    "suite": "304",
+    "room": "r304",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 304: no puck in range yet; the record expects about 4 people (therapy patients with limited mobility; medical patients, some with limited mobility)"
+   },
+   {
+    "rank": 7,
+    "suite": "300",
+    "room": "r300",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 300: no puck in range yet; the record expects about 4 people (few occupants; staff only)"
+   },
+   {
+    "rank": 8,
+    "suite": "305",
+    "room": "r305",
+    "action": "scan",
+    "target": null,
+    "text": "Throw a puck into Suite 305: no puck in range yet; the record expects about 4 people"
+   }
+  ],
+  "next_puck": {
+   "suite": "301",
+   "room": "r301",
+   "door": [
+    25.6,
+    12.97
+   ],
+   "text": "Next puck: Suite 301 (no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment))"
+  },
+  "record_checks": [],
+  "assumptions": {
+   "utilisation_open": 0.5,
+   "utilisation_closed": 0.05,
+   "open_hours": [
+    8.0,
+    18.0
+   ],
+   "load_factors_sf_per_person": {
+    "outpatient": 100.0,
+    "business": 150.0
+   },
+   "note": "expected people are estimates from floor area and building-code load factors unless the record carries a head count"
+  },
+  "text": "Floor record: 8 occupied suites, about 32 people expected (estimate, up to 70). Phones: 4 inside reporting 5 people, 1 located; 1 reported safe outside. 7 occupied suites have no puck in range. First: Rescue Suite 310: 5 people reported by 4 phones, 2 cannot move, 1 located; tenant: dental patients may be sedated or mid-procedure.",
+  "sample": true
+ },
+ "limits": [
+  "SAMPLE: every value in this file is hand-made to show the shape of the feed (the accountability block is computed from these hand-made phones by beacon.roster).",
+  "SIMULATED: every number on this feed comes from the simulator's stated noise model (hello.noise), not from a measurement.",
+  "A phone with no app cannot be ranged or identified: cold presence is a band of advertising devices per puck, never a position or an identity. Devices are not people: watches, earbuds and laptops advertise too, and some phones do not.",
+  "Cold count band: count = devices in the near and mid bands of one puck (signal at least -75 dBm: a few metres in line of sight; attributed to the puck's room); lower bound = half the count rounded down, but never fewer than the opt-in phones the feed places in that room (they advertise too); upper bound = the count plus half the far-band devices rounded up (some far devices are in the room behind furniture or bodies). Over-count causes: address rotation and several advertising sets per device. Under-count causes: idle phones that do not advertise, bodies. Entries from several pucks in one room hear the same devices: do not add them up.",
+  "A ring stays a ring: x and y are published only when the geometry is a fix. One puck gives a ring, two pucks two mirror-image candidates, three pucks not in a line (or one puck plus the phone's own bearing) one fix.",
+  "Bluetooth signal strength gives metres, not centimetres: a Bluetooth-only phone is a band or a room, never a precise point.",
+  "The twin prunes positions (outside the building, inside a wall, the wrong room for a line-of-sight link). This twin is a synthetic interior fitted to the real footprint, so pruning is only as good as its invented walls.",
+  "Floors come from the occupant's own report when given; otherwise the pucks' floor is assumed.",
+  "A phone not heard for 20 s is marked stale and its uncertainty grows by 0.25 m per second; it is dropped after 15 minutes."
+ ],
+ "privacy": {
+  "opt_in_only": true,
+  "cold_identities_kept": false,
+  "retention_s": 900.0,
+  "text": "Only phones whose owners installed the app and started sharing are identified, by a rotating id that is not a name, a number or a hardware address. Devices with no app are counted per signal-strength band and never identified or stored. A phone that stops sharing is forgotten at once; everything else is deleted 15 minutes after the phone was last heard."
+ }
+}

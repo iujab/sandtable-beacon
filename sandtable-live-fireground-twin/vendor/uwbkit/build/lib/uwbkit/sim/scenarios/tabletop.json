@@ -1,0 +1,35 @@
+{
+  "name": "tabletop",
+  "description": "A 1.2 x 0.8 m table with 4 anchors flat at its corners (z = 0) and a puck tag slid around by hand (0.2-0.25 m/s, two short rests). Small noise (sigma 2 cm) for game-board and tangible-UI demos.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [1.2, 0], [1.2, 0.8], [0, 0.8]],
+    "walls": [],
+    "labels": [{"name": "home", "at": [0.3, 0.25]}, {"name": "goal", "at": [0.95, 0.55]}]
+  },
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "A2": {"x": 1.2, "y": 0.0, "z": 0.0},
+    "A3": {"x": 1.2, "y": 0.8, "z": 0.0},
+    "A4": {"x": 0.0, "y": 0.8, "z": 0.0}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "puck", "z": 0.0, "path_mode": "spline", "jitter_m": 0.003,
+      "path": [
+        {"at": [0.3, 0.25], "t": 0},
+        {"at": [0.9, 0.22], "speed": 0.25},
+        {"at": [0.95, 0.55], "speed": 0.2, "hold_s": 2},
+        {"at": [0.35, 0.6], "speed": 0.25},
+        {"at": [0.6, 0.4], "speed": 0.2, "hold_s": 1}
+      ],
+      "speed": 0.2
+    }
+  },
+  "noise": {"sigma_m": 0.02, "nlos_extra_sigma_m": 0.05, "outlier_prob": 0.01, "outlier_m": 0.3, "dropout_prob": 0.02,
+            "rssi_1m_dbm": -62.0},
+  "seed": 17
+}

@@ -1,0 +1,856 @@
+{
+ "schema": "sandtable.radar_arithmetic/1",
+ "generated": "2026-11-14T12:13:19-06:00",
+ "simulated": false,
+ "kind": "arithmetic and geometry from datasheet constants; no radio data",
+ "frame_timing": {
+  "prf": "64 MHz (BPRF)",
+  "shr_symbol_ns": 1017.63,
+  "preamble": {
+   "32": {
+    "preamble_us": 32.56,
+    "preamble_plus_sfd_us": 40.71,
+    "blind_range_m_for_shr": 6102.0
+   },
+   "64": {
+    "preamble_us": 65.13,
+    "preamble_plus_sfd_us": 73.27,
+    "blind_range_m_for_shr": 10983.0
+   },
+   "128": {
+    "preamble_us": 130.26,
+    "preamble_plus_sfd_us": 138.4,
+    "blind_range_m_for_shr": 20745.0
+   },
+   "1024": {
+    "preamble_us": 1042.05,
+    "preamble_plus_sfd_us": 1050.19,
+    "blind_range_m_for_shr": 157420.0
+   }
+  },
+  "round_trip_to_wall": {
+   "1 m": {
+    "round_trip_ns": 6.67,
+    "shortest_preamble_over_round_trip": 4881.0
+   },
+   "2 m": {
+    "round_trip_ns": 13.34,
+    "shortest_preamble_over_round_trip": 2441.0
+   },
+   "3 m": {
+    "round_trip_ns": 20.01,
+    "shortest_preamble_over_round_trip": 1627.0
+   },
+   "4 m": {
+    "round_trip_ns": 26.69,
+    "shortest_preamble_over_round_trip": 1220.0
+   },
+   "5 m": {
+    "round_trip_ns": 33.36,
+    "shortest_preamble_over_round_trip": 976.0
+   },
+   "6 m": {
+    "round_trip_ns": 40.03,
+    "shortest_preamble_over_round_trip": 814.0
+   }
+  },
+  "room_diagonal_m": 12.85,
+  "room_diagonal_round_trip_ns": 85.7,
+  "note": "Lower bound on the frame: the preamble (and SFD) alone. PHR and payload add more. The echo of every part of the frame arrives while that frame is still being sent, and the DW3000's antenna is switched to the transmitter for the whole frame."
+ },
+ "resolution": {
+  "contrast_x4_1p4ghz_monostatic_range_resolution_m": 0.107,
+  "bandwidth_mhz": 499.2,
+  "monostatic_range_resolution_m": 0.3,
+  "bistatic_path_resolution_m": 0.601,
+  "bistatic_range_resolution_m_by_bistatic_angle": {
+   "0 deg": 0.3,
+   "60 deg": 0.347,
+   "90 deg": 0.425,
+   "120 deg": 0.601,
+   "150 deg": 1.16,
+   "170 deg": 3.445
+  },
+  "pulse_width_1_over_B_ns": 2.003,
+  "tap_ns": 1.0016,
+  "tap_path_m": 0.3,
+  "tap_monostatic_range_m": 0.15,
+  "note": "Resolution = how far apart two echoes must be to show as two. Path resolution c/B; projected onto the plane it is c/(2B cos(beta/2)), beta = bistatic angle at the target (derived from the gradient of R1 + R2, whose length is 2 cos(beta/2)). Accuracy of a single isolated echo can be a fraction of a tap; resolution cannot."
+ },
+ "wavelength": {
+  "ch5_wavelength_mm": 46.2,
+  "ch9_wavelength_mm": 37.53,
+  "ch5_phase_deg_per_mm_path": 7.79,
+  "chest_motion_ch5": [
+   {
+    "chest_mm": 1,
+    "beta0_path_change_mm": 2.0,
+    "beta0_phase_rad": 0.272,
+    "beta0_phase_deg": 15.6,
+    "beta90_path_change_mm": 1.41,
+    "beta90_phase_rad": 0.192,
+    "beta90_phase_deg": 11.0
+   },
+   {
+    "chest_mm": 2,
+    "beta0_path_change_mm": 4.0,
+    "beta0_phase_rad": 0.544,
+    "beta0_phase_deg": 31.2,
+    "beta90_path_change_mm": 2.83,
+    "beta90_phase_rad": 0.385,
+    "beta90_phase_deg": 22.0
+   },
+   {
+    "chest_mm": 3,
+    "beta0_path_change_mm": 6.0,
+    "beta0_phase_rad": 0.816,
+    "beta0_phase_deg": 46.8,
+    "beta90_path_change_mm": 4.24,
+    "beta90_phase_rad": 0.577,
+    "beta90_phase_deg": 33.1
+   },
+   {
+    "chest_mm": 4,
+    "beta0_path_change_mm": 8.0,
+    "beta0_phase_rad": 1.088,
+    "beta0_phase_deg": 62.3,
+    "beta90_path_change_mm": 5.66,
+    "beta90_phase_rad": 0.769,
+    "beta90_phase_deg": 44.1
+   },
+   {
+    "chest_mm": 5,
+    "beta0_path_change_mm": 10.0,
+    "beta0_phase_rad": 1.36,
+    "beta0_phase_deg": 77.9,
+    "beta90_path_change_mm": 7.07,
+    "beta90_phase_rad": 0.962,
+    "beta90_phase_deg": 55.1
+   }
+  ],
+  "note": "Phase change of the echo = 2 pi x (path change) / lambda; path change = 2 x chest motion x cos(beta/2) for motion along the bistatic bisector. beta = 0 is the monostatic best case."
+ },
+ "pairs": [
+  {
+   "pucks": 1,
+   "pairs_ellipses": 0,
+   "ordered_links": 0,
+   "self_location_unknowns_2d": 0,
+   "self_location_redundancy": 0,
+   "what_it_gives": "nothing: the board cannot receive while it transmits"
+  },
+  {
+   "pucks": 2,
+   "pairs_ellipses": 1,
+   "ordered_links": 2,
+   "self_location_unknowns_2d": 1,
+   "self_location_redundancy": 0,
+   "what_it_gives": "one ellipse: presence, echo path length and breathing; no position"
+  },
+  {
+   "pucks": 3,
+   "pairs_ellipses": 3,
+   "ordered_links": 6,
+   "self_location_unknowns_2d": 3,
+   "self_location_redundancy": 0,
+   "what_it_gives": "three ellipses: a 2-D position, no redundancy in the self-location"
+  },
+  {
+   "pucks": 4,
+   "pairs_ellipses": 6,
+   "ordered_links": 12,
+   "self_location_unknowns_2d": 5,
+   "self_location_redundancy": 1,
+   "what_it_gives": "six ellipses: a 2-D position with redundancy; one bad link can be outvoted"
+  },
+  {
+   "pucks": 5,
+   "pairs_ellipses": 10,
+   "ordered_links": 20,
+   "self_location_unknowns_2d": 7,
+   "self_location_redundancy": 3,
+   "what_it_gives": "ten ellipses: a 2-D position, better geometry, outlier rejection, a coarse echo map"
+  }
+ ],
+ "gdop": {
+  "sample_throw": {
+   "3": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3"
+     ],
+     "median": 2.22,
+     "p90": 3.33,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 2.8,
+      "room centre (4.75, 4.33)": 1.44,
+      "north-west corner (1.0, 7.65)": 3.05
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 1.31,
+     "worst": 2.26,
+     "n_subsets": 10
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.22
+   },
+   "4": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3",
+      "P4"
+     ],
+     "median": 1.04,
+     "p90": 1.65,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 1.18,
+      "room centre (4.75, 4.33)": 0.65,
+      "north-west corner (1.0, 7.65)": 1.91
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 0.82,
+     "worst": 1.04,
+     "n_subsets": 5
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.1
+   },
+   "5": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5"
+     ],
+     "median": 0.67,
+     "p90": 0.99,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 0.8,
+      "room centre (4.75, 4.33)": 0.44,
+      "north-west corner (1.0, 7.65)": 1.02
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 0.67,
+     "worst": 0.67,
+     "n_subsets": 1
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.07
+   }
+  },
+  "spread_contrast": {
+   "3": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3"
+     ],
+     "median": 1.02,
+     "p90": 1.31,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 1.09,
+      "room centre (4.75, 4.33)": 1.0,
+      "north-west corner (1.0, 7.65)": 1.18
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 0.99,
+     "worst": 1.17,
+     "n_subsets": 10
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.1
+   },
+   "4": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3",
+      "P4"
+     ],
+     "median": 0.66,
+     "p90": 0.71,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 0.71,
+      "room centre (4.75, 4.33)": 0.71,
+      "north-west corner (1.0, 7.65)": 0.76
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 0.66,
+     "worst": 0.67,
+     "n_subsets": 5
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.07
+   },
+   "5": {
+    "first_n_in_throw_order": {
+     "pucks": [
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5"
+     ],
+     "median": 0.49,
+     "p90": 0.54,
+     "share_over_5": 0.0,
+     "at_points": {
+      "sample victim (2.4, 2.1)": 0.55,
+      "room centre (4.75, 4.33)": 0.51,
+      "north-west corner (1.0, 7.65)": 0.6
+     }
+    },
+    "all_subsets_room_median_gdop": {
+     "best": 0.49,
+     "worst": 0.49,
+     "n_subsets": 1
+    },
+    "sigma_xy_m_at_room_median_for_sigma_path_0p10": 0.05
+   }
+  },
+  "note": "GDOP = sqrt(trace((J^T J)^-1)), J rows = gradient of R1 + R2 for every pair; position error ~ GDOP x per-link path error. Grid 0.25 m inside the room, cells within 0.3 m of a puck skipped. Infinite GDOP (on a baseline, or one link only) counts as over 5. sigma_path 0.1 m is an ASSUMPTION used only to show the scale."
+ },
+ "consistent_regions": {
+  "tol_0.30_m_path": {
+   "2": {
+    "area_m2": 4.01,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 7.28
+   },
+   "3": {
+    "area_m2": 0.4,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 1.32
+   },
+   "4": {
+    "area_m2": 0.21,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 0.64
+   },
+   "5": {
+    "area_m2": 0.15,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 0.4
+   }
+  },
+  "tol_0.10_m_path": {
+   "2": {
+    "area_m2": 1.32,
+    "separate_regions": 2,
+    "farthest_consistent_point_m": 7.26
+   },
+   "3": {
+    "area_m2": 0.05,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 0.4
+   },
+   "4": {
+    "area_m2": 0.02,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 0.11
+   },
+   "5": {
+    "area_m2": 0.02,
+    "separate_regions": 1,
+    "farthest_consistent_point_m": 0.08
+   }
+  },
+  "note": "Area of the room whose bistatic path on EVERY link matches the sample victim's within the tolerance (no noise, exact puck positions, first N pucks in throw order). 0.30 m of path = one CIR tap; 0.10 m = a sub-tap estimate. 'separate_regions' (8-connected, 5 cm cells) > 1 means pieces that do not touch at this grid; 'farthest_consistent_point_m' is how far from the true target a point can sit and still satisfy every pair."
+ },
+ "self_location_error": {
+  "sample_victim": {
+   "3": {
+    "3 cm": {
+     "median_m": 0.107,
+     "p90_m": 0.241
+    },
+    "5 cm": {
+     "median_m": 0.172,
+     "p90_m": 0.391
+    },
+    "10 cm": {
+     "median_m": 0.31,
+     "p90_m": 0.782
+    },
+    "20 cm": {
+     "median_m": 0.676,
+     "p90_m": 1.671
+    }
+   },
+   "4": {
+    "3 cm": {
+     "median_m": 0.054,
+     "p90_m": 0.126
+    },
+    "5 cm": {
+     "median_m": 0.088,
+     "p90_m": 0.209
+    },
+    "10 cm": {
+     "median_m": 0.203,
+     "p90_m": 0.441
+    },
+    "20 cm": {
+     "median_m": 0.346,
+     "p90_m": 0.872
+    }
+   },
+   "5": {
+    "3 cm": {
+     "median_m": 0.044,
+     "p90_m": 0.099
+    },
+    "5 cm": {
+     "median_m": 0.071,
+     "p90_m": 0.16
+    },
+    "10 cm": {
+     "median_m": 0.146,
+     "p90_m": 0.319
+    },
+    "20 cm": {
+     "median_m": 0.309,
+     "p90_m": 0.7
+    }
+   }
+  },
+  "room_centre": {
+   "3": {
+    "3 cm": {
+     "median_m": 0.044,
+     "p90_m": 0.094
+    },
+    "5 cm": {
+     "median_m": 0.074,
+     "p90_m": 0.158
+    },
+    "10 cm": {
+     "median_m": 0.164,
+     "p90_m": 0.321
+    },
+    "20 cm": {
+     "median_m": 0.3,
+     "p90_m": 0.669
+    }
+   },
+   "4": {
+    "3 cm": {
+     "median_m": 0.03,
+     "p90_m": 0.056
+    },
+    "5 cm": {
+     "median_m": 0.05,
+     "p90_m": 0.092
+    },
+    "10 cm": {
+     "median_m": 0.097,
+     "p90_m": 0.196
+    },
+    "20 cm": {
+     "median_m": 0.185,
+     "p90_m": 0.37
+    }
+   },
+   "5": {
+    "3 cm": {
+     "median_m": 0.02,
+     "p90_m": 0.042
+    },
+    "5 cm": {
+     "median_m": 0.039,
+     "p90_m": 0.071
+    },
+    "10 cm": {
+     "median_m": 0.073,
+     "p90_m": 0.133
+    },
+    "20 cm": {
+     "median_m": 0.138,
+     "p90_m": 0.282
+    }
+   }
+  },
+  "note": "Monte Carlo, seed 310, 400 trials: each puck position off by N(0, s) per axis, echo excess path exact, the solver uses the wrong puck positions (and the baseline between them). Target error relative to the pucks' own frame; registration into the twin adds its own error on top. Pucks: first N of the sample throw."
+ },
+ "link_budget": {
+  "person_rcs_m2_assumed": 0.6,
+  "formula": "echo/direct amplitude = sqrt(rcs / (4 pi)) x d / (R1 x R2), isotropic antennas",
+  "symmetric_case_baseline_2m": {
+   "note": "target on the perpendicular bisector of a 2 m baseline, distance from the baseline centre",
+   "echo_to_direct_db": {
+    "1 m": -13.2,
+    "2 m": -21.2,
+    "3 m": -27.2,
+    "4 m": -31.8,
+    "5 m": -35.5,
+    "6 m": -38.6
+   }
+  },
+  "sample_victim_per_link": [
+   {
+    "pair": "P1-P2",
+    "baseline_m": 2.4,
+    "R1_m": 7.17,
+    "R2_m": 4.78,
+    "echo_to_direct_db": -36.3
+   },
+   {
+    "pair": "P1-P3",
+    "baseline_m": 3.42,
+    "R1_m": 7.17,
+    "R2_m": 5.24,
+    "echo_to_direct_db": -34.0
+   },
+   {
+    "pair": "P1-P4",
+    "baseline_m": 3.21,
+    "R1_m": 7.17,
+    "R2_m": 5.32,
+    "echo_to_direct_db": -34.7
+   },
+   {
+    "pair": "P1-P5",
+    "baseline_m": 4.77,
+    "R1_m": 7.17,
+    "R2_m": 2.96,
+    "echo_to_direct_db": -26.2
+   },
+   {
+    "pair": "P2-P3",
+    "baseline_m": 2.14,
+    "R1_m": 4.78,
+    "R2_m": 5.24,
+    "echo_to_direct_db": -34.6
+   },
+   {
+    "pair": "P2-P4",
+    "baseline_m": 2.42,
+    "R1_m": 4.78,
+    "R2_m": 5.32,
+    "echo_to_direct_db": -33.6
+   },
+   {
+    "pair": "P2-P5",
+    "baseline_m": 2.47,
+    "R1_m": 4.78,
+    "R2_m": 2.96,
+    "echo_to_direct_db": -28.4
+   },
+   {
+    "pair": "P3-P4",
+    "baseline_m": 4.56,
+    "R1_m": 5.24,
+    "R2_m": 5.32,
+    "echo_to_direct_db": -28.9
+   },
+   {
+    "pair": "P3-P5",
+    "baseline_m": 2.28,
+    "R1_m": 5.24,
+    "R2_m": 2.96,
+    "echo_to_direct_db": -29.9
+   },
+   {
+    "pair": "P4-P5",
+    "baseline_m": 4.24,
+    "R1_m": 5.32,
+    "R2_m": 2.96,
+    "echo_to_direct_db": -24.6
+   }
+  ],
+  "sample_victim_best_db": -24.6,
+  "sample_victim_median_db": -31.8,
+  "sample_victim_worst_db": -36.3,
+  "real_reference_dwm1000": {
+   "noise_floor_db": -33.0,
+   "quiet_scene_residual_after_direct_path_db": -21.9,
+   "source": "l08_real_eth"
+  },
+  "coherent_integration_gain_db_at_20hz_upper_bound": {
+   "0.5 s": 10.0,
+   "1 s": 13.0,
+   "2 s": 16.0
+  },
+  "note": "Relative levels only: antenna gains, polarisation, wall loss and the body's real cross-section are left out. The real reference levels come from different hardware (DWM1000) in a 4 m room."
+ },
+ "smoke": {
+  "smoke_particle_diameter_m": [
+   1e-08,
+   1e-06
+  ],
+  "measured_mean_diameter_m": [
+   4e-08,
+   3.5e-07
+  ],
+  "sensors": {
+   "visible: 0.4 - 0.7 um": {
+    "band_m": [
+     4e-07,
+     7e-07
+    ],
+    "wavelength_used_m": 5.291502622129181e-07,
+    "x_for_0.1um": 0.594,
+    "regime_for_0.1um": "Mie",
+    "x_for_1um": 5.94,
+    "regime_for_1um": "Mie"
+   },
+   "lidar: 905 nm": {
+    "band_m": [
+     9.05e-07,
+     9.05e-07
+    ],
+    "wavelength_used_m": 9.05e-07,
+    "x_for_0.1um": 0.347,
+    "regime_for_0.1um": "Mie",
+    "x_for_1um": 3.47,
+    "regime_for_1um": "Mie"
+   },
+   "lidar: 1550 nm": {
+    "band_m": [
+     1.55e-06,
+     1.55e-06
+    ],
+    "wavelength_used_m": 1.55e-06,
+    "x_for_0.1um": 0.203,
+    "regime_for_0.1um": "Mie",
+    "x_for_1um": 2.03,
+    "regime_for_1um": "Mie"
+   },
+   "lwir: 8 - 14 um": {
+    "band_m": [
+     8e-06,
+     1.4e-05
+    ],
+    "wavelength_used_m": 1.0583005244258361e-05,
+    "x_for_0.1um": 0.0297,
+    "regime_for_0.1um": "Rayleigh",
+    "x_for_1um": 0.297,
+    "regime_for_1um": "Mie"
+   },
+   "uwb: ch 5, 46.2 mm": {
+    "band_m": [
+     0.04619582994329389,
+     0.04619582994329389
+    ],
+    "wavelength_used_m": 0.04619582994329389,
+    "x_for_0.1um": 6.8e-06,
+    "regime_for_0.1um": "negligible scattering",
+    "x_for_1um": 6.8e-05,
+    "regime_for_1um": "negligible scattering"
+   },
+   "uwb: ch 9, 37.5 mm": {
+    "band_m": [
+     0.037534111828926284,
+     0.037534111828926284
+    ],
+    "wavelength_used_m": 0.037534111828926284,
+    "x_for_0.1um": 8.37e-06,
+    "regime_for_0.1um": "negligible scattering",
+    "x_for_1um": 8.37e-05,
+    "regime_for_1um": "negligible scattering"
+   }
+  },
+  "note": "x = pi d / lambda; regimes from psu_scattering. Scattering is not the only loss: soot absorbs light and infrared, and flames, water and walls are separate effects.",
+  "sources": {
+   "ul_smoke_2007": {
+    "what": "Fabian and Gandhi, Smoke Characterization Project, UL / Fire Protection Research Foundation, 2007",
+    "url": "https://code-authorities.ul.com/wp-content/uploads/2014/04/SmokeStudyTechnicalReport.pdf",
+    "used": "particles measured from 10 nm to 10 um; mean diameters 0.040-0.293 um in small-scale flaming tests (Table 9), 0.041-0.156 um non-flaming (Table 10), 0.05-0.35 um in the fire test room (Table 21)."
+   },
+   "leeds_2019": {
+    "what": "Mustafa, Andrews et al., Smoke Particle Size Distribution in Pine Wood Fires, ISFEH9, 2019",
+    "url": "https://eprints.whiterose.ac.uk/157368/1/Mustafa%20et%20al%202019-ISFEH9%20Smoke%20Particle%20Size%20Distribution%20in%20Pine%20Wood%20Fires-k19-52.pdf",
+    "used": "ultra-fine particles < 100 nm early, then 100-1000 nm with a peak at 200 nm as the fire progressed."
+   },
+   "nist_tn1499": {
+    "what": "Amon, Bryner, Lock, Hamins, NIST Technical Note 1499, 2008 (thermal imagers for fire fighting)",
+    "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/TN/nbstechnicalnote1499.pdf",
+    "used": "visible 0.4-0.7 um; fire service thermal imagers 8-14 um."
+   },
+   "lidar_review": {
+    "what": "Li and Ibanez-Guzman, Lidar for Autonomous Driving, arXiv:2004.08467, 2020",
+    "url": "https://arxiv.org/pdf/2004.08467",
+    "used": "850-950 nm (905 nm mainstream) and 1550 nm lasers."
+   },
+   "psu_scattering": {
+    "what": "Brune, METEO 300 section 6.12, Penn State",
+    "url": "https://courses.ems.psu.edu/meteo300/node/785",
+    "used": "x = 2 pi r / lambda; x < 0.002 negligible scattering; 0.002-0.2 Rayleigh; 0.2-2000 Mie; Rayleigh cross-section ~ r^6 / lambda^4."
+   }
+  }
+ },
+ "layout": {
+  "room_m": [
+   9.5,
+   8.65
+  ],
+  "door": [
+   9.5,
+   7.2
+  ],
+  "pucks_sample_throw": {
+   "P1": [
+    7.9,
+    6.7
+   ],
+   "P2": [
+    6.2,
+    5.0
+   ],
+   "P3": [
+    7.5,
+    3.3
+   ],
+   "P4": [
+    4.7,
+    6.9
+   ],
+   "P5": [
+    5.3,
+    2.7
+   ]
+  },
+  "pucks_spread_contrast": {
+   "P1": [
+    8.6,
+    7.8
+   ],
+   "P2": [
+    0.9,
+    7.8
+   ],
+   "P3": [
+    0.9,
+    0.9
+   ],
+   "P4": [
+    8.6,
+    0.9
+   ],
+   "P5": [
+    4.75,
+    4.3
+   ]
+  },
+  "victim": [
+   2.4,
+   2.1
+  ],
+  "points": {
+   "sample victim (2.4, 2.1)": [
+    2.4,
+    2.1
+   ],
+   "room centre (4.75, 4.33)": [
+    4.75,
+    4.325
+   ],
+   "north-west corner (1.0, 7.65)": [
+    1.0,
+    7.65
+   ]
+  }
+ },
+ "l08_excerpt": {
+  "real_eth_json": {
+   "simulated": false,
+   "data": "ETH Zurich DWM1000 recording (doi:10.3929/ethz-b-000397625), four modules in a ~4 m square, 12 ordered links, 31 taps per frame, untagged walking person, motion-capture truth; L08's pipeline",
+   "direct_snr_db_median": 32.568,
+   "noise_floor_db_rel_direct": -33.033,
+   "post_peak_residual_db_quiet_scene": -21.874,
+   "fp_jitter_taps": 0.087,
+   "per_link_within_one_tap_of_truth": 0.327,
+   "per_link_chance_level": 0.098,
+   "median_abs_path_error_cm_of_matches": 14.1,
+   "tracking_verdict": "FAILED: the tracker follows clutter, not the person",
+   "tracking_inside_rectangle_median_cm": 187.0,
+   "tracking_inside_rectangle_p90_cm": 342.8
+  },
+  "simulated": {
+   "breathing_pair_mae_bpm": 2.017,
+   "breathing_pair_apnea_missed_of": [
+    2,
+    4
+   ],
+   "node_pos_sigma_m_vs_target_median_cm": {
+    "0.00": 1.96,
+    "0.03": 4.34,
+    "0.06": 8.27,
+    "0.10": 13.53
+   },
+   "noise_model": "direct-path SNR 36 dB at 1 m, first-path index jitter 0.03 tap + 0.4% one-tap misdetections, 3% gain jitter, random carrier phase per frame, 2% frame loss, 3 cm node-position error, static multipath, body sway 1.2 mm, person rcs 0.4-0.9 m^2"
+  },
+  "cir_notes": "DW3000 accumulator read with dwt_readaccdata, 6 bytes per complex sample, first-path index in 1/64 tap, 1016 samples at 64 MHz PRF, about 1.0016 ns per sample, valid only until the receiver is re-enabled (L08 hardware/CIR_NOTES.md, from the Qorvo driver and forum)."
+ },
+ "boards": "Qorvo DWM3001CDK (DWM3001C module: nRF52833 + DW3110), confirmed by the coordinator 2026-11-14",
+ "assumptions": {
+  "person_rcs_m2": 0.6,
+  "sigma_path_m": 0.1,
+  "layout": "sample throw from fixtures/scout/sample_scan.json; spread layout chosen by hand"
+ },
+ "sources": {
+  "dw3000_ds": {
+   "what": "Decawave/Qorvo DW3000 Datasheet, Version 1.1 (2020)",
+   "url": "https://atta.szlcsc.com/upload/public/pdf/source/20220621/2EAA42E8F3E2D83DDB8686FF8DCFAD44.pdf",
+   "used": "Table 16 (channels 5 and 9: 6489.6 and 7987.2 MHz, bandwidth 499.2 MHz); Table 18 (SHR symbol 993.59 ns at 16 MHz PRF, 1017.63 ns at 64 MHz PRF; data symbol 128.21 ns at 6.81 Mbps); Table 7 (8-symbol SFD for 64-symbol preambles); section 2 ('A TX/RX switch is used to connect the receiver or transmitter to the antenna port'); Table 21 (TX and RX are separate states)."
+  },
+  "dw3000_driver": {
+   "what": "Qorvo DW3000 driver as shipped in the Arduino library UWB_DW1000_DW3000 1.0.1 (src/qorvo/dw3000_device_api.h)",
+   "url": null,
+   "used": "line 141 (DWT_PLEN_32, the shortest preamble the driver offers, 'Non-standard length 32'); line 171 (DWT_RESPONSE_EXPECTED: 'Will enable the receiver after TX has completed')."
+  },
+  "dwm3000_ds": {
+   "what": "Qorvo DWM3000 module datasheet, revision B (May 2021)",
+   "url": "https://farnell.com/datasheets/4509027.pdf",
+   "used": "the module is 'based on the Qorvo DW3110 IC' (one antenna port, no PDoA); the antenna is vertically polarised and omnidirectional in one plane; operating temperature -40 to +85 C."
+  },
+  "ledergerber2020": {
+   "what": "Ledergerber and D'Andrea, A Multi-Static Radar Network with Ultra-Wideband Radio-Equipped Devices, Sensors 20(6):1599, 2020",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7147715",
+   "used": "CIR sample spacing about 1 ns; real DWM1000 tracking of a walking person, RMSE 0.33 m with four devices and 0.42 m with three; static persons cannot be localised."
+  },
+  "l08_real_eth": {
+   "what": "Lane L08 (tagless-uwb-echo-radar) results/real_eth.json: its pipeline run on the ETH Zurich DWM1000 recording of the paper above (real radio data, not our hardware); excerpt in l08_excerpt",
+   "url": null,
+   "used": "median over 12 links, relative to the direct path: noise floor -33.0 dB; residual after the direct path in a quiet scene -21.9 dB; tracking verdict FAILED (person 2-4 m from radios)."
+  },
+  "l08_sim_model": {
+   "what": "Lane L08 docs/SIM_MODEL.md (its simulator's echo amplitude model)",
+   "url": null,
+   "used": "echo amplitude relative to direct path a = sqrt(rcs / (4 pi)) / (R1 R2) times d; person rcs 0.6 m^2 (0.4-0.9 across seeds). An ASSUMPTION carried over, not a measurement."
+  },
+  "dwm3001c_mikroe": {
+   "what": "MikroElektronika, RTLS UWB Click (MIKROE-6863) data sheet, hosted by Farnell; a third-party board built on the Qorvo DWM3001C module",
+   "url": "https://www.farnell.com/datasheets/4790155.pdf",
+   "used": "the DWM3001C 'integrates a DW3110 UWB transceiver, nRF52833 Bluetooth Low Energy MCU, LIS2DH12 accelerometer, planar UWB antenna'."
+  },
+  "qorvo_forum_radar": {
+   "what": "Qorvo Tech Forum, 'Device-free human activity sensing project using the DWM3001CDK development board', reply by Qorvo staff, 2 June 2026",
+   "url": "https://forum.qorvo.com/t/device-free-human-activity-sensing-project-using-the-dwm3001cdk-development-board/25697",
+   "used": "'The DWM3001C was not meant for radar and it cannot simultaneously transmit and receive at the same time.' 'Our QM35 series has this ability.'"
+  },
+  "slmx4": {
+   "what": "SensorLogic SLMX4 Health Module data sheet (2022), a module built on Novelda's X4 impulse radar",
+   "url": "https://sensorlogicinc.github.io/modules/docs/SLMX4_Data_Sheet_2022.pdf",
+   "used": "X4: impulse radar, CF = 7.29 GHz, BW = 1.4 GHz, integrated planar patch antenna pair, RF data sampled at 23.328 GS/s, respiration out to 5 m."
+  },
+  "sample_scan": {
+   "what": "fixtures/scout/sample_scan.json in this repository (a labelled sample, not a measurement)",
+   "url": null,
+   "used": "room polygon 9.5 x 8.65 m, puck layout P1-P5 and the victim position used for the geometry."
+  }
+ }
+}

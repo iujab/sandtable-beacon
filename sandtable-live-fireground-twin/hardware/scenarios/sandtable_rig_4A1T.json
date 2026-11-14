@@ -1,0 +1,20 @@
+{
+  "name": "sandtable-rig-4A1T",
+  "description": "Sandtable exercise rig, room scale: four anchors on the corners of a 3.6 x 4.4 m rectangle, one tag (Engine 1). The rescue team is then a virtual unit moved by the Sandtable server.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {"outline": [[0, 0], [3.6, 0], [3.6, 4.4], [0, 4.4]], "walls": [], "labels": [{"name": "side A (address side)", "at": [1.8, 4.4]}]},
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 1.2},
+    "A2": {"x": 3.6, "y": 0.0, "z": 1.2},
+    "A3": {"x": 3.6, "y": 4.4, "z": 1.2},
+    "A4": {"x": 0.0, "y": 4.4, "z": 1.2}
+  },
+  "nodes": {
+    "T1": {"role": "tag", "label": "Engine 1", "z": 0.3, "path": [{"at": [1.7, 3.3], "t": 0}], "jitter_m": 0.0}
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 1810
+}

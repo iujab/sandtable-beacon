@@ -1,0 +1,47 @@
+{
+  "name": "two-tags",
+  "description": "Two people (T1 alice, T2 bob) start in opposite corners, meet in the middle (0.6 m apart for 4 s), separate, and meet again near the top before returning: proximity enter/exit twice per 25 s loop. 3 anchors; tag-to-tag ranges included.",
+  "dims": 2,
+  "profile": "3A2T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [7, 0], [7, 5], [0, 5]],
+    "walls": [],
+    "labels": [{"name": "meeting point", "at": [3.5, 2.2]}, {"name": "coffee", "at": [3.5, 4.4]}]
+  },
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 2.0},
+    "A2": {"x": 7.0, "y": 0.0, "z": 2.0},
+    "A3": {"x": 3.5, "y": 5.0, "z": 2.0}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "alice", "z": 1.0,
+      "path": [
+        {"at": [1.0, 1.0], "t": 0},
+        {"at": [3.2, 2.2], "t": 4, "hold_s": 4},
+        {"at": [1.0, 4.0], "t": 12, "hold_s": 2},
+        {"at": [3.2, 3.9], "t": 17, "hold_s": 3},
+        {"at": [1.0, 1.0], "t": 25}
+      ],
+      "path_mode": "linear",
+      "jitter_m": 0.02,
+      "events": [{"t": 6.0, "name": "button", "data": {"n": 1}}]
+    },
+    "T2": {
+      "role": "tag", "label": "bob", "z": 1.0,
+      "path": [
+        {"at": [6.0, 1.0], "t": 0},
+        {"at": [3.8, 2.2], "t": 4, "hold_s": 4},
+        {"at": [6.0, 4.0], "t": 12, "hold_s": 2},
+        {"at": [3.8, 3.9], "t": 17, "hold_s": 3},
+        {"at": [6.0, 1.0], "t": 25}
+      ],
+      "path_mode": "linear",
+      "jitter_m": 0.02
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 23
+}

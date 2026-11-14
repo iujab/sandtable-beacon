@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandtable Beacon incident report</title>
+<link rel="stylesheet" href="report.css">
+<style id="page-boxes"></style>
+</head>
+<body>
+<nav class="bar" aria-label="Report tools">
+  <a class="bar-brand" href="/" title="Back to the command board"><span class="mark" aria-hidden="true"></span><span>Sandtable Beacon</span></a>
+  <span class="bar-what">Reporting centre</span>
+  <span class="bar-status" id="bar-status" role="status">Loading the report…</span>
+  <span class="bar-gap"></span>
+  <a class="bar-link" href="/">Command board</a>
+  <details class="feeds" id="feeds">
+    <summary class="bar-link">Raw data</summary>
+    <div class="feeds-pop">
+      <p class="feeds-note">The same incident as machine-readable feeds from this server.</p>
+      <ul id="feeds-list"></ul>
+    </div>
+  </details>
+  <button type="button" class="print" id="btn-print">Print or save as PDF</button>
+</nav>
+<main id="report" class="sheet" aria-live="polite">
+  <p class="loading">Loading the report…</p>
+</main>
+<script type="module" src="report.js"></script>
+</body>
+</html>

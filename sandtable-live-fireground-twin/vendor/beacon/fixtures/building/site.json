@@ -1,0 +1,708 @@
+{
+ "schema": "sandtable.site/1",
+ "placeholder": false,
+ "source_note": "FIXTURE built from public open data by scripts/build_site.py. Not CoStar data. Chosen because it is a real multi-tenant medical office building in Los Angeles with a compact footprint, numbered suites on three floors and surface parking visible from the air. Business and person names are withheld; suite, floor and NAICS category are real. CoStar-only fields are null.",
+ "property": {
+  "property_id": "APN 2021-014-907",
+  "name": "Professional building, 7325 Medical Center Dr",
+  "address": "7325 Medical Center Dr",
+  "city": "West Hills, Los Angeles",
+  "state": "CA",
+  "zip": "91307",
+  "lat": 34.203454,
+  "lon": -118.629787,
+  "property_type": "Office / medical (Professional Buildings)",
+  "building_class": null,
+  "rba_sf": 43722,
+  "typical_floor_sf": 16708,
+  "stories": 3,
+  "year_built": 1991,
+  "year_renovated": null,
+  "construction": "Class A: fire-resistive, protected structural steel frame",
+  "sprinklers": null,
+  "elevators": null,
+  "parking_spaces": null,
+  "parking_ratio": null,
+  "percent_leased": null,
+  "height_m": 13.9,
+  "ground_elevation_m": 264.7,
+  "owner": null,
+  "property_manager": null
+ },
+ "field_sources": {
+  "property_id": {
+   "source": "Los Angeles County Assessor parcel record",
+   "synthetic": false
+  },
+  "address": {
+   "source": "Los Angeles County Assessor parcel record",
+   "synthetic": false
+  },
+  "property_type": {
+   "source": "Los Angeles County Assessor parcel record (use description)",
+   "synthetic": false
+  },
+  "rba_sf": {
+   "source": "Los Angeles County Assessor parcel record (main building area; not CoStar RBA)",
+   "synthetic": false
+  },
+  "typical_floor_sf": {
+   "source": "LA County LARIAC building outlines (2020 service, 2008 capture) (footprint area)",
+   "synthetic": false
+  },
+  "stories": {
+   "source": "derived: highest suite floor in City of Los Angeles, Listing of Active Businesses, consistent with roof height 46 ft",
+   "synthetic": false
+  },
+  "year_built": {
+   "source": "Los Angeles County Assessor parcel record",
+   "synthetic": false
+  },
+  "construction": {
+   "source": "Los Angeles County Assessor parcel record (quality class 'AX', class letter decoded with the standard A/B/C/D/S definitions)",
+   "synthetic": false
+  },
+  "height_m": {
+   "source": "LA County LARIAC building outlines (2020 service, 2008 capture)",
+   "synthetic": false
+  },
+  "ground_elevation_m": {
+   "source": "LA County LARIAC building outlines (2020 service, 2008 capture)",
+   "synthetic": false
+  },
+  "building_class": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "sprinklers": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "elevators": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "parking_spaces": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "parking_ratio": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "percent_leased": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "owner": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "property_manager": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  },
+  "year_renovated": {
+   "source": "CoStar-only field: null in fixture mode",
+   "synthetic": false
+  }
+ },
+ "tenants": [
+  {
+   "tenant_id": "reg-301-1",
+   "name": "Hospitals (name withheld)",
+   "suite": "301",
+   "floor": 3,
+   "sf": null,
+   "industry": "Hospitals",
+   "naics": "622000",
+   "registered_since": "2007",
+   "lease_expiration": null,
+   "life_hazard": "hospital outpatient department: patients may be non-ambulatory or under treatment",
+   "hazmat": "medical gases, sharps and biohazard waste likely",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-206-1",
+   "name": "All other miscellaneous health practitioners (name withheld)",
+   "suite": "206",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of all other miscellaneous health practitioners",
+   "naics": "621399",
+   "registered_since": "1992",
+   "lease_expiration": null,
+   "life_hazard": "patients with limited mobility possible",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-208-1",
+   "name": "Optometrists (name withheld)",
+   "suite": "208",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of optometrists",
+   "naics": "621320",
+   "registered_since": "2025",
+   "lease_expiration": null,
+   "life_hazard": "patients with dilated pupils or impaired vision possible",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-302-1",
+   "name": "Physicians (name withheld)",
+   "suite": "302",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2019",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-103-1",
+   "name": "Physicians (name withheld)",
+   "suite": "103",
+   "floor": 1,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2004",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-207-1",
+   "name": "Physicians (name withheld)",
+   "suite": "207",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "1985",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-304-1",
+   "name": "Physical, occupational & speech therapists, & audiologists (name withheld)",
+   "suite": "304",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of physical, occupational & speech therapists, & audiologists",
+   "naics": "621340",
+   "registered_since": "1991",
+   "lease_expiration": null,
+   "life_hazard": "therapy patients with limited mobility",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-205-1",
+   "name": "Physicians (name withheld)",
+   "suite": "205",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2024",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-200-1",
+   "name": "All other miscellaneous health practitioners (name withheld)",
+   "suite": "200",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of all other miscellaneous health practitioners",
+   "naics": "621399",
+   "registered_since": "2000",
+   "lease_expiration": null,
+   "life_hazard": "patients with limited mobility possible",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-200-2",
+   "name": "Other ambulatory health care services (name withheld)",
+   "suite": "200",
+   "floor": 2,
+   "sf": null,
+   "industry": "Other ambulatory health care services (including ambulance services, blood, & organ banks)",
+   "naics": "621900",
+   "registered_since": "2006",
+   "lease_expiration": null,
+   "life_hazard": "ambulatory care: patients may need assistance",
+   "hazmat": "medical gases possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-200-3",
+   "name": "Physicians (name withheld)",
+   "suite": "200",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2014",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-204-1",
+   "name": "Physicians (name withheld)",
+   "suite": "204",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2010",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-205-2",
+   "name": "Physicians (name withheld)",
+   "suite": "205",
+   "floor": 2,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2024",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-300-1",
+   "name": "Medical & diagnostic laboratories (name withheld)",
+   "suite": "300",
+   "floor": 3,
+   "sf": null,
+   "industry": "Medical & diagnostic laboratories",
+   "naics": "621510",
+   "registered_since": "2009",
+   "lease_expiration": null,
+   "life_hazard": "few occupants; staff only",
+   "hazmat": "laboratory reagents, biological samples, compressed gases likely",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-304-2",
+   "name": "Physicians (name withheld)",
+   "suite": "304",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2025",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-305-1",
+   "name": "Other accounting services (name withheld)",
+   "suite": "305",
+   "floor": 3,
+   "sf": null,
+   "industry": "Other accounting services",
+   "naics": "541219",
+   "registered_since": "2003",
+   "lease_expiration": null,
+   "life_hazard": null,
+   "hazmat": null,
+   "hazard_basis": null,
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-306-1",
+   "name": "Physicians (name withheld)",
+   "suite": "306",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of physicians (except mental health specialists)",
+   "naics": "621111",
+   "registered_since": "2010",
+   "lease_expiration": null,
+   "life_hazard": "medical patients, some with limited mobility",
+   "hazmat": "medical oxygen possible",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-307-1",
+   "name": "Podiatrists (name withheld)",
+   "suite": "307",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of podiatrists",
+   "naics": "621391",
+   "registered_since": "1998",
+   "lease_expiration": null,
+   "life_hazard": "patients with limited mobility possible",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-310-1",
+   "name": "Dentists (name withheld)",
+   "suite": "310",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of dentists",
+   "naics": "621210",
+   "registered_since": "2016",
+   "lease_expiration": null,
+   "life_hazard": "dental patients may be sedated or mid-procedure",
+   "hazmat": "medical oxygen and nitrous oxide cylinders likely",
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  },
+  {
+   "tenant_id": "reg-306-2",
+   "name": "All other miscellaneous health practitioners (name withheld)",
+   "suite": "306",
+   "floor": 3,
+   "sf": null,
+   "industry": "Offices of all other miscellaneous health practitioners",
+   "naics": "621399",
+   "registered_since": "2002",
+   "lease_expiration": null,
+   "life_hazard": "patients with limited mobility possible",
+   "hazmat": null,
+   "hazard_basis": "inferred from the NAICS category by a rule table, not observed",
+   "source": "City of Los Angeles, Listing of Active Businesses",
+   "synthetic": false
+  }
+ ],
+ "available_spaces": [],
+ "footprint": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -118.6300256,
+     34.2032094
+    ],
+    [
+     -118.6296365,
+     34.2032107
+    ],
+    [
+     -118.6296382,
+     34.2035447
+    ],
+    [
+     -118.6296552,
+     34.2035447
+    ],
+    [
+     -118.6296554,
+     34.203576
+    ],
+    [
+     -118.6297103,
+     34.2035758
+    ],
+    [
+     -118.6297105,
+     34.2036068
+    ],
+    [
+     -118.6300276,
+     34.2036057
+    ],
+    [
+     -118.6300256,
+     34.2032094
+    ]
+   ]
+  ]
+ },
+ "frame": {
+  "centre": {
+   "lat": 34.2034082,
+   "lon": -118.629832
+  },
+  "length_m": 44.12,
+  "width_m": 35.82,
+  "bearing_deg": 179.76,
+  "note": "minimum-area bounding rectangle of the footprint; bearing is the compass bearing of the long axis"
+ },
+ "sides": {
+  "A": {
+   "bearing_deg": 359.8,
+   "street": "Medical Center Dr",
+   "note": "address side (nearest street centreline in TIGER)"
+  },
+  "B": {
+   "bearing_deg": 89.8,
+   "street": null,
+   "note": null
+  },
+  "C": {
+   "bearing_deg": 179.8,
+   "street": null,
+   "note": null
+  },
+  "D": {
+   "bearing_deg": 269.8,
+   "street": null,
+   "note": null
+  }
+ },
+ "context": {
+  "hydrants": [
+   {
+    "id": "h1",
+    "lat": 34.20349,
+    "lon": -118.629655,
+    "distance_m": 13,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h2",
+    "lat": 34.202896,
+    "lon": -118.629654,
+    "distance_m": 63,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h3",
+    "lat": 34.20358,
+    "lon": -118.630823,
+    "distance_m": 96,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h4",
+    "lat": 34.204321,
+    "lon": -118.630838,
+    "distance_m": 137,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h5",
+    "lat": 34.204858,
+    "lon": -118.629856,
+    "distance_m": 156,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h6",
+    "lat": 34.20205,
+    "lon": -118.629633,
+    "distance_m": 157,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h7",
+    "lat": 34.203575,
+    "lon": -118.631967,
+    "distance_m": 201,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "id": "h8",
+    "lat": 34.20406,
+    "lon": -118.627623,
+    "distance_m": 210,
+    "size": "2 1/2 X 4D",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   }
+  ],
+  "fire_stations": [
+   {
+    "name": "LAFD Station 106",
+    "lat": 34.219043,
+    "lon": -118.627915,
+    "distance_m": 1744,
+    "address": "23004 ROSCOE BLVD",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   },
+   {
+    "name": "LAFD Station 105",
+    "lat": 34.185444,
+    "lon": -118.623688,
+    "distance_m": 2082,
+    "address": "6345 FALLBROOK AVE",
+    "source": "City of Los Angeles GeoHub, Fire Department layers",
+    "synthetic": false
+   }
+  ],
+  "apparatus_positions": [
+   {
+    "id": "E1",
+    "label": "Engine 1",
+    "lat": 34.203716,
+    "lon": -118.629788,
+    "side": "A",
+    "source": "inferred: nearest point of the address street to the building",
+    "synthetic": true
+   }
+  ],
+  "entrances": [
+   {
+    "id": "main",
+    "label": "Main entrance (assumed mid-facade, side A)",
+    "lat": 34.203606,
+    "lon": -118.629833,
+    "side": "A",
+    "leads_to": "stairA",
+    "source": "inferred from the footprint; not surveyed",
+    "synthetic": true
+   }
+  ],
+  "permits": []
+ },
+ "cross_checks": [
+  {
+   "id": "area",
+   "layers": [
+    "costar",
+    "vexcel"
+   ],
+   "text": "Record area 43,722 sq ft versus footprint 16,708 sq ft x 3 floors = 50,124 sq ft (+15%). Confirm rentable versus gross area, or an atrium or void.",
+   "record_sf": 43722,
+   "footprint_sf": 16708,
+   "stories": 3
+  },
+  {
+   "id": "suite-200",
+   "layers": [
+    "costar"
+   ],
+   "suite": "200",
+   "text": "Suite 200 has 3 active registrations: Offices of all other miscellaneous health practitioners (since 2000); Other ambulatory health care services (including ambulance services, blood, & organ banks) (since 2006); Offices of physicians (except mental health specialists) (since 2014). Confirm the current occupant."
+  },
+  {
+   "id": "suite-205",
+   "layers": [
+    "costar"
+   ],
+   "suite": "205",
+   "text": "Suite 205 has 2 active registrations: Offices of physicians (except mental health specialists) (since 2024); Offices of physicians (except mental health specialists) (since 2024). Confirm the current occupant."
+  },
+  {
+   "id": "suite-304",
+   "layers": [
+    "costar"
+   ],
+   "suite": "304",
+   "text": "Suite 304 has 2 active registrations: Offices of physical, occupational & speech therapists, & audiologists (since 1991); Offices of physicians (except mental health specialists) (since 2025). Confirm the current occupant."
+  },
+  {
+   "id": "suite-306",
+   "layers": [
+    "costar"
+   ],
+   "suite": "306",
+   "text": "Suite 306 has 2 active registrations: Offices of physicians (except mental health specialists) (since 2010); Offices of all other miscellaneous health practitioners (since 2002). Confirm the current occupant."
+  }
+ ],
+ "open_data": [
+  {
+   "name": "Los Angeles County Assessor parcel record",
+   "what": "address, year built, building area, use, construction class",
+   "url": "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query"
+  },
+  {
+   "name": "LA County LARIAC building outlines (2020 service, 2008 capture)",
+   "what": "footprint, roof height, ground elevation",
+   "url": "https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LARIAC_Buildings_2020/MapServer/0/query"
+  },
+  {
+   "name": "City of Los Angeles, Listing of Active Businesses",
+   "what": "tenant suite, floor and NAICS category (names withheld)",
+   "url": "https://data.lacity.org/d/6rrh-rzua"
+  },
+  {
+   "name": "US Census TIGERweb roads",
+   "what": "street geometry for the address side",
+   "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/8/query"
+  },
+  {
+   "name": "City of Los Angeles GeoHub, Fire Department layers",
+   "what": "hydrants (LADWP) and fire stations",
+   "url": "https://maps.lacity.org/lahub/rest/services/Fire_Department/MapServer"
+  },
+  {
+   "name": "USDA NAIP orthoimagery via the USGS National Map",
+   "what": "aerial imagery (public domain)",
+   "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer"
+  }
+ ],
+ "unavailable": [
+  "NAIP metadata: HTTPError: HTTP Error 502: Bad Gateway"
+ ]
+}

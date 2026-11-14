@@ -1,0 +1,4 @@
+uwbkit 1.0.0 vendored 2026-11-14 11:32:13 (full kit).
+Source: the bench's shared uwb-kit. Wire contract: INTERFACE.md v1.
+Run the hub from here:  PYTHONPATH=<this dir> python -m uwbkit hub --source sim --scenario <file.json> --port <port>
+  (needs: pip install aiohttp numpy pyserial)   or:  pip install <this dir>

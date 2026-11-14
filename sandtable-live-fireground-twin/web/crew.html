@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sandtable crew radio</title>
+<style>
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url("vendor/fonts/barlow-condensed-700.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; src: url("vendor/fonts/barlow-500.woff2") format("woff2"); }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: #0b0e12; color: #e8ecf0; font: 500 18px/1.35 "Barlow", "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; padding: 14px 16px; gap: 12px; transition: background .2s; }
+body.mayday { animation: flash .8s steps(2) infinite; }
+@keyframes flash { 50% { background: #a3160e; } }
+.top { display: flex; justify-content: space-between; align-items: baseline; }
+.cs { font: 700 64px/1 "Barlow Condensed", Arial, sans-serif; letter-spacing: .04em; }
+.badge { font: 700 13px "Barlow Condensed", Arial, sans-serif; letter-spacing: .12em; padding: 4px 8px; border-radius: 4px; background: #ff9f0a; color: #1a1405; }
+.where { font: 700 40px/1.05 "Barlow Condensed", Arial, sans-serif; }
+.status { text-transform: uppercase; letter-spacing: .12em; font: 700 16px "Barlow Condensed", Arial, sans-serif; color: #8d99a6; }
+.order { background: #171d25; border: 1px solid #313b47; border-radius: 10px; padding: 12px 14px; }
+.order h2 { margin: 0 0 6px; font: 700 14px "Barlow Condensed", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #8d99a6; }
+.order .task { font: 700 30px/1.1 "Barlow Condensed", Arial, sans-serif; }
+.steps { margin: 8px 0 0; padding-left: 22px; font-size: 19px; }
+.radio { flex: 1; overflow-y: auto; min-height: 80px; }
+.rx { padding: 8px 0; border-bottom: 1px dashed #242c36; font-size: 19px; }
+.rx.emergency { color: #ffd0cc; }
+button { font: 700 18px "Barlow Condensed", Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; padding: 14px; border-radius: 10px; border: 1px solid #313b47; background: #171d25; color: #e8ecf0; }
+button.may { background: #ff3b30; border-color: #ff3b30; color: #fff; }
+.row { display: flex; gap: 10px; } .row button { flex: 1; }
+.target { background: #2a1420; border: 1px solid #ff4fa3; border-radius: 10px; padding: 12px 14px; }
+.target[hidden], .feed[hidden] { display: none; }
+.target h2, .feed h2 { margin: 0 0 4px; font: 700 14px "Barlow Condensed", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #ffb3d6; display: flex; justify-content: space-between; gap: 8px; }
+.target .who { font: 700 30px/1.1 "Barlow Condensed", Arial, sans-serif; color: #fff; }
+.target .geo { font-size: 18px; color: #ffd0e6; margin-top: 2px; }
+.target .said { font-size: 17px; margin-top: 6px; color: #f0f2f4; }
+.target .meta { font-size: 15px; color: #c9a3b6; margin-top: 4px; }
+.src { font: 500 12px "Barlow", Arial, sans-serif; letter-spacing: 0; text-transform: none; color: #c9a3b6; border: 1px solid #6b2a4c; border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.feed { background: #121820; border: 1px dashed #3c4a5a; border-radius: 10px; padding: 10px 14px; }
+.feed h2 { color: #8d99a6; }
+.feed .src { color: #9fb3c8; border-color: #3c4a5a; }
+.fi { padding: 5px 0; border-top: 1px solid #242c36; font-size: 17px; }
+.fi:first-of-type { border-top: 0; }
+.fi b { color: #ff8cc6; font-family: "Barlow Condensed", Arial, sans-serif; font-size: 20px; margin-right: 6px; }
+.fi small { display: block; color: #8d99a6; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="top"><div class="cs" id="cs">—</div><span class="badge" id="sim" hidden>SIM</span></div>
+<div><div class="status" id="status">connecting…</div><div class="where" id="where">—</div></div>
+<div class="order"><h2>Current order</h2><div class="task" id="task">none</div><ol class="steps" id="steps"></ol></div>
+<div class="target" id="target" hidden><h2><span>You are sent to</span><span class="src" id="target-src"></span></h2><div class="who" id="t-who"></div><div class="geo" id="t-geo"></div><div class="said" id="t-said"></div><div class="meta" id="t-meta"></div></div>
+<div class="feed" id="feed" hidden><h2><span>Located people</span><span class="src" id="feed-src">from the feed</span></h2><div id="feed-list"></div></div>
+<div class="radio" id="radio"></div>
+<div class="row"><button id="voice">Voice off</button><button class="may" id="may">Mayday</button></div>
+<script>
+const unit = new URLSearchParams(location.search).get("unit") || "RIT";
+const $ = (id) => document.getElementById(id);
+const color = { E1: "#ffc247", RIT: "#4fd1ff" }[unit] || "#fff";
+$("cs").textContent = unit; $("cs").style.color = color;
+let voice = false, live = false, wasMayday = false, beacons = null, assignment = null, feedOn = false, feedTimer = null;
+const esc = (t) => String(t ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+const ago = (s) => (s == null ? "" : s < 1.5 ? "just now" : s < 90 ? `${Math.round(s)} s ago` : `${Math.round(s / 60)} min ago`);
+function geomWords(p) {
+  if (p.geometry === "fix") return `Located in ${p.room_label || "the room"}, within ${(p.sigma_m ?? 0).toFixed(1)} m`;
+  if (p.geometry === "candidates") return `One of ${p.candidates.length} places: check ${p.candidates.map((c) => `${c.room_label || "?"} (${Math.round(c.weight * 100)}%)`).join(", then ")}`;
+  if (p.geometry === "ring") return `Ring only: ${p.ring.r_m.toFixed(1)} m from puck ${p.ring.puck}. Search the arc, not a point`;
+  if (p.geometry === "zone") return `Somewhere in ${p.zone.room_label}: search the room`;
+  return "Heard, no position";
+}
+// the phone this crew is sent to, from the Beacon module's object relayed by the server
+function renderTarget() {
+  const box = document.getElementById("target");
+  const id = assignment?.target;
+  const p = id && /^B\d/.test(id) ? (beacons?.phones || []).find((q) => q.id === id) : null;
+  if (!p) { box.hidden = true; return; }
+  box.hidden = false;
+  const r = p.report || {};
+  $("t-who").textContent = `${p.id}: ${r.status || "no status"}${r.people != null ? `, ${r.people} ${r.people === 1 ? "person" : "people"}` : ""}${r.can_move === false ? ", cannot move" : ""}`;
+  $("t-geo").textContent = geomWords(p);
+  $("t-said").textContent = r.text ? `“${r.text}”` : "";
+  $("t-meta").textContent = [r.battery_pct != null ? `battery ${r.battery_pct}%` : "", `heard ${ago(p.track?.last_seen_s ?? r.age_s)}`].filter(Boolean).join(" · ");
+  $("target-src").textContent = `Beacon module${p.simulated ? ", simulated" : ""}${beacons?.sample ? ", sample" : ""}`;
+}
+// located people, read by polling the GeoJSON feed (what any other tool would read), not the WebSocket
+async function pollFeed() {
+  try {
+    const r = await fetch("/feed/scan.geojson", { cache: "no-store" });
+    if (!r.ok) return;
+    const g = await r.json();
+    const people = (g.features || []).filter((f) => ["victim", "phone", "phone-ring", "phone-candidate", "phone-zone"].includes(f.properties?.kind));
+    const box = document.getElementById("feed");
+    box.hidden = !people.length;
+    const seen = new Set();
+    $("feed-list").innerHTML = people.filter((f) => { const k = f.properties.id; if (seen.has(k)) return false; seen.add(k); return true; }).map((f) => {
+      const q = f.properties, kind = q.kind === "victim" ? "radar" : "phone";
+      const what = q.kind === "victim" ? `${q.state === "breathing" && q.breathing_bpm ? `breathing ${Math.round(q.breathing_bpm)}/min` : q.state || ""} · ±${q.uncertainty_m ?? "?"} m` :
+        q.kind === "phone" ? `${q.status || ""}${q.people != null ? `, ${q.people} people` : ""} · located ±${q.sigma_m ?? q.uncertainty_m ?? "?"} m` : q.kind === "phone-ring" ? `${q.status ? q.status + " · " : ""}ring only, ${q.r_m ?? "?"} m from ${q.puck || "a puck"}` : q.kind === "phone-candidate" ? `${q.status || ""} · one of ${q.of || "?"} places` : `${q.status || ""} · somewhere in the room`;
+      return `<div class="fi"><b>${esc(q.id)}</b>${esc([q.room_label, what].filter(Boolean).join(" · "))}<small>${esc(kind)}${q.status && q.kind === "victim" ? `, ${esc(q.status)}` : ""}${q.rescuer ? `, ${esc(q.rescuer)} sent` : ""}${q.simulated ? ", simulated" : ""}${q.sample ? ", sample" : ""}</small></div>`;
+    }).join("");
+    $("feed-src").textContent = `from the feed /feed/scan.geojson · ${(g.features || []).length} features`;
+  } catch { /* the feed is optional */ }
+}
+$("voice").onclick = () => { voice = !voice; $("voice").textContent = voice ? "Voice on" : "Voice off"; if (voice) speechSynthesis.speak(new SpeechSynthesisUtterance(unit + " radio check")); };
+$("may").onclick = () => fetch("/api/mayday", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit }) });
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  live = false; setTimeout(() => (live = true), 1500);
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === "hello") $("sim").hidden = !m.simulated;
+    if (m.type === "reset") { $("radio").innerHTML = ""; beacons = null; renderTarget(); document.getElementById("feed").hidden = true; }
+    if (m.type === "beacons") { beacons = m; renderTarget(); }
+    if (m.type === "state") {
+      const u = m.units.find((q) => q.id === unit);
+      if (!u) { $("status").textContent = "unit not known to the server"; return; }
+      $("status").textContent = `${u.status} · ${m.phase}`;
+      $("where").textContent = u.room_label || "no fix";
+      const a = u.assignment;
+      assignment = a; renderTarget();
+      if (m.scout && !feedOn) { feedOn = true; pollFeed(); feedTimer = setInterval(pollFeed, 2000); }
+      $("task").textContent = a ? `${a.task.replace("_", " ")}${a.target_label ? " → " + a.target_label : ""}${u.route ? ` · ${Math.round(u.route.length_m)} m` : ""}` : "none";
+      $("steps").innerHTML = u.route && !u.route.done ? (u.route.steps || []).map((s) => `<li>${s.replace(/[<>&]/g, "")}</li>`).join("") : "";
+      const may = !!m.mayday;
+      document.body.classList.toggle("mayday", may);
+      if (may && !wasMayday && navigator.vibrate && navigator.userActivation?.hasBeenActive) navigator.vibrate([400, 150, 400, 150, 800]);
+      wasMayday = may;
+    }
+    if (m.type === "radio" && (m.to === unit || m.to === "ALL")) {
+      const d = document.createElement("div"); d.className = "rx " + m.priority; d.textContent = m.text;
+      $("radio").prepend(d);
+      if (live && voice) { const u = new SpeechSynthesisUtterance(m.text.replace(/\bRIT\b/g, "Rit").replace(/\bE1\b/g, "Engine one")); u.rate = 1.05; speechSynthesis.speak(u); }
+    }
+  };
+  ws.onclose = () => { $("status").textContent = "disconnected: retrying"; setTimeout(connect, 1200); };
+}
+connect();
+</script>
+</body>
+</html>

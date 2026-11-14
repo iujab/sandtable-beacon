@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Beacon</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Beacon measures the distance from this phone to the rescue beacons the fire crew throws into the building, so rescuers can find you.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Beacon uses Bluetooth to find and connect to the rescue beacons the fire crew throws into the building.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Beacon sends your status and the beacon distances to the rescue team's server on this network.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Beacon reads air pressure (to tell rescuers your floor) and whether the phone is moving.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Only for the experimental camera-assisted direction: the camera helps estimate the direction to a rescue beacon. Nothing is recorded or sent.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Only for the experimental camera-assisted direction: the compass needs location to know true north. Your position is never sent.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

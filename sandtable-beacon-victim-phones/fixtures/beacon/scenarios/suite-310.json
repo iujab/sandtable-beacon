@@ -1,0 +1,25 @@
+{
+  "schema": "sandtable.beacon.scenario/1",
+  "name": "suite-310",
+  "simulated": true,
+  "title": "Suite 310 fire, two pucks on the door wall: a trapped iPhone 14 (U1), an injured iPhone 15 (U2), one occupant already out",
+  "description": "SIMULATED demo scene on the synthetic twin (fixtures/building/twin.json, floor f3), matching the owner's live demo: TWO pucks placed in the door-wall layout of Suite 310 (beacon.layout.recommend), two opt-in iPhones inside the fire room (an iPhone 14 with a U1 chip deep in the room: 2 people, trapped, cannot move; an iPhone 15 with a U2 chip near the outside wall: 1 person, injured), an opt-in phone whose user pressed 'I am out', and devices with no app (phones, wearables, a laptop) over the room and its neighbours that only feed the cold device count. Neither iPhone sends a bearing (they report no direction to an accessory). Nothing here is a measurement.",
+  "floor": "f3",
+  "room": "r310",
+  "seed": 310,
+  "pucks": {"throw": {"room": "r310", "n": 2, "seed": 310, "strategy": "door-wall"}},
+  "phones": [
+    {"key": "trapped-310", "room": "r310", "x": 2.1, "y": 1.8, "opt_in": true, "uwb": true, "chip": "U1", "model": "iPhone 14", "pointing": false, "report": {"status": "trapped", "text": "Two of us in the back office, smoke under the door", "people": 2, "can_move": false, "battery_pct": 41, "floor_reported": 3, "home_suite": "310", "platform": "ios", "safe_outside": false}},
+    {"key": "injured-310", "room": "r310", "x": 0.8, "y": 5.6, "opt_in": true, "uwb": true, "chip": "U2", "model": "iPhone 15", "pointing": false, "camera_assist": false, "report": {"status": "injured", "text": "By the window, hurt my leg", "people": 1, "can_move": false, "battery_pct": 63, "floor_reported": 3, "home_suite": "310", "platform": "ios", "safe_outside": false}},
+    {"key": "out-310", "room": null, "outside": true, "x": -12.0, "y": 4.0, "opt_in": true, "uwb": true, "chip": "U1", "model": "iPhone 13", "pointing": false, "report": {"status": "ok", "text": "I am out, at the assembly point", "people": 1, "can_move": true, "battery_pct": 88, "floor_reported": null, "home_suite": "310", "platform": "ios", "safe_outside": true}},
+    {"key": "noapp-310a", "room": "r310", "x": 6.8, "y": 2.6, "opt_in": false},
+    {"key": "noapp-310b", "room": "r310", "x": 1.4, "y": 6.9, "opt_in": false},
+    {"key": "noapp-311", "room": "r311", "x": 13.5, "y": 2.8, "opt_in": false},
+    {"key": "noapp-corridor", "room": "rcW", "x": 10.7, "y": 12.0, "opt_in": false}
+  ],
+  "cold_devices": [
+    {"key": "watch-310", "class": "wearable", "room": "r310", "x": 2.3, "y": 1.6},
+    {"key": "buds-311", "class": "wearable", "room": "r311", "x": 15.2, "y": 3.4},
+    {"key": "laptop-309", "class": "laptop", "room": "r309", "x": 7.4, "y": 15.1}
+  ]
+}

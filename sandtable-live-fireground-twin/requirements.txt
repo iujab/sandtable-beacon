@@ -1,0 +1,18 @@
+# Sandtable runtime (pure-Python or wheels-only; works on Linux x86_64/aarch64, Windows, macOS)
+fastapi>=0.115
+uvicorn>=0.32
+websockets>=13
+httpx>=0.27
+numpy>=2.1
+pillow>=11
+pyserial>=3.5
+aiohttp>=3.10
+# optional: live LLM backend at the event
+anthropic>=0.40
+# tests
+pytest>=8
+pytest-asyncio>=0.24
+# the bench's shared UWB kit, vendored (hub, simulator, solver, clients)
+./vendor/uwbkit
+# from vendor/beacon (lane L16's Beacon module)
+matplotlib>=3.9

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1208 618" width="1208" height="618" font-family="Helvetica, Arial, sans-serif" font-size="13">
+<title>Two pucks: at the door wall (recommended) versus mid-room (careless)</title>
+<rect x="0" y="0" width="1208" height="618" fill="#ffffff"/>
+<defs><clipPath id="cl0"><rect x="20.0" y="120" width="564.4" height="348.5"/></clipPath><clipPath id="cl1"><rect x="624.4" y="120" width="564.4" height="348.5"/></clipPath></defs>
+<text x="20" y="30" font-size="18" font-weight="bold" fill="#111">Two pucks, two phones: where to put the pucks</text>
+<text x="20" y="52" fill="#555">Two rings cross twice: the phone and its mirror image across the line through the pucks. Building twin, Suite 310; positions from beacon/layout.py.</text>
+<text x="20" y="70" fill="#555">Example phones are illustrations, not measurements. Drawn by hardware/layout_table.py.</text>
+<text x="20" y="98" font-size="15" font-weight="bold" fill="#111">A. Recommended: both pucks just inside the door wall</text>
+<text x="20" y="114" fill="#444">0.35 m inside, 4.0 m apart: every mirror image lands beyond that wall</text>
+<g clip-path="url(#cl0)">
+<rect x="20" y="120" width="564.4" height="348.5" fill="#f7f7f7"/>
+<polygon points="445.0,244.1 445.0,-818.1 363.4,-818.1 363.4,244.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="404.2" y="133.6" fill="#777" text-anchor="middle" font-size="12">West corridor</text>
+<polygon points="829.2,244.1 829.2,162.5 445.0,162.5 445.0,244.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="543.6" y="203.3" fill="#777" text-anchor="middle" font-size="12">South corridor</text>
+<polygon points="829.2,162.5 829.2,9.5 445.0,9.5 445.0,162.5" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="543.6" y="133.6" fill="#777" text-anchor="middle" font-size="12">Stair B</text>
+<polygon points="363.4,154.0 363.4,-140.1 40.4,-140.1 40.4,154.0" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="201.9" y="133.6" fill="#777" text-anchor="middle" font-size="12">Suite 309</text>
+<polygon points="910.8,448.1 910.8,244.1 363.4,244.1 363.4,448.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="543.6" y="346.1" fill="#777" text-anchor="middle" font-size="12">Suite 311</text>
+<polygon points="363.4,448.1 363.4,154.0 40.4,154.0 40.4,448.1" fill="#ffffff" stroke="#222" stroke-width="3"/>
+<text x="201.9" y="171.0" fill="#222" text-anchor="middle" font-weight="bold">Suite 310</text>
+<line x1="363.4" y1="218.6" x2="363.4" y2="188.0" stroke="#f7f7f7" stroke-width="5"/>
+<text x="371.9" y="184.6" fill="#222" font-size="12">door</text>
+<line x1="351.5" y1="-799.7" x2="351.5" y2="1240.3" stroke="#999" stroke-width="1" stroke-dasharray="6 4"/>
+<circle cx="351.5" cy="220.3" r="190.7" fill="none" stroke="#1f6fb2" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="351.5" cy="356.3" r="185.8" fill="none" stroke="#1f6fb2" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="176.1" cy="295.2" r="7" fill="#1f6fb2"/>
+<text x="186.1" y="287.2" fill="#1f6fb2" font-weight="bold">V1</text>
+<circle cx="526.9" cy="295.2" r="7" fill="none" stroke="#c0392b" stroke-width="2"/>
+<line x1="520.9" y1="289.2" x2="532.9" y2="301.2" stroke="#c0392b" stroke-width="2"/>
+<line x1="520.9" y1="301.2" x2="532.9" y2="289.2" stroke="#c0392b" stroke-width="2"/>
+<circle cx="351.5" cy="220.3" r="82.5" fill="none" stroke="#8a3ab9" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="351.5" cy="356.3" r="179.2" fill="none" stroke="#8a3ab9" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="273.0" cy="195.2" r="7" fill="#8a3ab9"/>
+<text x="283.0" y="187.2" fill="#8a3ab9" font-weight="bold">V2</text>
+<circle cx="430.0" cy="195.2" r="7" fill="none" stroke="#c0392b" stroke-width="2"/>
+<line x1="424.0" y1="189.2" x2="436.0" y2="201.2" stroke="#c0392b" stroke-width="2"/>
+<line x1="424.0" y1="201.2" x2="436.0" y2="189.2" stroke="#c0392b" stroke-width="2"/>
+<rect x="344.5" y="213.3" width="14" height="14" fill="#2f7d3a" stroke="#123" stroke-width="1.5"/>
+<text x="339.5" y="224.3" fill="#2f7d3a" font-weight="bold" text-anchor="end">P1</text>
+<rect x="344.5" y="349.3" width="14" height="14" fill="#2f7d3a" stroke="#123" stroke-width="1.5"/>
+<text x="339.5" y="360.3" fill="#2f7d3a" font-weight="bold" text-anchor="end">P2</text>
+</g>
+<rect x="20" y="120" width="564.4" height="348.5" fill="none" stroke="#bbb"/>
+<text x="20" y="492.5" fill="#1f6fb2">V1: mirror image in the Suite 311, 2 walls from a puck: the twin removes</text>
+<text x="20" y="509.5" fill="#1f6fb2">it (no UWB link through 2 walls in the model)</text>
+<text x="20" y="526.5" fill="#8a3ab9">V2: mirror image in the West corridor, 2 walls from a puck: the twin</text>
+<text x="20" y="543.5" fill="#8a3ab9">removes it (no UWB link through 2 walls in the model)</text>
+<text x="624.4000000000001" y="98" font-size="15" font-weight="bold" fill="#111">B. Careless: both pucks mid-room</text>
+<text x="624.4000000000001" y="114" fill="#444">the mirror image stays inside the room: two candidates</text>
+<g clip-path="url(#cl1)">
+<rect x="624.4000000000001" y="120" width="564.4" height="348.5" fill="#f7f7f7"/>
+<polygon points="1049.4,244.1 1049.4,-818.1 967.8,-818.1 967.8,244.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="1008.6" y="133.6" fill="#777" text-anchor="middle" font-size="12">West corridor</text>
+<polygon points="1433.6,244.1 1433.6,162.5 1049.4,162.5 1049.4,244.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="1148.0" y="203.3" fill="#777" text-anchor="middle" font-size="12">South corridor</text>
+<polygon points="1433.6,162.5 1433.6,9.5 1049.4,9.5 1049.4,162.5" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="1148.0" y="133.6" fill="#777" text-anchor="middle" font-size="12">Stair B</text>
+<polygon points="967.8,154.0 967.8,-140.1 644.8,-140.1 644.8,154.0" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="806.3" y="133.6" fill="#777" text-anchor="middle" font-size="12">Suite 309</text>
+<polygon points="1515.2,448.1 1515.2,244.1 967.8,244.1 967.8,448.1" fill="#ececec" stroke="#555" stroke-width="2"/>
+<text x="1148.0" y="346.1" fill="#777" text-anchor="middle" font-size="12">Suite 311</text>
+<polygon points="967.8,448.1 967.8,154.0 644.8,154.0 644.8,448.1" fill="#ffffff" stroke="#222" stroke-width="3"/>
+<text x="806.3" y="171.0" fill="#222" text-anchor="middle" font-weight="bold">Suite 310</text>
+<line x1="967.8" y1="218.6" x2="967.8" y2="188.0" stroke="#f7f7f7" stroke-width="5"/>
+<text x="976.3" y="184.6" fill="#222" font-size="12">door</text>
+<line x1="30.9" y1="1074.0" x2="1475.7" y2="-366.2" stroke="#999" stroke-width="1" stroke-dasharray="6 4"/>
+<circle cx="753.3" cy="353.9" r="64.7" fill="none" stroke="#1f6fb2" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="859.3" cy="248.2" r="91.8" fill="none" stroke="#1f6fb2" stroke-width="1.3" stroke-opacity="0.55"/>
+<circle cx="780.5" cy="295.2" r="7" fill="#1f6fb2"/>
+<text x="790.5" y="287.2" fill="#1f6fb2" font-weight="bold">V1</text>
+<circle cx="812.1" cy="326.9" r="7" fill="#e08a00"/>
+<text x="822.1" y="318.9" fill="#b36b00" font-weight="bold">V1?</text>
+<rect x="746.3" y="346.9" width="14" height="14" fill="#2f7d3a" stroke="#123" stroke-width="1.5"/>
+<text x="741.3" y="357.9" fill="#2f7d3a" font-weight="bold" text-anchor="end">P1</text>
+<rect x="852.3" y="241.2" width="14" height="14" fill="#2f7d3a" stroke="#123" stroke-width="1.5"/>
+<text x="847.3" y="252.2" fill="#2f7d3a" font-weight="bold" text-anchor="end">P2</text>
+</g>
+<rect x="624.4000000000001" y="120" width="564.4" height="348.5" fill="none" stroke="#bbb"/>
+<text x="624.4000000000001" y="492.5" fill="#1f6fb2">V1: its mirror image is also inside Suite 310: two candidates, nothing can</text>
+<text x="624.4000000000001" y="509.5" fill="#1f6fb2">decide</text>
+<text x="20" y="604" fill="#555">Green squares: pucks. Filled dots: the phone. Red cross: the mirror candidate the board dismisses (and shows as dismissed). Orange: a mirror candidate nothing can dismiss.</text>
+</svg>

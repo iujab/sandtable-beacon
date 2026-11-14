@@ -1,0 +1,25 @@
+{
+  "name": "static-cal",
+  "description": "Tag held perfectly still at the known point (2.5, 2.0, 1.0) in the 6 x 4.5 m office, all line-of-sight, default noise: for anchor calibration and noise/accuracy studies.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "duration_s": 60,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [6, 0], [6, 4.5], [0, 4.5]],
+    "walls": [],
+    "labels": [{"name": "survey mark", "at": [2.5, 2.0]}]
+  },
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 2.0},
+    "A2": {"x": 6.0, "y": 0.0, "z": 2.0},
+    "A3": {"x": 6.0, "y": 4.5, "z": 2.0},
+    "A4": {"x": 0.0, "y": 4.5, "z": 2.0}
+  },
+  "nodes": {
+    "T1": {"role": "tag", "label": "reference", "z": 1.0, "at": [2.5, 2.0]}
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 3
+}

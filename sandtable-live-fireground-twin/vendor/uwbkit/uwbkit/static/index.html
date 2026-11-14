@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e13">
+<title>uwb-kit console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect width='22' height='22' rx='4' fill='%230a0e13'/%3E%3Ccircle cx='11' cy='11' r='2.6' fill='%2335d0ba'/%3E%3Ccircle cx='11' cy='11' r='6.5' fill='none' stroke='%2335d0ba' stroke-opacity='.6' stroke-width='1.4'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0a0e13; --panel:#10161e; --panel2:#141c26; --line:#1f2b39; --line2:#2b3a4c;
+  --text:#dbe4ee; --muted:#7f8ea0; --dim:#56657a;
+  --accent:#35d0ba; --accent-dim:#1c6e64; --sim:#f5a524; --bad:#ff6b6b; --warn:#f5a524;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow-x:hidden}
+.num,td,.chip b,input,select,pre{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding:10px 16px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e141b,#0b1016)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.02em;font-size:15px;white-space:nowrap}
+.brand svg{display:block}
+.badge{font:700 12px/1 var(--mono);letter-spacing:.14em;padding:6px 10px;border-radius:5px;white-space:nowrap}
+.badge.sim{background:var(--sim);color:#1b1200;box-shadow:0 0 0 1px #0006,0 0 18px #f5a52455}
+.badge.live{background:transparent;color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.badge.off{background:#2a1416;color:var(--bad);box-shadow:inset 0 0 0 1.5px #a33}
+.chips{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;color:var(--muted);font-size:12.5px;min-width:0}
+.chip{white-space:nowrap}
+.chip b{color:var(--text);font-weight:500}
+.chip.warn b{color:var(--warn)} .chip.bad b{color:var(--bad)}
+.spacer{flex:1}
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 392px;min-height:0}
+#mapwrap{position:relative;min-height:320px;min-width:0;background:
+  radial-gradient(1200px 700px at 30% 20%,#0f1620 0,#0a0e13 70%)}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default}
+#map.grab{cursor:grab} #map.grabbing{cursor:grabbing}
+.maptools{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap}
+.overlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(440px,86%);
+  background:#10161ef2;border:1px solid var(--line2);border-radius:10px;padding:18px 20px;text-align:center;
+  box-shadow:0 10px 40px #0009}
+.overlay h3{margin:0 0 6px;font-size:16px} .overlay p{margin:0 0 12px;color:var(--muted)}
+.hint{position:absolute;left:14px;bottom:10px;color:var(--dim);font-size:12px;pointer-events:none}
+aside{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;min-height:0}
+section{border-bottom:1px solid var(--line);padding:12px 14px}
+h2{margin:0 0 8px;font:600 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:8px}
+h2 .count{font-family:var(--mono);color:var(--dim);letter-spacing:0}
+button,select,input{font-size:13px;color:var(--text);background:var(--panel2);border:1px solid var(--line2);
+  border-radius:6px;min-height:40px;padding:0 12px}
+button{cursor:pointer;font-family:var(--sans);font-weight:550}
+button:hover{border-color:#3d5269;background:#182230}
+button:active{transform:translateY(1px)}
+button.on,button.primary{border-color:var(--accent);color:var(--accent)}
+button.rec.on{border-color:var(--bad);color:var(--bad)}
+button.small{min-height:32px;padding:0 10px;font-size:12px}
+button:disabled{opacity:.45;cursor:default}
+select{width:100%} input{width:100%;min-width:0}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row>*{flex:0 0 auto} .row .grow{flex:1 1 0;min-width:0;width:auto}
+.note{color:var(--muted);font-size:12.5px;margin:8px 0 0}
+.note.ok{color:var(--accent)} .note.err{color:var(--bad)}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.card.stale{opacity:.5}
+.card .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.card .id{font:650 14px var(--mono)} .card .label{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .src{margin-left:auto;font:600 11px var(--mono);letter-spacing:.08em;color:var(--muted);border:1px solid var(--line2);
+  border-radius:4px;padding:2px 6px;text-transform:uppercase}
+.qbar{height:6px;border-radius:3px;background:#0b1118;overflow:hidden;margin:4px 0 8px}
+.qbar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .2s linear}
+.kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 8px}
+.kv div{min-width:0} .kv span{display:block;color:var(--dim);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+.kv b{font:500 13px var(--mono);white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font:600 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:right;padding:2px 4px 6px}
+td{text-align:right;padding:3px 4px;border-top:1px solid #18222e;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr.stale td{color:var(--dim)} td.nlos{color:var(--warn)} td.bad{color:var(--bad)}
+.scroll{overflow-x:auto}
+#events{max-height:190px;overflow-y:auto;font:12px/1.5 var(--mono)}
+#events div{display:flex;gap:8px;border-top:1px solid #18222e;padding:2px 0;white-space:nowrap}
+#events div:first-child{border-top:0}
+#events .t{color:var(--dim)} #events .n{color:var(--accent)} #events .d{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+details>summary{cursor:pointer;list-style:none;min-height:28px;display:flex;align-items:center}
+details>summary::-webkit-details-marker{display:none}
+details>summary h2{margin:0}
+details>summary h2::after{content:"+";font:500 14px var(--mono);color:var(--dim);margin-left:4px}
+details[open]>summary h2::after{content:"\2212"}
+details[open]>summary{margin-bottom:8px}
+.agrid{display:grid;grid-template-columns:34px repeat(3,minmax(0,1fr));gap:6px;align-items:center}
+.agrid label{font:600 12px var(--mono);color:var(--muted)}
+.agrid .hd{font:600 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+pre{margin:0;max-height:180px;overflow:auto;font-size:11.5px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+.hide{display:none!important}
+@media (max-width:700px){
+  header{padding:8px 12px;gap:8px 10px}
+  main{display:block;overflow-y:auto}
+  #mapwrap{height:56vh;min-height:300px}
+  aside{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  .chips{font-size:12px;gap:4px 12px}
+  .hint{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="2.4" fill="#35d0ba"/><circle cx="11" cy="11" r="6" fill="none" stroke="#35d0ba" stroke-opacity=".55" stroke-width="1.3"/><circle cx="11" cy="11" r="9.6" fill="none" stroke="#35d0ba" stroke-opacity=".25" stroke-width="1.3"/></svg>
+    uwb-kit
+  </div>
+  <span id="badge" class="badge off" role="status">CONNECTING</span>
+  <div class="chips">
+    <span class="chip">source <b id="c-source">-</b></span>
+    <span class="chip">profile <b id="c-profile">-</b></span>
+    <span class="chip" id="chip-rate">rate <b id="c-rate">-</b></span>
+    <span class="chip" id="chip-online">online <b id="c-online">-</b></span>
+    <span class="chip" id="chip-drop">dropped <b id="c-drop">-</b></span>
+    <span class="chip hide" id="chip-batt">battery <b id="c-batt">-</b></span>
+    <span class="chip">clients <b id="c-clients">-</b></span>
+  </div>
+  <span class="spacer"></span>
+  <button id="rec" class="rec small" title="Record every message to an NDJSON file on the hub">&#9679; Record</button>
+</header>
+<main>
+  <div id="mapwrap">
+    <canvas id="map" aria-label="Live map of anchors, tags and ranges"></canvas>
+    <div class="maptools">
+      <button class="small" id="mode" title="How ranges are drawn">Ranges: lines</button>
+      <button class="small" id="trails" title="Position trails">Trails: on</button>
+    </div>
+    <div id="overlay" class="overlay hide"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <aside>
+    <section id="sec-sim" class="hide">
+      <h2>Simulator</h2>
+      <select id="scenario" aria-label="Scenario"></select>
+      <p class="note" id="scen-desc"></p>
+      <div class="row" style="margin-top:8px">
+        <button id="pause" class="small">Pause</button>
+        <button id="restart" class="small">Restart</button>
+        <span class="grow"></span>
+        <button class="small spd" data-v="0.5">0.5x</button>
+        <button class="small spd on" data-v="1">1x</button>
+        <button class="small spd" data-v="2">2x</button>
+        <button class="small spd" data-v="4">4x</button>
+      </div>
+    </section>
+    <section>
+      <h2>Fixes <span class="count" id="n-fix"></span></h2>
+      <div id="cards"></div>
+      <p class="note hide" id="rec-note"></p>
+    </section>
+    <section>
+      <h2>Links <span class="count" id="n-links"></span></h2>
+      <div class="scroll"><table>
+        <thead><tr><th>link</th><th>d m</th><th>Hz</th><th>std</th><th>rssi</th><th>fp</th><th>los</th><th>age</th></tr></thead>
+        <tbody id="links"></tbody>
+      </table></div>
+    </section>
+    <section>
+      <details id="sec-anchors">
+        <summary><h2>Anchors <span class="count" id="cal-state"></span></h2></summary>
+        <div class="row">
+          <button id="autocal" class="small primary" title="Anchors range each other; the kit solves the layout">Self-calibrate</button>
+          <span class="note" style="margin:0" id="cal-note"></span>
+        </div>
+        <p class="note">Or tape-measure a rectangle (width = A1&rarr;A2, depth = A1&rarr;A4): A1 is the origin, A2 lies on +x, +y is to the left of A1&rarr;A2. Metres.</p>
+        <div class="row" style="margin:8px 0">
+          <input id="rw" class="grow" inputmode="decimal" placeholder="width m" aria-label="Rectangle width">
+          <input id="rd" class="grow" inputmode="decimal" placeholder="depth m" aria-label="Rectangle depth">
+          <input id="rz" class="grow" inputmode="decimal" placeholder="z m" aria-label="Anchor height">
+          <button id="rfill" class="small">Fill</button>
+        </div>
+        <div class="agrid" id="agrid"></div>
+        <div class="row" style="margin-top:8px"><button id="aset" class="small primary">Apply coordinates</button></div>
+      </details>
+    </section>
+    <section>
+      <h2>Events</h2>
+      <div id="events"></div>
+    </section>
+    <section>
+      <details id="sec-log">
+        <summary><h2>Board log</h2></summary>
+        <pre id="log">no lines yet</pre>
+      </details>
+    </section>
+  </aside>
+</main>
+<script src="/uwbkit-client.js"></script>
+<script src="/static/console.js"></script>
+</body>
+</html>

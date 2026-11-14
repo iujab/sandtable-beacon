@@ -1,0 +1,2 @@
+[console_scripts]
+uwbkit = uwbkit.cli:main

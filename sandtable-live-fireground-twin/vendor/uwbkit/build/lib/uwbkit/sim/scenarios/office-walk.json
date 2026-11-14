@@ -1,0 +1,38 @@
+{
+  "name": "office-walk",
+  "description": "A visitor walks a smooth loop through a 6 x 4.5 m office (door, desk, window), pausing 3 s at the desk where they press the button. 4 anchors at the ceiling corners, all line-of-sight. The hub default.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [6, 0], [6, 4.5], [0, 4.5]],
+    "walls": [],
+    "labels": [{"name": "door", "at": [0, 2.25]}, {"name": "desk", "at": [5.4, 3.8]}, {"name": "window", "at": [6, 1.5]}]
+  },
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 2.0},
+    "A2": {"x": 6.0, "y": 0.0, "z": 2.0},
+    "A3": {"x": 6.0, "y": 4.5, "z": 2.0},
+    "A4": {"x": 0.0, "y": 4.5, "z": 2.0}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "visitor", "z": 1.0,
+      "path": [
+        {"at": [0.8, 2.25], "t": 0, "hold_s": 1},
+        {"at": [2.0, 1.1], "speed": 1.0},
+        {"at": [4.6, 1.0], "speed": 1.1},
+        {"at": [5.1, 2.0], "speed": 1.0},
+        {"at": [5.0, 3.5], "speed": 0.9, "hold_s": 3},
+        {"at": [3.0, 3.6], "speed": 1.1},
+        {"at": [1.4, 3.3], "speed": 0.9}
+      ],
+      "path_mode": "spline",
+      "jitter_m": 0.02,
+      "events": [{"t": 9.0, "name": "button", "data": {"n": 1}}]
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 7
+}

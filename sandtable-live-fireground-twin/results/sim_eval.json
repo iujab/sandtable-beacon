@@ -1,0 +1,138 @@
+{
+ "what": "Sandtable on the uwb-kit simulator. All numbers are SIMULATED; no UWB hardware was attached.",
+ "generated": "2026-11-14T10:40:46-0600",
+ "rigs": [
+  {
+   "scenario": "hardware/scenarios/sandtable_rig_3A2T.json",
+   "hub_source": "sim:sandtable-rig-3A2T",
+   "simulated": true,
+   "profile": "3A2T",
+   "noise_model": {
+    "antenna_offset_m": 0.035,
+    "attenuation_db": 8.0,
+    "dropout_per_wall": 1.0,
+    "dropout_prob": 0.03,
+    "far_m": 10.0,
+    "fp_gap_los_db": 2.0,
+    "fp_gap_sigma_db": 2.0,
+    "fp_nlos_frac": 0.8,
+    "fp_outlier_db": 4.0,
+    "los_mid_db": 8.0,
+    "los_scale_db": 1.2,
+    "nlos_bias_gamma_k": 4.0,
+    "nlos_bias_m": 0.3,
+    "nlos_extra_sigma_m": 0.15,
+    "outlier_m": 1.5,
+    "outlier_neg_frac": 0.1,
+    "outlier_neg_scale": 0.25,
+    "outlier_prob": 0.02,
+    "path_loss_exp": 2.0,
+    "rssi_1m_dbm": -68.0,
+    "rssi_sigma_db": 1.5,
+    "sigma_m": 0.08,
+    "walls": []
+   },
+   "registration_scale": 9.827,
+   "accuracy": {
+    "points": 27,
+    "samples": 324,
+    "error_building_m": {
+     "mean": 0.85,
+     "median": 0.81,
+     "p90": 1.46,
+     "max": 2.17
+    },
+    "error_rig_cm": {
+     "median": 8.3
+    },
+    "room_level_accuracy_pct": 95.7,
+    "room_level_accuracy_pct_by_room_kind": {
+     "corridor": 88.3,
+     "lobby": 100.0,
+     "mechanical": 100.0,
+     "restroom": 100.0,
+     "stair": 100.0,
+     "suite": 100.0
+    },
+    "reported_sigma_building_m_median": 0.88
+   },
+   "mayday": {
+    "threshold_s": 8.0,
+    "trials": 5,
+    "detected": 5,
+    "latency_s": {
+     "mean": 7.9,
+     "min": 7.79,
+     "max": 7.98
+    },
+    "false_maydays_while_walking_40s": 0
+   }
+  },
+  {
+   "scenario": "hardware/scenarios/sandtable_table_4A1T.json",
+   "hub_source": "sim:sandtable-table-4A1T",
+   "simulated": true,
+   "profile": "4A1T",
+   "noise_model": {
+    "antenna_offset_m": 0.035,
+    "attenuation_db": 8.0,
+    "dropout_per_wall": 1.0,
+    "dropout_prob": 0.02,
+    "far_m": 10.0,
+    "fp_gap_los_db": 2.0,
+    "fp_gap_sigma_db": 2.0,
+    "fp_nlos_frac": 0.8,
+    "fp_outlier_db": 4.0,
+    "los_mid_db": 8.0,
+    "los_scale_db": 1.2,
+    "nlos_bias_gamma_k": 4.0,
+    "nlos_bias_m": 0.3,
+    "nlos_extra_sigma_m": 0.05,
+    "outlier_m": 0.3,
+    "outlier_neg_frac": 0.1,
+    "outlier_neg_scale": 0.25,
+    "outlier_prob": 0.01,
+    "path_loss_exp": 2.0,
+    "rssi_1m_dbm": -62.0,
+    "rssi_sigma_db": 1.5,
+    "sigma_m": 0.02,
+    "walls": []
+   },
+   "registration_scale": 49.136,
+   "accuracy": {
+    "points": 27,
+    "samples": 324,
+    "error_building_m": {
+     "mean": 0.8,
+     "median": 0.64,
+     "p90": 1.51,
+     "max": 6.73
+    },
+    "error_rig_cm": {
+     "median": 1.3
+    },
+    "room_level_accuracy_pct": 96.0,
+    "room_level_accuracy_pct_by_room_kind": {
+     "corridor": 89.2,
+     "lobby": 100.0,
+     "mechanical": 100.0,
+     "restroom": 100.0,
+     "stair": 100.0,
+     "suite": 100.0
+    },
+    "reported_sigma_building_m_median": 2.51
+   },
+   "mayday": {
+    "threshold_s": 8.0,
+    "trials": 3,
+    "detected": 3,
+    "latency_s": {
+     "mean": 7.92,
+     "min": 7.76,
+     "max": 8.12
+    },
+    "false_maydays_while_walking_40s": 0
+   }
+  }
+ ]
+}

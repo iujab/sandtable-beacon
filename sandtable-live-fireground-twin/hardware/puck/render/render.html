@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>puck render</title>
+<style>
+@font-face { font-family: Barlow; src: url(fonts/barlow-500.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: Barlow; src: url(fonts/barlow-600.woff2) format("woff2"); font-weight: 600; }
+@font-face { font-family: BarlowC; src: url(fonts/barlow-condensed-700.woff2) format("woff2"); font-weight: 700; }
+html, body { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
+body { background: radial-gradient(ellipse at 50% 38%, #fbfbfa 0%, #ecebe8 55%, #dcdad5 100%); font-family: Barlow, sans-serif; }
+#c { position: absolute; left: 0; top: 0; }
+#ov { position: absolute; left: 0; top: 0; pointer-events: none; }
+.lab { position: absolute; transform: translate(-50%, -50%); background: rgba(255,255,255,0.94); color: #1d2125; border: 1px solid #c9c6bf;
+  border-radius: 6px; padding: 5px 10px 6px; font-size: 19px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.lab small { display: block; font-weight: 500; font-size: 14px; color: #5b6168; margin-top: 1px; }
+#title { position: absolute; left: 44px; top: 34px; color: #1d2125; }
+#title h1 { font-family: BarlowC, sans-serif; font-weight: 700; font-size: 40px; margin: 0; letter-spacing: 0.5px; }
+#title p { margin: 4px 0 0; font-size: 18px; color: #50565d; font-weight: 500; }
+#foot { position: absolute; left: 44px; bottom: 26px; font-size: 14px; color: #6a6f75; font-weight: 500; }
+</style></head>
+<body>
+<canvas id="c"></canvas><svg id="ov"></svg><div id="labels"></div>
+<div id="title"></div><div id="foot"></div>
+<script type="module">
+import * as THREE from './three.module.js';
+const cfg = window.RENDER_CFG;
+const W = cfg.width, H = cfg.height;
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = cfg.exposure || 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(cfg.camera.fov || 30, W / H, 1, 5000);
+cam.up.set(0, 0, 1);
+cam.position.fromArray(cfg.camera.pos); cam.lookAt(new THREE.Vector3().fromArray(cfg.camera.target));
+
+scene.add(new THREE.HemisphereLight(0xfdfcf8, 0x8a857c, 1.15));
+const key = new THREE.DirectionalLight(0xffffff, 1.9);
+key.position.set(...(cfg.key || [-180, -260, 420])); key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096); key.shadow.radius = 6; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.4;
+const sc = key.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 1600;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xe9f0ff, 0.75); fill.position.set(300, -60, 160); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 1.0); rim.position.set(120, 320, 260); scene.add(rim);
+
+if (cfg.ground !== false) {
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: cfg.shadowOpacity || 0.2 }));
+  g.position.z = cfg.groundZ || 0; g.receiveShadow = true; scene.add(g);
+}
+
+function parseSTL(buf) {
+  const dv = new DataView(buf); const n = dv.getUint32(80, true);
+  const pos = new Float32Array(n * 9); let o = 84;
+  for (let i = 0; i < n; i++) { o += 12; for (let k = 0; k < 9; k++) { pos[i * 9 + k] = dv.getFloat32(o, true); o += 4; } o += 2; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals(); return g;
+}
+function smoothGeom(g, angleDeg) {
+  // merge vertices and recompute normals with a crease angle, for smooth curved shells with crisp edges
+  const p = g.getAttribute('position'); const n = p.count / 3;
+  const key = (i) => `${Math.round(p.getX(i) * 1000)},${Math.round(p.getY(i) * 1000)},${Math.round(p.getZ(i) * 1000)}`;
+  const fn = []; const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let f = 0; f < n; f++) { a.fromBufferAttribute(p, 3 * f); b.fromBufferAttribute(p, 3 * f + 1); c.fromBufferAttribute(p, 3 * f + 2);
+    fn.push(new THREE.Vector3().subVectors(c, b).cross(new THREE.Vector3().subVectors(a, b)).normalize()); }
+  const map = new Map();
+  for (let i = 0; i < p.count; i++) { const k = key(i); if (!map.has(k)) map.set(k, []); map.get(k).push(Math.floor(i / 3)); }
+  const cosT = Math.cos(angleDeg * Math.PI / 180); const nrm = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const f0 = fn[Math.floor(i / 3)]; const acc = new THREE.Vector3();
+    for (const f of map.get(key(i))) if (fn[f].dot(f0) >= cosT) acc.add(fn[f]);
+    acc.normalize(); nrm[3 * i] = acc.x; nrm[3 * i + 1] = acc.y; nrm[3 * i + 2] = acc.z; }
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); return g;
+}
+const groups = {};
+for (const p of cfg.parts) {
+  const buf = await (await fetch('parts/' + p.file)).arrayBuffer();
+  let g = parseSTL(buf); g = smoothGeom(g, p.crease || 32);
+  const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(p.color), roughness: p.rough ?? 0.5, metalness: p.metal ?? 0.0,
+    clearcoat: p.clearcoat ?? 0.0, clearcoatRoughness: 0.4, transparent: (p.opacity ?? 1) < 1, opacity: p.opacity ?? 1, side: THREE.DoubleSide,
+    sheen: p.sheen ?? 0.0, sheenRoughness: 0.8 });
+  const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true;
+  if (p.offset) m.position.fromArray(p.offset);
+  if (p.renderOrder) m.renderOrder = p.renderOrder;
+  scene.add(m); groups[p.name || p.file] = m;
+}
+renderer.render(scene, cam);
+// labels
+const svg = document.getElementById('ov'); svg.setAttribute('width', W); svg.setAttribute('height', H);
+const labs = document.getElementById('labels');
+for (const L of (cfg.labels || [])) {
+  const off = L.part && groups[L.part] ? groups[L.part].position : new THREE.Vector3();
+  const v = new THREE.Vector3().fromArray(L.anchor).add(off).project(cam);
+  const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H;
+  const lx = x + L.dx, ly = y + L.dy;
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x); line.setAttribute('y1', y); line.setAttribute('x2', lx); line.setAttribute('y2', ly);
+  line.setAttribute('stroke', '#2b2f33'); line.setAttribute('stroke-width', '1.6'); svg.appendChild(line);
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', 4); dot.setAttribute('fill', '#2b2f33');
+  dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '1.5'); svg.appendChild(dot);
+  const d = document.createElement('div'); d.className = 'lab'; d.style.left = lx + 'px'; d.style.top = ly + 'px';
+  d.innerHTML = L.text + (L.sub ? `<small>${L.sub}</small>` : ''); labs.appendChild(d);
+}
+if (cfg.title) document.getElementById('title').innerHTML = `<h1>${cfg.title}</h1>` + (cfg.subtitle ? `<p>${cfg.subtitle}</p>` : '');
+if (cfg.foot) document.getElementById('foot').textContent = cfg.foot;
+await document.fonts.ready;
+window.RENDER_DONE = true;
+</script></body></html>

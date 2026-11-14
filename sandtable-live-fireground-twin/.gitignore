@@ -1,0 +1,10 @@
+.venv/
+node_modules/
+data/
+.env
+*.pid
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+hardware/puck/render/parts/

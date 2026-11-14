@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beacon SOS for iPhone</title>
+<style>
+/* Fonts copied from Sandtable (see style.css for the credit). */
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; src: url("vendor/fonts/barlow-condensed-700.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Barlow"; font-weight: 400; src: url("vendor/fonts/barlow-400.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url("vendor/fonts/barlow-600.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("vendor/fonts/jetbrains-mono-400.woff2") format("woff2"); font-display: swap; }
+:root { --bg: #0b0e12; --card: #12171d; --line: #242c36; --text: #e8ecf0; --muted: #8d99a6; --phone: #ff4fa3; --e1: #ffc247; --warn: #ff9f0a; --ok: #3fcf8e; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.5 "Barlow", "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 36px 18px 60px; }
+h1 { font: 700 44px/1 "Barlow Condensed", Arial, sans-serif; letter-spacing: .04em; margin: 0 0 8px; display: flex; align-items: center; gap: 14px; }
+h1 i { width: 16px; height: 16px; border-radius: 50%; background: var(--phone); box-shadow: 0 0 0 6px rgba(255,79,163,.18); flex: none; }
+.lede { font-size: 19px; color: #cfd6de; margin: 0 0 26px; max-width: 60ch; }
+h2 { font: 700 17px "Barlow Condensed", Arial, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #cfd6de; margin: 30px 0 10px; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+ol.steps li::before { content: counter(s); font: 700 22px/1.2 "Barlow Condensed", Arial, sans-serif; color: var(--phone); }
+ul.promise { margin: 0; padding-left: 20px; }
+ul.promise li { margin: 5px 0; }
+.server-text { margin-top: 8px; padding: 8px 12px; background: #1b1420; border: 1px solid #5a2346; border-radius: 8px; color: #f2d6e5; font-size: 14.5px; }
+.status { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 8px; padding: 12px 14px; }
+.status p { margin: 0; }
+.status code { font: 400 14px "JetBrains Mono", ui-monospace, monospace; color: #cfd6de; }
+.addr { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.addr .host { font: 400 26px/1.2 "JetBrains Mono", ui-monospace, monospace; color: var(--e1); word-break: break-all; }
+.addr .url { font: 400 15px "JetBrains Mono", ui-monospace, monospace; color: #cfd6de; margin-top: 8px; word-break: break-all; }
+.addr p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+button { font: 600 13px "Barlow", Arial, sans-serif; color: var(--text); background: #171d25; border: 1px solid #313b47; border-radius: 6px; padding: 6px 12px; cursor: pointer; margin-top: 10px; }
+a { color: #cfd6de; }
+.sim { display: inline-block; font: 700 12px "Barlow Condensed", Arial, sans-serif; letter-spacing: .12em; background: var(--warn); color: #1a1405; padding: 3px 7px 2px; border-radius: 4px; vertical-align: 3px; margin-left: 6px; }
+footer { margin-top: 36px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><i aria-hidden="true"></i>Beacon SOS for iPhone</h1>
+  <p class="lede">If you are trapped in a building on fire, this app tells the fire crew that you are there, how many people are with you, and whether you can move. The pucks they throw into the room find your phone.</p>
+
+  <h2>What it does</h2>
+  <ol class="steps">
+    <li><span>You open the app and press what is happening: trapped, injured, sheltering, or “I am out”.</span></li>
+    <li><span>Your phone sends an SOS beacon over Bluetooth with that status, the number of people with you, your battery and your floor.</span></li>
+    <li><span>On an iPhone 11 or later, the rescue pucks also measure their distance to your phone over UWB. Several pucks, or your phone held up and pointed at the door, turn that into a position in the room.</span></li>
+    <li><span>The app shows you what the rescuers know: how many beacons hear you, and how well they can place you.</span></li>
+  </ol>
+
+  <h2>The privacy promise</h2>
+  <ul class="promise">
+    <li>Nothing is sent until you open the app and choose to share.</li>
+    <li>Your phone is known by a short code that changes, never by your name, number or a hardware address.</li>
+    <li>Phones without the app are only counted as nearby devices. They are never identified or stored.</li>
+  </ul>
+  <div class="server-text" id="privacy" hidden></div>
+
+  <h2>Status</h2>
+  <div class="status">
+    <p><b>iOS:</b> source, not compiled on this machine; build it with Xcode (<code>docs/IOS_BUILD.md</code>).</p>
+  </div>
+
+  <h2>Connect the app to this server</h2>
+  <div class="addr">
+    <div>Type this server address into the app's settings:</div>
+    <div class="host" id="host">…</div>
+    <div class="url" id="url"></div>
+    <button id="copy">Copy the address</button>
+    <p>The phone must be on the same Wi-Fi as this server.</p>
+  </div>
+
+  <h2>No iPhone at hand?</h2>
+  <p>Open the <a href="phone.html">simulated phone</a>: the same screens in the browser, talking to the simulator <span class="sim" id="sim-badge" hidden>SIM</span>.</p>
+
+  <footer>Sandtable · Beacon. <a href="index.html">The command board</a>.</footer>
+</main>
+<script>
+const host = location.host || "localhost";
+document.getElementById("host").textContent = host;
+document.getElementById("url").textContent = `${location.protocol}//${host}/`;
+document.getElementById("copy").onclick = async (e) => {
+  try { await navigator.clipboard.writeText(`${location.protocol}//${host}/`); e.target.textContent = "Copied"; }
+  catch { e.target.textContent = "Select the address above to copy it"; }
+};
+fetch("/api/beacons", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((b) => {
+  if (!b) return;
+  if (b.privacy && b.privacy.text) { const p = document.getElementById("privacy"); p.textContent = `This server says: ${b.privacy.text}`; p.hidden = false; }
+  document.getElementById("sim-badge").hidden = b.simulated === false;
+}).catch(() => {});
+</script>
+</body>
+</html>

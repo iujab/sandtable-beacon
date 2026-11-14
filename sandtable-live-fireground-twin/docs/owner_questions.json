@@ -1,0 +1,34 @@
+[
+ {
+  "q": "Is one UWB sensor enough to scan a room?",
+  "a": "No. A single DWM3001CDK board cannot hear its own echoes. Qorvo's own staff say the module cannot transmit and receive at the same time. The smallest radar is two boards: one transmits, the other records the echoes that arrive after the direct pulse."
+ },
+ {
+  "q": "Why not?",
+  "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 µs, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
+ },
+ {
+  "q": "How do multiple boards fix it?",
+  "a": "One board transmits and the others listen. Each pair turns an echo's delay into an ellipse with the two boards as foci. More boards give more ellipses at different angles, and the target sits where they cross. The boards first range each other to learn their own positions, because every ellipse needs known foci."
+ },
+ {
+  "q": "How many are needed, and what does each added board buy?",
+  "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m² (two boards) to 0.40 m² (three) and 0.15 m² (five)."
+ },
+ {
+  "q": "What is the 'map', and what is it not?",
+  "a": "It is a coarse echo map: a few strong reflectors, a rough outline, what moved, and where the room disagrees with the stored twin. It is not a LiDAR-grade model, because echoes about 0.3 to 0.6 m apart merge and walls reflect like mirrors. The twin is the map; the boards add people, breathing and changes."
+ },
+ {
+  "q": "Why does this beat cameras and LiDAR in smoke, and where does it not?",
+  "a": "Smoke particles (0.01 to 1 µm) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
+ },
+ {
+  "q": "What is the biggest open risk?",
+  "a": "Signal strength. The sample victim's echoes arrive 25 to 36 dB below the direct pulse. In real recorded data, the empty room's own multipath already flickers at about 22 dB below. Expect detection within a few metres of the pucks. A breathing person across a 9.5 m room is unproven until measured."
+ },
+ {
+  "q": "What is simulated today?",
+  "a": "All of the radar. No board has run it, and the reused echo-reading firmware targets ESP32 boards, not the DWM3001CDK. Scout is a secondary, simulation-only mode of Sandtable Beacon. The timing and geometry arithmetic is exact; detection performance is not measured. On the one real recording available, the reused tracker followed clutter, not the person."
+ }
+]

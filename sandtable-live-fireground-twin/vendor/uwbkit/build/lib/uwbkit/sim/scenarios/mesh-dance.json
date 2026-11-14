@@ -1,0 +1,38 @@
+{
+  "name": "mesh-dance",
+  "description": "Anchor-free mesh of 5 nodes: N1 and N2 stand still at the front corners, N3 circles centre stage, N4 walks a wide U around it, N5 paces along the front. All 10 pairwise ranges; positions come from MDS in the relative frame.",
+  "dims": 2,
+  "profile": "mesh5",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [8, 0], [8, 6.5], [0, 6.5]],
+    "walls": [],
+    "labels": [{"name": "stage", "at": [4.0, 3.2]}, {"name": "front", "at": [4.0, 0.3]}]
+  },
+  "anchors": {},
+  "nodes": {
+    "N1": {"role": "mesh", "label": "left", "z": 1.0, "at": [1.0, 1.0]},
+    "N2": {"role": "mesh", "label": "right", "z": 1.0, "at": [7.0, 1.0]},
+    "N3": {
+      "role": "mesh", "label": "circler", "z": 1.0, "path_mode": "spline", "jitter_m": 0.02,
+      "path": [{"at": [5.2, 3.2], "t": 0.0}, {"at": [5.039, 3.8], "t": 1.0}, {"at": [4.6, 4.239], "t": 2.0},
+               {"at": [4.0, 4.4], "t": 3.0}, {"at": [3.4, 4.239], "t": 4.0}, {"at": [2.961, 3.8], "t": 5.0},
+               {"at": [2.8, 3.2], "t": 6.0}, {"at": [2.961, 2.6], "t": 7.0}, {"at": [3.4, 2.161], "t": 8.0},
+               {"at": [4.0, 2.0], "t": 9.0}, {"at": [4.6, 2.161], "t": 10.0}, {"at": [5.039, 2.6], "t": 11.0},
+               {"at": [5.2, 3.2], "t": 12.0}]
+    },
+    "N4": {
+      "role": "mesh", "label": "wanderer", "z": 1.0, "path_mode": "spline", "jitter_m": 0.02,
+      "path": [{"at": [1.3, 2.5], "t": 0, "hold_s": 1}, {"at": [1.5, 5.6], "speed": 0.9}, {"at": [6.5, 5.7], "speed": 0.9},
+               {"at": [6.7, 2.5], "speed": 0.9, "hold_s": 1}, {"at": [6.5, 5.7], "speed": 0.9},
+               {"at": [1.5, 5.6], "speed": 0.9}]
+    },
+    "N5": {
+      "role": "mesh", "label": "pacer", "z": 1.0, "path_mode": "spline", "jitter_m": 0.02,
+      "path": [{"at": [2.6, 1.0], "t": 0, "hold_s": 1.5}, {"at": [5.4, 1.0], "speed": 0.6, "hold_s": 1.5}]
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 5
+}

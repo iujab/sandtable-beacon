@@ -1,0 +1,93 @@
+# arduino-cli compile of hardware/firmware/uwbkit_tagless (L08 CIR delta on the shared uwb-kit DW3000 firmware)
+# date: 2026-11-14T11:53:45-06:00
+# arduino-cli  Version: 1.5.1 Commit: 01f3d4f2b Date: 2026-06-05T10:22:17Z
+# core: esp32:esp32    3.3.12    3.3.12 esp32
+# library: UWB_DW1000_DW3000                                1.0.1     -         user     -
+# command: nice arduino-cli compile --fqbn esp32:esp32:esp32 --jobs 4 --build-path data/fw_build/uwbkit_tagless --output-dir hardware/firmware/bin/uwbkit_tagless --warnings default hardware/firmware/uwbkit_tagless
+
+In file included from sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:43:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:20:9: warning: "_BV" redefined
+   20 | #define _BV(n) (1 << n) // sets 1 at position of BIT "n"
+      |         ^~~
+In file included from sandtable-live-fireground-twin/data/fw_build/uwbkit_tagless/sketch/uwbkit_tagless.ino.cpp:1:
+~/.arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Arduino.h:113:9: note: this is the location of the previous definition
+  113 | #define _BV(b) (1UL << (b))
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000Ng.hpp:19,
+                 from sandtable-live-fireground-twin/hardware/firmware/uwbkit_tagless/uwbkit_tagless.ino:44:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:20:9: warning: "FCS_LEN" redefined
+   20 | #define FCS_LEN 2
+      |         ^~~~~~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_regs.h:19,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.h:10,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:18:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_vals.h:21:9: note: this is the location of the previous definition
+   21 | #define FCS_LEN                 (2)
+      |         ^~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:61:9: warning: "BIAS_CTRL_BIAS_MASK" redefined
+   61 | #define BIAS_CTRL_BIAS_MASK 0x1F
+      |         ^~~~~~~~~~~~~~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_regs.h:2793:9: note: this is the location of the previous definition
+ 2793 | #define BIAS_CTRL_BIAS_MASK  0x1fU
+      |         ^~~~~~~~~~~~~~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:99:9: warning: "SPEED_OF_LIGHT" redefined
+   99 | #define SPEED_OF_LIGHT 0.029979245800 //in centimetres per picosecond
+      |         ^~~~~~~~~~~~~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.h:11:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_defines.h:21:9: note: this is the location of the previous definition
+   21 | #define SPEED_OF_LIGHT (299702547)
+      |         ^~~~~~~~~~~~~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_regs.h:19,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.h:10,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:18,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/UWB_DW3000.cpp:5:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_vals.h:21:9: warning: "FCS_LEN" redefined
+   21 | #define FCS_LEN                 (2)
+      |         ^~~~~~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000Ng.hpp:19,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/UWB_DW3000.cpp:4:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:20:9: note: this is the location of the previous definition
+   20 | #define FCS_LEN 2
+      |         ^~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_regs.h:2793:9: warning: "BIAS_CTRL_BIAS_MASK" redefined
+ 2793 | #define BIAS_CTRL_BIAS_MASK  0x1fU
+      |         ^~~~~~~~~~~~~~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:61:9: note: this is the location of the previous definition
+   61 | #define BIAS_CTRL_BIAS_MASK 0x1F
+      |         ^~~~~~~~~~~~~~~~~~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.h:11:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_defines.h:21:9: warning: "SPEED_OF_LIGHT" redefined
+   21 | #define SPEED_OF_LIGHT (299702547)
+      |         ^~~~~~~~~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/DW3000Ng/DW3000NgConstants.hpp:99:9: note: this is the location of the previous definition
+   99 | #define SPEED_OF_LIGHT 0.029979245800 //in centimetres per picosecond
+      |         ^~~~~~~~~~~~~~
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:20:9: warning: "_BV" redefined
+   20 | #define _BV(n) (1 << n) // sets 1 at position of BIT "n"
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/UWB_Core.h:4,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/UWB_DW3000.h:4,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/UWB_DW3000.cpp:1:
+~/.arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Arduino.h:113:9: note: this is the location of the previous definition
+  113 | #define _BV(b) (1UL << (b))
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_device_api.cpp:22:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:20:9: warning: "_BV" redefined
+   20 | #define _BV(n) (1 << n) // sets 1 at position of BIT "n"
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:12:
+~/.arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Arduino.h:113:9: note: this is the location of the previous definition
+  113 | #define _BV(b) (1UL << (b))
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.h:8,
+                 from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000_shared_functions.cpp:13:
+~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:20:9: warning: "_BV" redefined
+   20 | #define _BV(n) (1 << n) // sets 1 at position of BIT "n"
+      |         ^~~
+In file included from ~/Arduino/libraries/UWB_DW1000_DW3000/src/qorvo/dw3000.h:12:
+~/.arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Arduino.h:113:9: note: this is the location of the previous definition
+  113 | #define _BV(b) (1UL << (b))
+      |         ^~~
+Sketch uses 916659 bytes (69%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 49288 bytes (15%) of dynamic memory, leaving 278392 bytes for local variables. Maximum is 327680 bytes.
+exit=0

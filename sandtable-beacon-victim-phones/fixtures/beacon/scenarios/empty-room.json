@@ -1,0 +1,13 @@
+{
+  "schema": "sandtable.beacon.scenario/1",
+  "name": "empty-room",
+  "simulated": true,
+  "title": "Empty Suite 310: two pucks placed, nothing inside",
+  "description": "SIMULATED control scene on the synthetic twin: two pucks are placed in the door-wall layout of Suite 310 and there is no phone, wearable or laptop anywhere on the floor. The pucks should hear nothing (state 'silent': weak evidence of empty, never proof).",
+  "floor": "f3",
+  "room": "r310",
+  "seed": 311,
+  "pucks": {"throw": {"room": "r310", "n": 2, "seed": 310, "strategy": "door-wall"}},
+  "phones": [],
+  "cold_devices": []
+}

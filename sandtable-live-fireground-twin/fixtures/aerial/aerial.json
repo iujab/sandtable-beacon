@@ -1,0 +1,46 @@
+{
+ "schema": "sandtable.aerial/1",
+ "placeholder": false,
+ "images": [
+  {
+   "id": "ortho",
+   "kind": "ortho",
+   "path": "fixtures/aerial/ortho.png",
+   "bbox": [
+    -118.6311449,
+    34.2023308,
+    -118.6284295,
+    34.2045766
+   ],
+   "width": 1250,
+   "height": 1250,
+   "gsd_m": 0.2,
+   "native_gsd_m": 0.6,
+   "capture_date": null,
+   "heading_deg": null,
+   "source": "USDA NAIP orthoimagery via the USGS National Map",
+   "synthetic": false,
+   "note": "Resampled by the USGS image service from 0.6 m NAIP. Stand-in for Vexcel ortho in fixture mode."
+  },
+  {
+   "id": "ortho_context",
+   "kind": "ortho",
+   "path": "fixtures/aerial/ortho_context.png",
+   "bbox": [
+    -118.6339146,
+    34.2000401,
+    -118.6256598,
+    34.2068673
+   ],
+   "width": 1267,
+   "height": 1267,
+   "gsd_m": 0.6,
+   "native_gsd_m": 0.6,
+   "capture_date": null,
+   "heading_deg": null,
+   "source": "USDA NAIP orthoimagery via the USGS National Map",
+   "synthetic": false,
+   "note": "Resampled by the USGS image service from 0.6 m NAIP. Stand-in for Vexcel ortho in fixture mode."
+  }
+ ]
+}

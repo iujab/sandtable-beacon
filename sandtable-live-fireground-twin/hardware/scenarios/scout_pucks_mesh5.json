@@ -1,0 +1,101 @@
+{
+ "dims": 2,
+ "profile": "mesh5",
+ "rate_hz": 10,
+ "loop": true,
+ "anchors": {},
+ "nodes": {
+  "N1": {
+   "role": "mesh",
+   "label": "puck P1",
+   "z": 0.3,
+   "at": [
+    8.6,
+    6.4
+   ]
+  },
+  "N2": {
+   "role": "mesh",
+   "label": "puck P2",
+   "z": 0.3,
+   "at": [
+    7.0,
+    7.9
+   ]
+  },
+  "N3": {
+   "role": "mesh",
+   "label": "puck P3",
+   "z": 0.3,
+   "at": [
+    7.9,
+    4.6
+   ]
+  },
+  "N4": {
+   "role": "mesh",
+   "label": "puck P4",
+   "z": 0.3,
+   "at": [
+    5.7,
+    5.6
+   ]
+  },
+  "N5": {
+   "role": "mesh",
+   "label": "puck P5",
+   "z": 0.3,
+   "at": [
+    6.6,
+    3.7
+   ]
+  }
+ },
+ "noise": {
+  "sigma_m": 0.08,
+  "nlos_extra_sigma_m": 0.15,
+  "outlier_prob": 0.02,
+  "outlier_m": 1.5,
+  "dropout_prob": 0.03
+ },
+ "seed": 310,
+ "name": "scout-pucks-mesh5",
+ "description": "Scout mode, SIMULATED: five pucks thrown through the door of Suite 310 (exercise fire room, twin frame in metres), static, 0.3 m above the floor, empty room. All ten pairwise ranges; the kit solves positions by MDS in its relative mesh frame. Use it to learn the link baseline and to check self-location.",
+ "room": {
+  "outline": [
+   [
+    0,
+    0
+   ],
+   [
+    9.5,
+    0
+   ],
+   [
+    9.5,
+    8.65
+   ],
+   [
+    0,
+    8.65
+   ]
+  ],
+  "walls": [],
+  "labels": [
+   {
+    "name": "door d310 (corridor side)",
+    "at": [
+     9.5,
+     7.2
+    ]
+   },
+   {
+    "name": "Suite 310 (exercise fire room)",
+    "at": [
+     4.75,
+     4.3
+    ]
+   }
+  ]
+ }
+}

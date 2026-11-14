@@ -1,0 +1,34 @@
+{
+ "source": "../sandtable-beacon-victim-phones/project.json (lane L16)",
+ "vendored": "2026-11-14T12:28:56-0600",
+ "owner_questions": [
+  {
+   "q": "Can a UWB board range a victim's phone over UWB at all?",
+   "a": "Yes, with exactly your boards: a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware ranges an iPhone 11 or later through Apple's accessory protocol, once the person has opened our app. Both your iPhones give distance (about 60 readings a second); neither gives direction to an accessory. The app reads the distance and reports it; the board itself only logs it on its debug channel."
+  },
+  {
+   "q": "Can it be done cold, to a phone whose owner installed nothing?",
+   "a": "No. An iPhone's UWB radio only answers a session started by an app with the user's permission. Cold, a radio can only count Bluetooth advertisements nearby: a rough band of devices by signal strength, no identity, and devices are not people. The stock puck firmware cannot even do that; the UNO Q's own radio can (written, never run)."
+  },
+  {
+   "q": "One puck or two for angle?",
+   "a": "One puck gives a ring. Two give two candidate points, mirror images across the line between the pucks; the twin's walls often delete one. Three pucks not in a line give a position. The phone's own direction would turn one ring into a point, but an iPhone 14 or 15 does not report direction to an accessory without camera assistance (a moving phone that can see), so do not count on it. Simulated numbers follow when the evaluation finishes."
+  },
+  {
+   "q": "Will the phone keep answering with the screen off?",
+   "a": "Not as built tonight: keep the app open (it keeps the screen awake). Two ways exist and are not built: a Bluetooth-paired background session in which only the puck gets the measurements, and, on iOS 18.4 or later, a Live Activity that lets the app keep ranging."
+  },
+  {
+   "q": "Can we put both UWB boards on one device we throw in?",
+   "a": "It works poorly. Bearing from two single-antenna boards comes from the difference of two ranges: at 10 cm spacing it is useless, at 30 cm about 14 to 38 degrees of error, at 50 cm about 8 to 23 degrees, and the mirror ambiguity remains. Simulated numbers follow."
+  },
+  {
+   "q": "Or one puck on the Android phone and one on the UNO Q, two separately powered pucks?",
+   "a": "Two separate pucks a few metres apart are far better than two boards on one device: tens of centimetres, with two candidates that the twin can often cut to one. The Android phone is only worth using as a power source: the stock firmware prints nothing a phone could read. Recommended for the live demo: three separate pucks on battery banks, 2 to 3 m apart, not in a line; the UNO Q can power one and run the server."
+  },
+  {
+   "q": "What does a puck need?",
+   "a": "Power only (5 V on either micro-USB port). The range comes back through the iPhone app over Wi-Fi. Stand the board upright, at least 15 cm off the floor, component-free side toward the phone. Puck positions are measured with a tape and clicked onto the plan: the stock firmware cannot range board to board."
+  }
+ ]
+}

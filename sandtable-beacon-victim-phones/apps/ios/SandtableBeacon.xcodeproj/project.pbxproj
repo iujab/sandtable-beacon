@@ -1,0 +1,303 @@
+// !$*UTF8*$!
+/* SandtableBeacon: HAND-WRITTEN project file for UNCOMPILED SOURCE (no Mac was available).
+   Parsed with the pure-Python pbxproj package only (apps/ios/tools/pbxproj_check.py).
+   Primary route: run xcodegen in apps/ios (it replaces this file). See docs/IOS_BUILD.md. */
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5B1E0C0000000000000000B1 /* SandtableBeaconApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A1 /* SandtableBeaconApp.swift */; };
+		5B1E0C0000000000000000B2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A2 /* ContentView.swift */; };
+		5B1E0C0000000000000000B3 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A3 /* SetupView.swift */; };
+		5B1E0C0000000000000000B4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A4 /* Theme.swift */; };
+		5B1E0C0000000000000000B5 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A5 /* Models.swift */; };
+		5B1E0C0000000000000000B6 /* PuckLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A6 /* PuckLink.swift */; };
+		5B1E0C0000000000000000B7 /* PuckManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A7 /* PuckManager.swift */; };
+		5B1E0C0000000000000000B8 /* Sensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A8 /* Sensors.swift */; };
+		5B1E0C0000000000000000B9 /* Reporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000A9 /* Reporter.swift */; };
+		5B1E0C0000000000000000BB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B1E0C0000000000000000AB /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		5B1E0C0000000000000000A1 /* SandtableBeaconApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandtableBeaconApp.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A2 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A3 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A5 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A6 /* PuckLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckLink.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A7 /* PuckManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuckManager.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A8 /* Sensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensors.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000A9 /* Reporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reporter.swift; sourceTree = "<group>"; };
+		5B1E0C0000000000000000AA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5B1E0C0000000000000000AB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5B1E0C0000000000000000AC /* SandtableBeacon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SandtableBeacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5B1E0C0000000000000000D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5B1E0C0000000000000000C1 = {
+			isa = PBXGroup;
+			children = (
+				5B1E0C0000000000000000C2 /* SandtableBeacon */,
+				5B1E0C0000000000000000C3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5B1E0C0000000000000000C2 /* SandtableBeacon */ = {
+			isa = PBXGroup;
+			children = (
+				5B1E0C0000000000000000A1 /* SandtableBeaconApp.swift */,
+				5B1E0C0000000000000000A2 /* ContentView.swift */,
+				5B1E0C0000000000000000A3 /* SetupView.swift */,
+				5B1E0C0000000000000000A4 /* Theme.swift */,
+				5B1E0C0000000000000000A5 /* Models.swift */,
+				5B1E0C0000000000000000A6 /* PuckLink.swift */,
+				5B1E0C0000000000000000A7 /* PuckManager.swift */,
+				5B1E0C0000000000000000A8 /* Sensors.swift */,
+				5B1E0C0000000000000000A9 /* Reporter.swift */,
+				5B1E0C0000000000000000AB /* Assets.xcassets */,
+				5B1E0C0000000000000000AA /* Info.plist */,
+			);
+			path = SandtableBeacon;
+			sourceTree = "<group>";
+		};
+		5B1E0C0000000000000000C3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5B1E0C0000000000000000AC /* SandtableBeacon.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5B1E0C0000000000000000E1 /* SandtableBeacon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B1E0C000000000000000002 /* Build configuration list for PBXNativeTarget "SandtableBeacon" */;
+			buildPhases = (
+				5B1E0C0000000000000000D1 /* Sources */,
+				5B1E0C0000000000000000D2 /* Frameworks */,
+				5B1E0C0000000000000000D3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SandtableBeacon;
+			productName = SandtableBeacon;
+			productReference = 5B1E0C0000000000000000AC /* SandtableBeacon.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5B1E0C0000000000000000F1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					5B1E0C0000000000000000E1 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 5B1E0C000000000000000001 /* Build configuration list for PBXProject "SandtableBeacon" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 5B1E0C0000000000000000C1;
+			productRefGroup = 5B1E0C0000000000000000C3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5B1E0C0000000000000000E1 /* SandtableBeacon */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5B1E0C0000000000000000D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B1E0C0000000000000000BB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5B1E0C0000000000000000D1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B1E0C0000000000000000B1 /* SandtableBeaconApp.swift in Sources */,
+				5B1E0C0000000000000000B2 /* ContentView.swift in Sources */,
+				5B1E0C0000000000000000B3 /* SetupView.swift in Sources */,
+				5B1E0C0000000000000000B4 /* Theme.swift in Sources */,
+				5B1E0C0000000000000000B5 /* Models.swift in Sources */,
+				5B1E0C0000000000000000B6 /* PuckLink.swift in Sources */,
+				5B1E0C0000000000000000B7 /* PuckManager.swift in Sources */,
+				5B1E0C0000000000000000B8 /* Sensors.swift in Sources */,
+				5B1E0C0000000000000000B9 /* Reporter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		5B1E0C000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		5B1E0C000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		5B1E0C000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SandtableBeacon/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.sandtablebeacon;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		5B1E0C000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SandtableBeacon/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.sandtablebeacon;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5B1E0C000000000000000001 /* Build configuration list for PBXProject "SandtableBeacon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B1E0C000000000000000011 /* Debug */,
+				5B1E0C000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5B1E0C000000000000000002 /* Build configuration list for PBXNativeTarget "SandtableBeacon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B1E0C000000000000000021 /* Debug */,
+				5B1E0C000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5B1E0C0000000000000000F1 /* Project object */;
+}

@@ -1,0 +1,39 @@
+{
+  "name": "clinic-hallway",
+  "description": "A patient walks from the waiting area through the gap in an interior wall to the exam room (presses the call button there) and back. The wall at x = 4 m blocks line of sight to the far anchors, so ranges are NLOS: biased long, noisier, low los.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [8, 0], [8, 5], [0, 5]],
+    "walls": [{"a": [4, 0], "b": [4, 3], "nlos_bias_m": 0.35, "attenuation_db": 8}],
+    "labels": [{"name": "door", "at": [0, 2.5]}, {"name": "waiting", "at": [1.5, 1.0]}, {"name": "exam room", "at": [6.5, 1.0]}]
+  },
+  "anchors": {
+    "A1": {"x": 0, "y": 0, "z": 2.0},
+    "A2": {"x": 8, "y": 0, "z": 2.0},
+    "A3": {"x": 8, "y": 5, "z": 2.0},
+    "A4": {"x": 0, "y": 5, "z": 2.0}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "patient", "z": 1.0,
+      "path": [
+        {"at": [1.5, 1.2], "t": 0, "hold_s": 2},
+        {"at": [3.0, 1.6], "speed": 0.8},
+        {"at": [3.2, 4.0], "speed": 0.8},
+        {"at": [4.8, 4.0], "speed": 0.9},
+        {"at": [6.5, 1.5], "speed": 0.8, "hold_s": 4},
+        {"at": [5.0, 4.0], "speed": 0.8},
+        {"at": [3.0, 4.0], "speed": 0.9},
+        {"at": [1.5, 2.6], "speed": 0.7, "hold_s": 3}
+      ],
+      "path_mode": "linear",
+      "jitter_m": 0.02,
+      "events": [{"t": 14.0, "name": "button", "data": {"n": 1}}]
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 11
+}

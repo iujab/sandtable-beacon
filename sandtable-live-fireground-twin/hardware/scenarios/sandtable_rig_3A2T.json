@@ -1,0 +1,20 @@
+{
+  "name": "sandtable-rig-3A2T",
+  "description": "Sandtable exercise rig, room scale: three anchors on a 3.6 x 4.4 m rectangle (the same proportions as the exercise floor, so the default registration is about 1:9.8), two tags. T1 is Engine 1, T2 is the rescue team. The tags are parked; the Sandtable server moves them with /sim/teleport (storyboard autopilot, followers, UI drag), so positions still pass through the kit's noisy ranging and solver.",
+  "dims": 2,
+  "profile": "3A2T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {"outline": [[0, 0], [3.6, 0], [3.6, 4.4], [0, 4.4]], "walls": [], "labels": [{"name": "side A (address side)", "at": [1.8, 4.4]}]},
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 1.2},
+    "A2": {"x": 3.6, "y": 0.0, "z": 1.2},
+    "A3": {"x": 1.8, "y": 4.4, "z": 1.2}
+  },
+  "nodes": {
+    "T1": {"role": "tag", "label": "Engine 1", "z": 0.3, "path": [{"at": [1.7, 3.3], "t": 0}], "jitter_m": 0.0},
+    "T2": {"role": "tag", "label": "Rescue team", "z": 0.3, "path": [{"at": [1.9, 3.3], "t": 0}], "jitter_m": 0.0}
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.15, "outlier_prob": 0.02, "outlier_m": 1.5, "dropout_prob": 0.03},
+  "seed": 1810
+}

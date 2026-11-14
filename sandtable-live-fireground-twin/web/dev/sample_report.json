@@ -1,0 +1,1156 @@
+{
+ "type": "report",
+ "schema": "sandtable.report/1",
+ "sample": true,
+ "sample_note": "SAMPLE for page development. The address, the building record facts and the tenants of floor 3 are real public data (fixture mode). The people, phones, times, crews, hazards and the after-action text are invented for this sample. The pre-plan summary is a replay of a recorded real model run for this building.",
+ "generated_t": 1794679855.0,
+ "simulated": true,
+ "incident": {
+  "id": "sample-0001",
+  "address": "7325 Medical Center Dr, West Hills, Los Angeles, CA 91307",
+  "floor": "f3",
+  "floor_label": "3",
+  "phase": "terminated",
+  "elapsed_s": 700.0,
+  "started_t": 1794679155.0,
+  "mode": "exercise",
+  "script": "beacon"
+ },
+ "building": {
+  "name": "Professional building, 7325 Medical Center Dr",
+  "address": "7325 Medical Center Dr",
+  "city": "West Hills, Los Angeles",
+  "state": "CA",
+  "zip": "91307",
+  "facts": [
+   {
+    "key": "Use",
+    "value": "Office / medical (Professional Buildings)",
+    "source": "Los Angeles County Assessor parcel record (use description)"
+   },
+   {
+    "key": "Construction",
+    "value": "Class A: fire-resistive, protected structural steel frame",
+    "source": "Los Angeles County Assessor parcel record (quality class 'AX', class letter decoded with the standard A/B/C/D/S definitions)"
+   },
+   {
+    "key": "Stories",
+    "value": 3,
+    "source": "derived: highest suite floor in City of Los Angeles, Listing of Active Businesses, consistent with roof height 46 ft"
+   },
+   {
+    "key": "Year built",
+    "value": 1991,
+    "source": "Los Angeles County Assessor parcel record"
+   },
+   {
+    "key": "Building area",
+    "value": "43,722 sf",
+    "source": "Los Angeles County Assessor parcel record (main building area; not CoStar RBA)"
+   },
+   {
+    "key": "Footprint",
+    "value": "16,708 sf",
+    "source": "LA County LARIAC building outlines (2020 service, 2008 capture) (footprint area)"
+   },
+   {
+    "key": "Roof height",
+    "value": "13.9 m",
+    "source": "LA County LARIAC building outlines (2020 service, 2008 capture)"
+   },
+   {
+    "key": "Tenants on floor 3",
+    "value": "10 registrations in 8 suites",
+    "source": "City of Los Angeles, Listing of Active Businesses"
+   }
+  ],
+  "missing": [
+   "sprinklers",
+   "elevators",
+   "building class",
+   "owner contact",
+   "property manager / after-hours contact"
+  ]
+ },
+ "provenance": {
+  "building_record": {
+   "status": "real",
+   "mode": "fixture",
+   "text": "Public open data: county assessor parcel, city business registrations (names withheld), county building outline. Not CoStar data."
+  },
+  "aerial": {
+   "status": "real",
+   "mode": "fixture",
+   "text": "Aerial: USDA NAIP orthoimagery via the USGS National Map. Not Vexcel imagery."
+  },
+  "twin": {
+   "status": "fixture",
+   "mode": "fixture",
+   "text": "Twin: synthetic interior fitted to the real building footprint. Not a Matterport scan."
+  },
+  "crews": {
+   "status": "simulated",
+   "text": "Crew positions from the uwb-kit simulator (8 cm range noise, 2 % outliers)."
+  },
+  "beacon": {
+   "status": "sample",
+   "source": "sample",
+   "connected": false,
+   "simulated": true,
+   "text": "Phones and puck positions invented for this sample; no Beacon server was read."
+  },
+  "agent": {
+   "status": "replay",
+   "backend": "replay",
+   "text": "Pre-plan: replay of a recorded real model run. After-action text: written for this sample, not model output."
+  }
+ },
+ "people": [
+  {
+   "id": "B1",
+   "source": "phone",
+   "method": "uwb-twr",
+   "status": "trapped",
+   "people": 2,
+   "can_move": false,
+   "report": {
+    "status": "trapped",
+    "text": "Two of us in the back office, smoke under the door",
+    "people": 2,
+    "can_move": false,
+    "battery_pct": 41,
+    "home_suite": "310"
+   },
+   "where": {
+    "text": "Suite 310, 2.5 m from the west wall and 2 m from the south wall",
+    "room": "r310",
+    "room_label": "Suite 310",
+    "suite": "310",
+    "floor": "f3"
+   },
+   "geometry": {
+    "kind": "fix",
+    "x": 2.4,
+    "y": 2.1,
+    "sigma_m": 0.3,
+    "pruned": [
+     {
+      "x": 12.1,
+      "y": 0.9,
+      "reason": "ruled out by the range to puck P3"
+     }
+    ]
+   },
+   "located_t_rel": 190.0,
+   "assigned": "RIT",
+   "assigned_t_rel": 196.0,
+   "reached_t_rel": 341.0,
+   "out_t_rel": 485.0,
+   "state": "out"
+  },
+  {
+   "id": "B2",
+   "source": "phone",
+   "method": "ble-rssi",
+   "status": "sheltering",
+   "people": 1,
+   "can_move": true,
+   "report": {
+    "status": "sheltering",
+    "text": "Door shut, wet towel under it, smoke in the hall",
+    "people": 1,
+    "can_move": true,
+    "battery_pct": 77,
+    "home_suite": "309"
+   },
+   "where": {
+    "text": "Bluetooth ring 7 m around puck P1 (signal strength only); the occupant's home suite is 309",
+    "room": null,
+    "room_label": null,
+    "suite": null,
+    "floor": "f3"
+   },
+   "geometry": {
+    "kind": "ring",
+    "puck": "P1",
+    "cx": 7.9,
+    "cy": 6.7,
+    "r_m": 7.0,
+    "sigma_m": 1.8,
+    "arcs": [
+     [
+      0,
+      253
+     ],
+     [
+      287,
+      360
+     ]
+    ],
+    "ring_kind": "ble"
+   },
+   "located_t_rel": 212.0,
+   "assigned": "E1",
+   "assigned_t_rel": 230.0,
+   "reached_t_rel": 430.0,
+   "out_t_rel": 520.0,
+   "state": "out",
+   "note": "Ring only: Engine 1 was sent to search Suite 309, not to a point"
+  },
+  {
+   "id": "X1",
+   "source": "crew",
+   "method": "crew search",
+   "status": "unknown",
+   "people": 1,
+   "can_move": true,
+   "report": {
+    "status": null,
+    "text": "Found by Engine 1 during the search; no occupant app",
+    "people": 1,
+    "can_move": true
+   },
+   "where": {
+    "text": "West corridor, outside the Suite 309 door",
+    "room": "rcW",
+    "room_label": "West corridor",
+    "suite": null,
+    "floor": "f3"
+   },
+   "geometry": {
+    "kind": "point",
+    "x": 10.7,
+    "y": 12.0,
+    "basis": "Engine 1's position when it reported the find"
+   },
+   "located_t_rel": 372.0,
+   "assigned": "E1",
+   "assigned_t_rel": 372.0,
+   "reached_t_rel": 372.0,
+   "out_t_rel": 520.0,
+   "state": "out"
+  },
+  {
+   "id": "B4",
+   "source": "phone",
+   "method": "uwb-twr",
+   "status": "injured",
+   "people": 1,
+   "can_move": false,
+   "report": {
+    "status": "injured",
+    "text": "Fell, leg hurt, cannot walk",
+    "people": 1,
+    "can_move": false,
+    "battery_pct": 23,
+    "home_suite": null
+   },
+   "where": {
+    "text": "Two candidates: Suite 311 (74 %) or Suite 310 (26 %); found in Suite 311",
+    "room": "r311",
+    "room_label": "Suite 311",
+    "suite": "311",
+    "floor": "f3"
+   },
+   "geometry": {
+    "kind": "candidates",
+    "candidates": [
+     {
+      "x": 13.8,
+      "y": 3.2,
+      "sigma_m": 0.35,
+      "weight": 0.74,
+      "room": "r311",
+      "room_label": "Suite 311"
+     },
+     {
+      "x": 1.3,
+      "y": 4.7,
+      "sigma_m": 0.35,
+      "weight": 0.26,
+      "room": "r310",
+      "room_label": "Suite 310"
+     }
+    ],
+    "pruned": []
+   },
+   "located_t_rel": 352.0,
+   "assigned": "RIT",
+   "assigned_t_rel": 500.0,
+   "reached_t_rel": 590.0,
+   "out_t_rel": 650.0,
+   "state": "out"
+  },
+  {
+   "id": "B3",
+   "source": "phone",
+   "method": "app self-report",
+   "status": "ok",
+   "people": 1,
+   "can_move": true,
+   "report": {
+    "status": "ok",
+    "text": "I am out, at the assembly point",
+    "people": 1,
+    "can_move": true,
+    "battery_pct": 88,
+    "home_suite": "310",
+    "safe_outside": true
+   },
+   "where": {
+    "text": "Outside the building (self-reported); home suite 310",
+    "room": null,
+    "room_label": null,
+    "suite": "310",
+    "floor": null
+   },
+   "geometry": {
+    "kind": "none"
+   },
+   "located_t_rel": 118.0,
+   "assigned": null,
+   "reached_t_rel": null,
+   "out_t_rel": 118.0,
+   "state": "safe-outside"
+  }
+ ],
+ "pucks": [
+  {
+   "id": "P1",
+   "x": 7.9,
+   "y": 6.7
+  },
+  {
+   "id": "P2",
+   "x": 7.4,
+   "y": 2.6
+  },
+  {
+   "id": "P3",
+   "x": 5.2,
+   "y": 7.6
+  }
+ ],
+ "accountability": {
+  "type": "accountability",
+  "schema": "sandtable.accountability/1",
+  "floor": "f3",
+  "floor_label": "3",
+  "rows": [
+   {
+    "suite": "300",
+    "room": "r300",
+    "room_label": "Suite 300",
+    "tenant": "Medical & diagnostic laboratories",
+    "life_hazard": "few occupants; staff only",
+    "expected": {
+     "people": 2,
+     "low": 1,
+     "high": 4,
+     "basis": "885 sf laboratory, staff only (rule from the business category); estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 1,
+     "high": 4
+    },
+    "state": "unscanned",
+    "priority": 3,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "301",
+    "room": "r301",
+    "room_label": "Suite 301",
+    "tenant": "Hospitals",
+    "life_hazard": "hospital outpatient department: patients may be non-ambulatory or under treatment",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 4,
+     "high": 14
+    },
+    "state": "unscanned",
+    "priority": 2,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "302",
+    "room": "r302",
+    "room_label": "Suite 302",
+    "tenant": "Physicians",
+    "life_hazard": "medical patients, some with limited mobility",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 4,
+     "high": 14
+    },
+    "state": "unscanned",
+    "priority": 2,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "303",
+    "room": "r303",
+    "room_label": "Suite 303",
+    "tenant": null,
+    "life_hazard": null,
+    "expected": {
+     "people": null,
+     "low": 0,
+     "high": 9,
+     "basis": "no business registration on record: 0 if vacant, up to 9 at 100 sf per person if occupied"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 0,
+     "high": 9
+    },
+    "state": "unscanned",
+    "priority": 4,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "304",
+    "room": "r304",
+    "room_label": "Suite 304",
+    "tenant": "Physical, occupational & speech therapists, & audiologists; Physicians",
+    "life_hazard": "therapy patients with limited mobility",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 4,
+     "high": 14
+    },
+    "state": "unscanned",
+    "priority": 2,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "305",
+    "room": "r305",
+    "room_label": "Suite 305",
+    "tenant": "Other accounting services",
+    "life_hazard": null,
+    "expected": {
+     "people": 7,
+     "low": 3,
+     "high": 10,
+     "basis": "1040 sf at 150 sf per person (business load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 3,
+     "high": 10
+    },
+    "state": "unscanned",
+    "priority": 4,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "306",
+    "room": "r306",
+    "room_label": "Suite 306",
+    "tenant": "Physicians; All other miscellaneous health practitioners",
+    "life_hazard": "medical patients, some with limited mobility",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 4,
+     "high": 14
+    },
+    "state": "unscanned",
+    "priority": 2,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "307",
+    "room": "r307",
+    "room_label": "Suite 307",
+    "tenant": "Podiatrists",
+    "life_hazard": "patients with limited mobility possible",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 4,
+     "high": 14
+    },
+    "state": "unscanned",
+    "priority": 2,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "308",
+    "room": "r308",
+    "room_label": "Suite 308",
+    "tenant": null,
+    "life_hazard": null,
+    "expected": {
+     "people": null,
+     "low": 0,
+     "high": 9,
+     "basis": "no business registration on record: 0 if vacant, up to 9 at 100 sf per person if occupied"
+    },
+    "app_registered": 0,
+    "safe_outside": 0,
+    "phones_opt_in": 0,
+    "people_reported": 0,
+    "located": 0,
+    "cold_devices": null,
+    "cold_range": null,
+    "unaccounted": {
+     "low": 0,
+     "high": 9
+    },
+    "state": "unscanned",
+    "priority": 3,
+    "crews": [],
+    "assigned": null,
+    "reached": false,
+    "out": false,
+    "outcome": "not searched; no puck in range"
+   },
+   {
+    "suite": "309",
+    "room": "r309",
+    "room_label": "Suite 309",
+    "tenant": null,
+    "life_hazard": null,
+    "expected": {
+     "people": null,
+     "low": 0,
+     "high": 9,
+     "basis": "no business registration on record: 0 if vacant, up to 9 at 100 sf per person if occupied"
+    },
+    "app_registered": 1,
+    "safe_outside": 0,
+    "phones_opt_in": 1,
+    "people_reported": 1,
+    "located": 0,
+    "cold_devices": 1,
+    "cold_range": [
+     0,
+     3
+    ],
+    "unaccounted": {
+     "low": 0,
+     "high": 8
+    },
+    "state": "people-reported",
+    "priority": null,
+    "crews": [
+     "E1"
+    ],
+    "assigned": "E1",
+    "reached": true,
+    "out": true,
+    "outcome": "1 person walked out with Engine 1 (B2)"
+   },
+   {
+    "suite": "310",
+    "room": "r310",
+    "room_label": "Suite 310",
+    "tenant": "Dentists",
+    "life_hazard": "dental patients may be sedated or mid-procedure",
+    "expected": {
+     "people": 9,
+     "low": 4,
+     "high": 14,
+     "basis": "885 sf at 100 sf per person (outpatient load factor), open hours; estimate"
+    },
+    "app_registered": 2,
+    "safe_outside": 1,
+    "phones_opt_in": 1,
+    "people_reported": 2,
+    "located": 2,
+    "cold_devices": 3,
+    "cold_range": [
+     2,
+     5
+    ],
+    "unaccounted": {
+     "low": 1,
+     "high": 11
+    },
+    "state": "people-reported",
+    "priority": null,
+    "crews": [
+     "RIT"
+    ],
+    "assigned": "RIT",
+    "reached": true,
+    "out": true,
+    "outcome": "2 people carried out by the rescue team (B1)"
+   },
+   {
+    "suite": "311",
+    "room": "r311",
+    "room_label": "Suite 311",
+    "tenant": null,
+    "life_hazard": null,
+    "expected": {
+     "people": null,
+     "low": 0,
+     "high": 10,
+     "basis": "no business registration on record: 0 if vacant, up to 10 at 100 sf per person if occupied"
+    },
+    "app_registered": 1,
+    "safe_outside": 0,
+    "phones_opt_in": 1,
+    "people_reported": 1,
+    "located": 0,
+    "cold_devices": 1,
+    "cold_range": [
+     0,
+     3
+    ],
+    "unaccounted": {
+     "low": 0,
+     "high": 9
+    },
+    "state": "people-reported",
+    "priority": null,
+    "crews": [
+     "RIT"
+    ],
+    "assigned": "RIT",
+    "reached": true,
+    "out": true,
+    "outcome": "1 person carried out by the rescue team (B4)"
+   }
+  ],
+  "totals": {
+   "expected_low": 28,
+   "expected_high": 135,
+   "phones_opt_in": 3,
+   "people_reported": 4,
+   "located": 2,
+   "safe_outside": 1,
+   "cold_devices": 5,
+   "found_by_crews": 1,
+   "out": 5,
+   "unaccounted_low": 25,
+   "unaccounted_high": 130,
+   "suites_unscanned": 9
+  },
+  "source": {
+   "costar_mode": "fixture",
+   "real_sponsor_data": false,
+   "beacon": "sample",
+   "text": "Building record: public open data with named sources; CoStar-only fields are empty. Tenant names withheld. Not CoStar data."
+  },
+  "limits": [
+   "Devices are not people: watches, earbuds and laptops advertise too, and some phones do not.",
+   "Expected occupancy is an estimate from floor area and a load factor, not a head count.",
+   "A silent or unscanned suite is not an empty suite."
+  ]
+ },
+ "crews": [
+  {
+   "id": "E1",
+   "label": "Engine 1",
+   "kind": "engine",
+   "physical": true,
+   "tag": "T1",
+   "status": "out",
+   "time_in_s": 450.0,
+   "air_pct": 58.0,
+   "last": {
+    "room": "rsB",
+    "room_label": "Stair B",
+    "x": 17.6,
+    "y": 10.6,
+    "t_rel": 520.0
+   },
+   "assignment": {
+    "task": "exit",
+    "target_label": "Stair B"
+   },
+   "track": [
+    [
+     17.55,
+     9.0
+    ],
+    [
+     17.55,
+     7.2
+    ],
+    [
+     10.7,
+     7.2
+    ],
+    [
+     9.0,
+     7.2
+    ],
+    [
+     10.7,
+     7.2
+    ],
+    [
+     10.7,
+     12.0
+    ],
+    [
+     9.0,
+     12.97
+    ],
+    [
+     5.0,
+     13.0
+    ],
+    [
+     9.0,
+     12.97
+    ],
+    [
+     10.7,
+     12.0
+    ],
+    [
+     10.7,
+     7.2
+    ],
+    [
+     17.55,
+     7.2
+    ],
+    [
+     17.55,
+     10.6
+    ]
+   ],
+   "simulated": true
+  },
+  {
+   "id": "RIT",
+   "label": "Rescue team",
+   "kind": "rit",
+   "physical": true,
+   "tag": "T2",
+   "status": "out",
+   "time_in_s": 435.0,
+   "air_pct": 52.0,
+   "last": {
+    "room": "rsB",
+    "room_label": "Stair B",
+    "x": 18.8,
+    "y": 10.2,
+    "t_rel": 650.0
+   },
+   "assignment": {
+    "task": "exit",
+    "target_label": "Stair B"
+   },
+   "track": [
+    [
+     17.55,
+     32.6
+    ],
+    [
+     17.55,
+     36.0
+    ],
+    [
+     10.7,
+     36.0
+    ],
+    [
+     10.7,
+     7.2
+    ],
+    [
+     8.5,
+     7.2
+    ],
+    [
+     3.0,
+     2.6
+    ],
+    [
+     8.5,
+     7.2
+    ],
+    [
+     10.7,
+     7.2
+    ],
+    [
+     17.55,
+     7.2
+    ],
+    [
+     17.55,
+     6.0
+    ],
+    [
+     14.5,
+     3.5
+    ],
+    [
+     17.55,
+     6.0
+    ],
+    [
+     18.8,
+     10.2
+    ]
+   ],
+   "simulated": true
+  }
+ ],
+ "hazards": [
+  {
+   "id": "hz1",
+   "kind": "fire",
+   "ref": "r310",
+   "label": "Suite 310",
+   "note": "fire room (alarm panel zone, Engine 1 confirmed)",
+   "source": "crew",
+   "t_rel": 120.0,
+   "geometry": {
+    "kind": "room",
+    "polygon": [
+     [
+      9.5,
+      0.0
+     ],
+     [
+      9.5,
+      8.65
+     ],
+     [
+      0.0,
+      8.65
+     ],
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "hz2",
+   "kind": "smoke",
+   "ref": "n012-n013",
+   "label": "West corridor near Suite 309",
+   "note": "heavy smoke, visibility nil (Engine 1 report)",
+   "source": "crew",
+   "t_rel": 265.0,
+   "geometry": {
+    "kind": "edge",
+    "polyline": [
+     [
+      10.7,
+      9.6
+     ],
+     [
+      10.7,
+      15.0
+     ]
+    ]
+   }
+  }
+ ],
+ "differences": [
+  {
+   "id": "D1",
+   "kind": "twin",
+   "text": "Door between Suite 310 and Suite 311 that the twin does not show (rescue team observation)",
+   "source": "crew",
+   "at": [
+    9.5,
+    3.4
+   ],
+   "t_rel": 600.0
+  },
+  {
+   "id": "D2",
+   "kind": "record",
+   "text": "Suite 309 has no business registration on record, but an occupant's app lists it as home suite: verify occupancy",
+   "source": "beacon + record",
+   "room": "r309"
+  },
+  {
+   "id": "D3",
+   "kind": "record",
+   "text": "Record area 43,722 sq ft versus footprint 16,708 sq ft x 3 floors = 50,124 sq ft (+15%). Confirm rentable versus gross area, or an atrium or void.",
+   "source": "bundle cross-check (real public data)"
+  }
+ ],
+ "timeline": [
+  {
+   "t_rel": 0.0,
+   "kind": "alarm",
+   "text": "Alarm: 7325 Medical Center Dr, West Hills, Los Angeles. Command agent is building the pre-plan.",
+   "unit": null
+  },
+  {
+   "t_rel": 41.0,
+   "kind": "phase",
+   "text": "Pre-plan complete. Crews cleared to enter.",
+   "unit": null
+  },
+  {
+   "t_rel": 55.0,
+   "kind": "assign",
+   "text": "Engine 1: attack Suite 310 via Stair B, 26 m",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 118.0,
+   "kind": "beacon",
+   "text": "B3 (occupant app): \"I am out, at the assembly point\". Home suite 310; counted as safe outside",
+   "unit": null
+  },
+  {
+   "t_rel": 120.0,
+   "kind": "hazard",
+   "text": "Suite 310: fire confirmed by Engine 1",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 150.0,
+   "kind": "beacon",
+   "text": "Engine 1 throws 3 pucks into Suite 310",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 171.0,
+   "kind": "phone",
+   "text": "B1: trapped, 2 people, cannot move. One UWB ring from P1 so far",
+   "unit": null
+  },
+  {
+   "t_rel": 190.0,
+   "kind": "phone",
+   "text": "B1: UWB fix in Suite 310, 2.5 m from the west wall, 2 m from the south wall, within 0.3 m",
+   "unit": null
+  },
+  {
+   "t_rel": 196.0,
+   "kind": "assign",
+   "text": "Rescue team: rescue B1 in Suite 310, 31 m via North corridor and West corridor",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 212.0,
+   "kind": "phone",
+   "text": "B2: sheltering, 1 person, can move. Bluetooth ring 7 m around P1 (signal strength only)",
+   "unit": null
+  },
+  {
+   "t_rel": 230.0,
+   "kind": "assign",
+   "text": "Engine 1: search Suite 309 for B2 (a ring, not a point: search the room)",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 265.0,
+   "kind": "hazard",
+   "text": "West corridor near Suite 309: heavy smoke, visibility nil",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 341.0,
+   "kind": "reached",
+   "text": "Rescue team reached B1 in Suite 310: 2 people, cannot walk",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 352.0,
+   "kind": "phone",
+   "text": "B4: injured, 1 person, cannot move. Two candidates: Suite 311 (74 %) or Suite 310 (26 %)",
+   "unit": null
+  },
+  {
+   "t_rel": 372.0,
+   "kind": "found",
+   "text": "Engine 1 found 1 person in the West corridor at the Suite 309 door (no occupant app)",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 430.0,
+   "kind": "reached",
+   "text": "Engine 1 reached B2 in Suite 309: 1 person, walking",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 485.0,
+   "kind": "out",
+   "text": "Rescue team out via Stair B with B1's 2 people",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 500.0,
+   "kind": "assign",
+   "text": "Rescue team: rescue B4, search Suite 311 first (the more probable candidate)",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 520.0,
+   "kind": "out",
+   "text": "Engine 1 out via Stair B with B2 and X1",
+   "unit": "E1"
+  },
+  {
+   "t_rel": 590.0,
+   "kind": "reached",
+   "text": "Rescue team reached B4 in Suite 311",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 600.0,
+   "kind": "observation",
+   "text": "D1: door between Suite 310 and Suite 311 not in the twin (rescue team)",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 650.0,
+   "kind": "out",
+   "text": "Rescue team out via Stair B with B4",
+   "unit": "RIT"
+  },
+  {
+   "t_rel": 655.0,
+   "kind": "par",
+   "text": "All crews are out of the floor. 6 people out or safe outside; 9 suites not searched.",
+   "unit": null
+  }
+ ],
+ "agent": {
+  "preplan_summary": "Three-storey Class A fire-resistive medical office building (1991) with six inferred medical life-hazard suites on floor 3; worst case is Suite 310 (dental, sedation, oxygen and nitrous oxide). Attack up Stair B (17 m, 26 m of hose via the standpipe), evacuate down Stair A to side A where Engine 1 is staged; hydrant H1 is 13 m from the building.",
+  "preplan_backend": "replay",
+  "aar": {
+   "backend": "sample",
+   "summary": "Fire in Suite 310 (dental office). Six people are accounted for: B1's two were carried out by the rescue team from a UWB fix, B2 was reached by a room search from a Bluetooth ring only, X1 was found by Engine 1 in the corridor with no app, B4 was reached in the more probable of two candidate positions, and B3 reported herself outside. Nine suites on floor 3 were never searched; from the building record, between 24 and 102 people could be in them during open hours. That is a range from floor area, not a count, and it is why the floor is not cleared.",
+   "went_well": [
+    "B1 went from first ring to a fix in 19 s once the third puck landed",
+    "The ring for B2 was searched as a room, not walked to as a point"
+   ],
+   "improve": [
+    "B4 waited 148 s for a crew: both crews were committed",
+    "No puck reached the east side of the floor"
+   ],
+   "follow_up": [
+    "Search suites 300 to 308 before the floor is declared clear",
+    "File the Suite 309 occupancy question against the building record",
+    "Add the 310/311 door to the twin"
+   ]
+  }
+ },
+ "limits": [
+  "A ring is a range from one puck, not a position; two candidates are two places, not one.",
+  "Devices are not people: the cold device count is a band, and phones without the app cannot be identified.",
+  "Expected occupancy comes from floor area and a load factor: an estimate, never a head count.",
+  "An unscanned or silent suite is not cleared.",
+  "Crew positions are simulated; the interior twin is synthetic and may differ from the real floor."
+ ]
+}

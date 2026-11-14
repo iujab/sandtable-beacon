@@ -1,0 +1,20 @@
+{
+  "name": "sandtable-table-4A1T",
+  "description": "Sandtable on a table: four anchors flat on the corners of a 0.72 x 0.88 m printed plan (about 1:49), one puck tag. Small noise as in the kit's own tabletop scenario. At this scale a 2 cm ranging error is about 1 m in the building, so only room-level location is meaningful.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {"outline": [[0, 0], [0.72, 0], [0.72, 0.88], [0, 0.88]], "walls": [], "labels": []},
+  "anchors": {
+    "A1": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "A2": {"x": 0.72, "y": 0.0, "z": 0.0},
+    "A3": {"x": 0.72, "y": 0.88, "z": 0.0},
+    "A4": {"x": 0.0, "y": 0.88, "z": 0.0}
+  },
+  "nodes": {
+    "T1": {"role": "tag", "label": "Engine 1", "z": 0.0, "path": [{"at": [0.34, 0.66], "t": 0}], "jitter_m": 0.0}
+  },
+  "noise": {"sigma_m": 0.02, "nlos_extra_sigma_m": 0.05, "outlier_prob": 0.01, "outlier_m": 0.3, "dropout_prob": 0.02, "rssi_1m_dbm": -62.0},
+  "seed": 1810
+}

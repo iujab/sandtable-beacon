@@ -1,0 +1,38 @@
+{
+ "mode": "auto",
+ "profile": "4A1T",
+ "simulated": true,
+ "llm_backend": "replay",
+ "final_step": "done",
+ "phase": "terminated",
+ "wall_s": 75.9,
+ "runs": {
+  "preplan": [
+   "replay"
+  ],
+  "mayday#1": [
+   "replay"
+  ],
+  "hazard#2": [
+   "replay"
+  ],
+  "contact#3": [
+   "replay"
+  ],
+  "aar": [
+   "replay"
+  ]
+ },
+ "radio_messages": 5,
+ "fallback_runs": [],
+ "preplan_backend": "replay",
+ "aar_backend": "replay",
+ "metrics_simulated": {
+  "replans": 1,
+  "hazards": 1,
+  "mayday_to_assign_s": 2.8,
+  "mayday_to_contact_s": 34.2,
+  "mayday_to_all_out_s": 40.4
+ },
+ "at": "2026-11-14T11:38:52-0600"
+}

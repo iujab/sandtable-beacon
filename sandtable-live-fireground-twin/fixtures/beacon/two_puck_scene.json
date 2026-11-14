@@ -1,0 +1,82 @@
+{
+ "schema": "sandtable.beacon_scene/1",
+ "title": "Two pucks, two phones (the owner's live setup)",
+ "room": "r310",
+ "room_label": "Suite 310",
+ "floor": "f3",
+ "note": "Two UWB pucks placed by hand at tape-measured positions (distance only, no direction) and two victims' phones. Phone positions are SIMULATED truth for the simulator; on real hardware the phones are wherever the people are.",
+ "pucks": [
+  {
+   "id": "P1",
+   "x": 7.6,
+   "y": 2.2,
+   "placed": "by hand",
+   "how": "tape-measured and clicked onto the plan"
+  },
+  {
+   "id": "P2",
+   "x": 3.4,
+   "y": 1.9,
+   "placed": "by hand",
+   "how": "tape-measured and clicked onto the plan"
+  }
+ ],
+ "puck_line": {
+  "from": "P1",
+  "to": "P2"
+ },
+ "phones": [
+  {
+   "key": "victim-phone-1",
+   "x": 2.0,
+   "y": 6.3,
+   "report": {
+    "status": "trapped",
+    "text": "Two of us in the back office, smoke under the door",
+    "people": 2,
+    "can_move": false,
+    "battery_pct": 38,
+    "floor_reported": 3,
+    "home_suite": "310"
+   },
+   "truth": {
+    "x": 2.0,
+    "y": 6.3
+   },
+   "mirror": {
+    "x": 2.64,
+    "y": -2.65,
+    "outside_building": true,
+    "inside_room_clear_of_walls": false,
+    "apart_m": 8.97
+   },
+   "expect": "fix: the mirror candidate is outside the building, the twin removes it"
+  },
+  {
+   "key": "victim-phone-2",
+   "x": 6.0,
+   "y": 0.9,
+   "report": {
+    "status": "injured",
+    "text": "Fell near the window, leg hurt",
+    "people": 1,
+    "can_move": false,
+    "battery_pct": 71,
+    "floor_reported": 3,
+    "home_suite": "310"
+   },
+   "truth": {
+    "x": 6.0,
+    "y": 0.9
+   },
+   "mirror": {
+    "x": 5.83,
+    "y": 3.26,
+    "outside_building": false,
+    "inside_room_clear_of_walls": true,
+    "apart_m": 2.37
+   },
+   "expect": "candidates: the mirror stays inside the room, both remain possible"
+  }
+ ]
+}

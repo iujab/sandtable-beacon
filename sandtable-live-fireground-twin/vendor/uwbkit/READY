@@ -1,0 +1,132 @@
+uwb-kit is READY (tier 1: hub + simulator + solver + record/replay + Python and JS clients).
+Wire contract: uwb-kit/INTERFACE.md v1 (implemented exactly; additions are listed at its end).
+Everything below was run against a real hub with real clients before this file was written.
+Firmware, the bring-up tools and the web console land next;
+this file is updated when they do (see "Status" at the bottom). Your code does not change.
+
+== 0. The shared hub is already running =====================================================
+
+  ws://127.0.0.1:1800/stream     http://127.0.0.1:1800/events     http://127.0.0.1:1800/state
+  source sim:office-walk, profile 4A1T, 10 Hz, hello.simulated = true  ->  show a SIM badge.
+
+  Check it:   curl -s http://127.0.0.1:1800/healthz
+  Watch it:   ../uwb-kit/.venv/bin/python -m uwbkit listen --types pos,event --count 20
+  Restart:    bash ../uwb-kit/run_demo.sh --stop ; bash ../uwb-kit/run_demo.sh --daemon --tailnet
+              (pid in uwb-kit/.hub.pid, log in uwb-kit/logs/hub.log)
+
+  It is SHARED: do not POST /sim/scenario, /sim/teleport, /anchors or /record to port 1800.
+  If your demo needs its own scenario or teleporting, run your own hub (section 2).
+
+== 1. Install ===============================================================================
+
+On this bench (fastest; paths relative to your project directory):
+
+  uv pip install --python .venv/bin/python -e ../uwb-kit        # into YOUR venv (deps: aiohttp, numpy, pyserial; wheels only)
+  # or use the kit's own ready-made venv without installing anything:
+  ../uwb-kit/.venv/bin/python -m uwbkit --version
+
+Anywhere else (Windows laptop, UNO Q, a clean clone), Python >= 3.10:
+
+  python -m venv .venv
+  .venv/bin/pip install ./uwb-kit              # Windows: .venv\Scripts\pip install .\uwb-kit
+  .venv/bin/python -m uwbkit --version         # Windows: .venv\Scripts\python -m uwbkit --version
+
+Vendor it when your project is done (copies, so your repo stands alone):
+
+  ../uwb-kit/.venv/bin/python -m uwbkit vendor vendor/uwbkit                 # whole kit (hub + sim + solver + clients)
+  ../uwb-kit/.venv/bin/python -m uwbkit vendor vendor/uwbkit --client-only   # just client.py + uwbkit-client.js
+  # then:  pip install ./vendor/uwbkit     or     PYTHONPATH=vendor/uwbkit python -m uwbkit hub ...
+
+== 2. Run your own hub (own port = your project port + 100, own scenario file) ==============
+
+  python -m uwbkit hub --source sim --scenario scenarios/my-scenario.json --port 1920
+  python -m uwbkit hub --source sim --scenario two-tags --port 1920          # a built-in scenario by name
+  python -m uwbkit hub --source sim --profile mesh5 --port 1920              # first built-in with that profile
+  python -m uwbkit hub --source replay:session.ndjson --loop --port 1920     # replay a recording
+  python -m uwbkit hub --source serial:auto                                  # real boards on USB
+  python -m uwbkit hub --source udp:0.0.0.0:1801                             # real boards over Wi-Fi
+
+  (`python` = the interpreter where uwbkit is installed, e.g. .venv/bin/python or ../uwb-kit/.venv/bin/python;
+   the console script `uwbkit hub ...` is equivalent. Other flags: --host 127.0.0.1[,more] --profile 4A1T
+   --seed N --speed 2 --record file.ndjson --record-dir DIR --tag-z 1.0 --dims 3. `uwbkit hub --help` lists all.)
+
+  Point your code at it with the URL argument or the environment variable both clients honour:
+      UWBKIT_URL=ws://127.0.0.1:1920/stream
+
+  Scenario files follow the schema in INTERFACE.md exactly. Built-in scenarios (`python -m uwbkit scenarios`):
+      office-walk (default)  clinic-hallway  two-tags  mesh-dance  static-cal  nlos-stress
+      figure-eight  tabletop  cube-3d
+  They live in uwb-kit/uwbkit/sim/scenarios/*.json: copy one as a starting point for your own.
+  A bad scenario file fails with a readable message that names the offending key.
+
+  Launching the hub from your demo launcher (cross-platform, no shell tricks):
+      import subprocess, sys
+      hub = subprocess.Popen([sys.executable, "-m", "uwbkit", "hub", "--source", "sim",
+                              "--scenario", "scenarios/my-scenario.json", "--port", "1920"])
+
+== 3. Python client (stdlib only, one file: uwb-kit/uwbkit/client.py) ========================
+
+  from uwbkit.client import Stream, Kit
+  for msg in Stream("ws://127.0.0.1:1800/stream"):          # reconnects automatically; url=None -> $UWBKIT_URL
+      if msg["type"] == "hello": print("SIM" if msg["simulated"] else "REAL", msg["nodes"])
+      if msg["type"] == "pos":   print(msg["id"], msg["x"], msg["y"], msg["q"], msg["src"])
+      if msg["type"] == "event": print(msg["id"], msg["name"], msg["data"])
+
+  asyncio:      async for msg in AsyncStream(url): ...
+  filter:       Stream(url, types={"pos", "event"})          # .hello / .anchors / .simulated stay available
+  SSE instead:  Stream("http://127.0.0.1:1800/events")
+  REST:         kit = Kit("http://127.0.0.1:1920"); kit.state(); kit.teleport("T1", 1.0, 2.0);
+                kit.set_scenario("two-tags"); kit.sim_control("pause"); kit.record("start", "run1.ndjson");
+                kit.truth()   # sim ground truth: for metrics in results/ only, never for a demo UI
+
+== 4. JavaScript client (one file, no dependencies: uwb-kit/uwbkit/static/uwbkit-client.js) ==
+
+  <script src="http://localhost:1800/uwbkit-client.js"></script>     <!-- every hub serves it; or vendor the file -->
+  <script>
+    const kit = new UwbKit("ws://localhost:1800/stream");            // reconnects automatically
+    kit.simBadge();                                                   // shows a SIM badge while hello.simulated is true
+    kit.on("pos", p => draw(p.id, p.x, p.y, p.q));
+    kit.on("event", e => console.log(e.id, e.name, e.data));
+  </script>
+
+  Node >= 22:   const UwbKit = require("./vendor/uwbkit/uwbkit-client.js");   // same API
+  State cache:  kit.hello, kit.anchors, kit.pos["T1"], kit.ranges["T1-A1"], kit.status, kit.simulated
+  REST:         await kit.state(); kit.teleport("T1", 1, 2); kit.setScenario("two-tags"); kit.simControl("pause");
+                kit.record("start", "run1.ndjson"); kit.post("/sim/control", {cmd: "speed", value: 2})
+  Phone:        adb reverse tcp:1920 tcp:1920   (the phone then opens http://localhost:1920/...)
+
+== 5. What the stream gives you (details: INTERFACE.md) ======================================
+
+  hello (first), anchors (second), then range (per link, ~10 Hz), pos (per tag; per node in mesh5),
+  event (motion_start, motion_stop, proximity, button, node_online, node_offline), status (1 Hz).
+  hello may be sent AGAIN on a live connection when the configuration changes (scenario switch, a new
+  board appears): replace your node list when you see it.
+  Simulator noise model (also in hello.sim.noise): Gaussian range noise, positive NLOS bias + extra noise
+  + attenuation per wall crossed, positive-skewed outliers, dropouts. Numbers from it are SIMULATED.
+
+== Status ====================================================================================
+
+  [x] hub: /stream /events /state /healthz /anchors /calibrate /sim/* /record (+ /sim/truth /diag /room)
+  [x] simulator + 9 built-in scenarios, solver (robust LSQ + EKF; MDS for mesh5), record / replay
+  [x] Python client, JS client (verified in Node and headless Chromium against the live hub)
+  [x] web console at /  (live map, fix quality, per-link table, scenario picker, drag-to-teleport, record)
+  [x] serial: and udp: sources, line-protocol parser, vendor adapters (MaUWB AT+RANGE, DWM1001 les/lec),
+      fake-board emulator: `python -m uwbkit fakeboard --udp 127.0.0.1:1801` (or --tcp PORT / --pty);
+      tested end to end over real sockets and a pty, never on real boards
+  [x] board firmware: ESP32+DW3000, ESP32+DW1000, MaUWB ESP32-S3 bridge, UNO Q LED matrix:
+      COMPILE-VERIFIED ONLY (firmware/build_logs/, firmware/STATUS.json); never run on hardware
+  [x] bring-up tools: uwbkit identify | flash | doctor | anchors, and BRINGUP.md (numbered, ~45 min)
+  [x] evaluation: `python -m uwbkit eval` -> results/solver_accuracy.json + .png  (SIMULATED numbers)
+
+  If you copied files out of uwb-kit/firmware into your own project: the kit firmware was reviewed against the
+  driver sources and changed at 10:40 CST (uwbkit_dw3000.ino radio_send now also clears the HPDWARN status bit;
+  firmware/README.md "Review fixes" and first-power-up items 12-16). Re-sync your copy.
+
+  What a project should plan for when real boards arrive (details: DEVIATIONS.md):
+    - hello.simulated becomes false and your SIM badge disappears by itself; nothing else changes.
+    - no `pos` until the owner has set the anchor coordinates (anchors.calibrated == "none" until then).
+    - two tags share air time (about half the rate each); status.battery may be empty; range.fp / los may be
+      missing on some boards. Treat every optional field as optional.
+    - keep a recorded session and your sim scenario as fallbacks: `--source replay:<file> --loop`.
+
+  Tests: ../uwb-kit/.venv/bin/python -m pytest ../uwb-kit/tests -q      (121 pass, about 100 s)

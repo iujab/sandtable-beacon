@@ -1,0 +1,48 @@
+{
+  "name": "nlos-stress",
+  "description": "Torture test: a 10 x 8 m floor split into three rooms by walls with doors, plus a glass partition and a metal cabinet. The tag walks through every room, so most links are NLOS most of the time; outliers (8 %, up to 2 m) and dropouts (5 % base) are high.",
+  "dims": 2,
+  "profile": "4A1T",
+  "rate_hz": 10,
+  "loop": true,
+  "room": {
+    "outline": [[0, 0], [10, 0], [10, 8], [0, 8]],
+    "walls": [
+      {"a": [4, 0], "b": [4, 3], "nlos_bias_m": 0.4, "attenuation_db": 9, "material": "drywall"},
+      {"a": [4, 4.5], "b": [4, 8], "nlos_bias_m": 0.4, "attenuation_db": 9, "material": "drywall"},
+      {"a": [6, 4], "b": [10, 4], "nlos_bias_m": 0.3, "attenuation_db": 7, "material": "drywall"},
+      {"a": [6.5, 0], "b": [6.5, 1.5], "nlos_bias_m": 0.15, "attenuation_db": 3, "material": "glass"},
+      {"a": [2.4, 6], "b": [3.2, 6], "nlos_bias_m": 0.6, "attenuation_db": 12, "material": "metal cabinet"}
+    ],
+    "labels": [{"name": "door", "at": [4, 3.75]}, {"name": "door", "at": [5, 4]}, {"name": "cabinet", "at": [2.8, 6.2]},
+               {"name": "lab", "at": [8, 2]}, {"name": "store", "at": [8, 6.5]}]
+  },
+  "anchors": {
+    "A1": {"x": 0, "y": 0, "z": 2.0},
+    "A2": {"x": 10, "y": 0, "z": 2.0},
+    "A3": {"x": 10, "y": 8, "z": 2.0},
+    "A4": {"x": 0, "y": 8, "z": 2.0}
+  },
+  "nodes": {
+    "T1": {
+      "role": "tag", "label": "worker", "z": 1.0,
+      "path": [
+        {"at": [1.5, 2.0], "t": 0},
+        {"at": [3.0, 3.7], "speed": 1.0},
+        {"at": [5.0, 3.7], "speed": 1.0},
+        {"at": [8.0, 2.0], "speed": 1.2, "hold_s": 3},
+        {"at": [5.0, 3.0], "speed": 1.0},
+        {"at": [5.0, 5.0], "speed": 0.8},
+        {"at": [8.0, 6.5], "speed": 1.1, "hold_s": 2},
+        {"at": [5.0, 5.5], "speed": 1.0},
+        {"at": [5.0, 3.75], "speed": 0.8},
+        {"at": [3.0, 3.75], "speed": 1.0},
+        {"at": [1.5, 6.5], "speed": 1.1}
+      ],
+      "path_mode": "linear",
+      "jitter_m": 0.02
+    }
+  },
+  "noise": {"sigma_m": 0.08, "nlos_extra_sigma_m": 0.2, "outlier_prob": 0.08, "outlier_m": 2.0, "dropout_prob": 0.05},
+  "seed": 13
+}

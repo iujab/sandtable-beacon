@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+data/
+.env
+*.pid
+__pycache__/
+.android-sdk/
+.gradle/
+.gradle-home/
+build/
+*.log.tmp
+logs/

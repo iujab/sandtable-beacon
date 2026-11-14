@@ -1,0 +1,135 @@
+{
+ "dims": 2,
+ "profile": "mesh5",
+ "rate_hz": 10,
+ "loop": true,
+ "anchors": {},
+ "nodes": {
+  "N1": {
+   "role": "mesh",
+   "label": "puck P1",
+   "z": 0.3,
+   "at": [
+    8.6,
+    6.4
+   ]
+  },
+  "N2": {
+   "role": "mesh",
+   "label": "puck P2",
+   "z": 0.3,
+   "at": [
+    7.0,
+    7.9
+   ]
+  },
+  "N3": {
+   "role": "mesh",
+   "label": "puck P3",
+   "z": 0.3,
+   "at": [
+    7.9,
+    4.6
+   ]
+  },
+  "N4": {
+   "role": "mesh",
+   "label": "puck P4",
+   "z": 0.3,
+   "at": [
+    5.7,
+    5.6
+   ]
+  },
+  "N5": {
+   "role": "mesh",
+   "label": "puck P5",
+   "z": 0.3,
+   "at": [
+    6.6,
+    3.7
+   ]
+  }
+ },
+ "noise": {
+  "sigma_m": 0.08,
+  "nlos_extra_sigma_m": 0.15,
+  "outlier_prob": 0.02,
+  "outlier_m": 1.5,
+  "dropout_prob": 0.03
+ },
+ "seed": 310,
+ "name": "scout-pucks-mesh5-person",
+ "description": "Scout mode, SIMULATED: the same five pucks as scout-pucks-mesh5, with a person standing at [6.81, 5.91] between them. The kit simulator has no body model, so the body is a stand-in: two crossed 0.4 m wall segments of 3 dB each (a link through the centre loses about 6 dB of total power and about 11 dB of first-path power, and its range reads about 0.1 m long). Links N1-N4 and N2-N5 pass through the person.",
+ "room": {
+  "outline": [
+   [
+    0,
+    0
+   ],
+   [
+    9.5,
+    0
+   ],
+   [
+    9.5,
+    8.65
+   ],
+   [
+    0,
+    8.65
+   ]
+  ],
+  "walls": [
+   {
+    "a": [
+     6.609999999999999,
+     5.91
+    ],
+    "b": [
+     7.01,
+     5.91
+    ],
+    "nlos_bias_m": 0.06,
+    "attenuation_db": 3.0,
+    "nlos_extra_sigma_m": 0.04
+   },
+   {
+    "a": [
+     6.81,
+     5.71
+    ],
+    "b": [
+     6.81,
+     6.11
+    ],
+    "nlos_bias_m": 0.06,
+    "attenuation_db": 3.0,
+    "nlos_extra_sigma_m": 0.04
+   }
+  ],
+  "labels": [
+   {
+    "name": "door d310 (corridor side)",
+    "at": [
+     9.5,
+     7.2
+    ]
+   },
+   {
+    "name": "Suite 310 (exercise fire room)",
+    "at": [
+     4.75,
+     4.3
+    ]
+   },
+   {
+    "name": "person (stand-in: two crossed 0.4 m absorbing segments)",
+    "at": [
+     6.81,
+     5.91
+    ]
+   }
+  ]
+ }
+}

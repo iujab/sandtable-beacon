@@ -1,0 +1,14 @@
+.venv/
+node_modules/
+data/
+.env
+.env.*
+*.pid
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+.DS_Store
+xcuserdata/
+DerivedData/
+.secrets/

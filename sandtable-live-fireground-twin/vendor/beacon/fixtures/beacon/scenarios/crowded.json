@@ -1,0 +1,40 @@
+{
+  "schema": "sandtable.beacon.scenario/1",
+  "name": "crowded",
+  "simulated": true,
+  "title": "Crowded Suite 310: five opt-in phones, ten cold devices",
+  "description": "SIMULATED stress scene on the synthetic twin: a waiting room full of patients. Three pucks in Suite 310; five opt-in phones (three in the room, one in Suite 309, one in Suite 311; UWB and Bluetooth-only mixed) and ten devices with no app (phones, watches, earbuds, a laptop) over the room and its neighbours.",
+  "floor": "f3",
+  "room": "r310",
+  "seed": 312,
+  "pucks": {"throw": {"room": "r310", "n": 3, "seed": 310}},
+  "phones": [
+    {"key": "crowd-uwb-1", "room": "r310", "x": 1.8, "y": 1.5, "opt_in": true, "uwb": true, "chip": "U1", "model": "iPhone 14", "pointing": false,
+     "report": {"status": "trapped", "text": "Patient sedated in chair 2, cannot walk", "people": 2, "can_move": false,
+                "battery_pct": 63, "floor_reported": 3, "home_suite": "310", "platform": "ios"}},
+    {"key": "crowd-uwb-2", "room": "r310", "x": 4.6, "y": 4.9, "opt_in": true, "uwb": true, "chip": "U2", "model": "iPhone 15", "pointing": true, "camera_assist": true,
+     "report": {"status": "injured", "text": "Hurt my ankle, by the reception desk", "people": 1, "can_move": false,
+                "battery_pct": 22, "floor_reported": 3, "home_suite": "310", "platform": "ios"}},
+    {"key": "crowd-ble-1", "room": "r310", "x": 2.2, "y": 7.3, "opt_in": true, "uwb": false, "pointing": false,
+     "report": {"status": "sheltering", "text": "Three of us in the waiting room", "people": 3, "can_move": true,
+                "battery_pct": 54, "floor_reported": 3, "home_suite": "310", "platform": "ios"}},
+    {"key": "crowd-ble-309", "room": "r309", "x": 5.0, "y": 11.2, "opt_in": true, "uwb": false, "pointing": false,
+     "report": {"status": "sheltering", "text": "Staying put in 309", "people": 1, "can_move": true,
+                "battery_pct": 90, "floor_reported": 3, "home_suite": "309", "platform": "ios"}},
+    {"key": "crowd-uwb-311", "room": "r311", "x": 12.8, "y": 3.9, "opt_in": true, "uwb": true, "chip": "U1", "model": "iPhone 12", "pointing": false,
+     "report": {"status": "ok", "text": "Fine, waiting for instructions", "people": 1, "can_move": true,
+                "battery_pct": 71, "floor_reported": 3, "home_suite": "311", "platform": "ios"}},
+    {"key": "crowd-noapp-1", "room": "r310", "x": 3.1, "y": 2.4, "opt_in": false},
+    {"key": "crowd-noapp-2", "room": "r310", "x": 7.6, "y": 1.2, "opt_in": false},
+    {"key": "crowd-noapp-3", "room": "r309", "x": 2.5, "y": 14.0, "opt_in": false},
+    {"key": "crowd-noapp-4", "room": "r311", "x": 18.0, "y": 2.0, "opt_in": false}
+  ],
+  "cold_devices": [
+    {"key": "crowd-watch-1", "class": "wearable", "room": "r310", "x": 1.9, "y": 1.7},
+    {"key": "crowd-watch-2", "class": "wearable", "room": "r310", "x": 6.1, "y": 6.4},
+    {"key": "crowd-laptop-1", "class": "laptop", "room": "r310", "x": 8.4, "y": 3.0},
+    {"key": "crowd-buds-1", "class": "wearable", "room": "r309", "x": 6.8, "y": 13.6},
+    {"key": "crowd-watch-3", "class": "wearable", "room": "r311", "x": 11.2, "y": 1.6},
+    {"key": "crowd-noapp-5", "class": "phone", "room": "rcW", "x": 10.6, "y": 9.8}
+  ]
+}

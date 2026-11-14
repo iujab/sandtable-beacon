@@ -333,3 +333,9 @@ A puck host is a small computer that powers a puck and may read it (the UNO Q; `
 - `GET /api/layout?room=r310&n=2` returns the recommended puck layout for a room: `{"pucks": [{"id", "x", "y"}], "wall": "...", "why": "...", "mirror_falls": "..."}` (drawn as ghost markers: "place the pucks here").
 - `GET /api/app_link.svg?url=<server base url>` returns a QR code (SVG) of `sandtablebeacon://server?url=...`; scanning it with the iPhone's camera opens the Beacon app and fills in the server address.
 - The stock puck firmware serves one phone at a time. A phone that takes turns on a board reports each puck only every 10 to 20 s; the session keeps a still phone's last range for 25 s.
+
+## A9. Ingest details (13:00 CST)
+
+- The iOS app re-sends each board's latest `uwb` and `sos` reading, with its original `t`, in every batch for up to 25 s (boards are shared by taking turns). The server counts a reading once: an observation whose (`eid`, `kind`, `accessory`) was already received with the same or a later `t` is skipped and counted in the response's `"skipped"`.
+- An observation carrying `"dry_run": true` (a puck host started with `--dry-run`) is skipped.
+- Cold bands are signal-strength thresholds, not distances: `near` is stronger than -60 dBm (within about 1 m in the open with the stated model), `mid` is -60 to -75 dBm (to about 3.5 m), `far` is weaker (farther, or through a wall or a body). The "2 m / 6 m" wording in section 2.3 was written before the path-loss model was fixed from sources.

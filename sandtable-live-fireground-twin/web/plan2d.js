@@ -361,7 +361,7 @@ export class Plan {
     const b = view.b, P = (p) => this.P(p), fs = 0.62;
     const tip = (g, text) => g.appendChild(el("title", {}, text));
     const pts = (poly) => poly.map((q) => P(q).join(",")).join(" ");
-    for (const c of b.presence || []) {
+    for (const c of (b.presence || []).filter((q) => (q.count || 0) > 0 || (q.count_range?.[1] || 0) > 0)) {
       const r = this.rooms[c.room]; if (!r) continue;
       const p = P(chipSpot(r, b));
       const g = el("g", { class: "bc-presence" });

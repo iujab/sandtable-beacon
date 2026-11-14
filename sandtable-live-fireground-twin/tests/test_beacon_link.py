@@ -194,17 +194,26 @@ def test_beacon_script_replays_the_recorded_two_puck_run_identically(monkeypatch
         s, events, step, seen = _beacon_run(monkeypatch, tmp_path / str(i))
         inc = s.incident
         assert step == "done" and inc.phase == "terminated", s.director.steps
-        assert inc.phones["B1"]["status"] == "out" and inc.phones["B1"]["geometry"] == "fix" and inc.phones["B2"]["geometry"] == "candidates"
+        assert inc.phones["B1"]["status"] == "out" and inc.phones["B1"]["geometry"] == "fix"
+        assert inc.phones["B2"]["status"] == "out" and inc.phones["B2"]["geometry"] == "fix" and inc.phones["B2"]["searched"][0]["by"] == "Engine 1"
+        assert inc.phones["B1"]["rescuer"] == "RIT" and inc.phones["B2"]["rescuer"] == "E1"
+        assert any(e["kind"] == "search" and "nobody there" in e["text"] for e in inc.timeline)
+        b2 = next(p for e in events if e.get("type") == "beacons" for p in e.get("phones") or [] if p["id"] == "B2" and p["geometry"] == "fix")
+        assert any(q["reason"] == "searched by Engine 1: nobody there" for q in b2["pruned"]) and b2["annotated"]
+        rep = s.report()
+        how = {p["id"]: p["how_found"] for p in rep["people"]}
+        assert "outside the building" in how["B1"] and "searched by Engine 1" in how["B2"] and all(p["out_t_rel"] for p in rep["people"])
         relayed = [e for e in events if e.get("type") == "beacons" and e.get("phones")]
         assert relayed and all(e["link"]["source"] == "replay" and e["replay"] is True and e["sample"] is False for e in relayed)
         assert all(p.get("placed") == "by hand" for p in relayed[-1]["pucks"]) and len(relayed[-1]["pucks"]) == 2
         b1 = next(p for p in relayed[0]["phones"] if p["id"] == "B1")
         assert b1["pruned"] and "outside the building" in b1["pruned"][0]["reason"]
         par = next(e["text"] for e in inc.timeline if e["kind"] == "par")
-        assert "with B1" in par and "B2" in par
+        assert "B1" in par and "B2" in par and "Accountability complete" in par
         runs.append([x for x in seen if x["kind"] in ("phone", "phone_reached", "all_out")])
     kinds = [x["kind"] for x in runs[0]]
-    assert kinds.count("phone") >= 2 and "phone_reached" in kinds
+    assert kinds.count("phone") >= 3 and kinds.count("phone_reached") == 2 and kinds[-1] == "all_out"
+    assert any(x["kind"] == "phone" and x["data"]["why"] == {"B2": "fix"} for x in runs[0])
     for a, b in zip(runs[0], runs[1]):
         a, b = dict(a), dict(b)
         a.pop("seq"), b.pop("seq")

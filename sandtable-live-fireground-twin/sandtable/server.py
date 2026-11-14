@@ -199,7 +199,15 @@ class AppState:
         people = []
         for e in sorted(inc.phones.values(), key=lambda q: q["id"]):
             rp = (raw_phones.get(e["id"]) or {}).get("report") or {}
+            gd = phone_geometry(raw_phones.get(e["id"])) or {}
+            reasons = [q.get("reason") or "" for q in gd.get("pruned") or []]
+            searched = [r for r in reasons if r.startswith("searched by")]
+            how = (f"two candidates; a crew's search removed one ({searched[0]})" if searched else
+                   f"two candidates; the twin removed one ({reasons[0]})" if reasons and e.get("geometry") == "fix" else
+                   {"fix": f"fix ({e.get('method')})", "candidates": "two candidates, not resolved", "ring": "range only (a ring)",
+                    "zone": "Bluetooth zone only"}.get(e.get("geometry"), str(e.get("geometry"))))
             people.append({"id": e["id"], "source": "phone", "status": e["status"], "state": progress.get(e["status"], e["status"]), "people": e.get("people"),
+                           "how_found": how,
                            "report": {"status": e.get("report_status"), "people": e.get("people"), "can_move": e.get("can_move"), "text": rp.get("text")},
                            "where": e.get("label"), "room": e.get("room"), "room_label": e.get("room_label"), "geometry": e.get("geometry"),
                            "geometry_detail": phone_geometry(raw_phones.get(e["id"])), "text": e.get("text"),
@@ -209,6 +217,7 @@ class AppState:
         for v in sorted(inc.victims.values(), key=lambda q: q["id"]):
             sv = scan_v.get(v["id"]) or {}
             people.append({"id": v["id"], "source": "radar", "status": v["status"], "state": progress.get(v["status"], v["status"]), "people": 1,
+                           "how_found": "UWB radar scan: a breathing or moving echo" + (" (hand-made sample)" if (inc.scan or {}).get("sample") else " (simulated)"),
                            "report": {"status": None, "people": None, "can_move": None, "text": None},
                            "where": v.get("label"), "room": v.get("room"), "room_label": v.get("room_label"), "geometry": "fix",
                            "geometry_detail": {"kind": "fix", "x": sv.get("x"), "y": sv.get("y"), "sigma_m": sv.get("sigma_m"), "pruned": []},
@@ -219,7 +228,7 @@ class AppState:
         md = inc.mayday or getattr(inc, "_last_mayday", None)
         if md:
             u = inc.units[md["unit"]]
-            people.append({"id": md["unit"], "source": "crew", "status": u["status"], "state": "out" if u["status"] == "out" else "reached" if inc.contact_done else "located",
+            people.append({"id": md["unit"], "source": "crew", "status": u["status"], "how_found": f"tagged crew: {md.get('reason')} mayday", "state": "out" if u["status"] == "out" else "reached" if inc.contact_done else "located",
                            "people": 1, "report": {"status": "mayday", "people": 1, "can_move": None, "text": f"mayday ({md.get('reason')})"},
                            "where": md.get("room_label"), "room": md.get("room"), "room_label": md.get("room_label"), "geometry": "fix",
                            "geometry_detail": {"kind": "fix", "x": u.get("x"), "y": u.get("y"), "sigma_m": u.get("sigma_m"), "pruned": []}, "text": f"mayday ({md.get('reason')})",

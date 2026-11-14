@@ -385,7 +385,9 @@ class Director:
         if not r2:
             await self._withdraw(human, slow)
             return
-        inc.held_units = set()
+        if r1 != r2:
+            inc._log("script", f"{inc.units[r1]['label']} stays out at the stair; {inc.units[r2]['label']} goes in for {second} (one crew in the room at a time)", r1)
+        inc.held_units = {r1} if r1 != r2 else set()     # one crew in the room at a time: the first crew, out with its people, stays out
         n = len(((s.beacon.beacons or {}).get("phones") and next((p.get("candidates") or [] for p in s.beacon.beacons["phones"] if p.get("id") == second), [])) or [])
         self._say(f"{inc.units[r2]['label']} searches for {second}" + (f": {n} candidates, the nearer one first" if n else ""))
         if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
@@ -404,7 +406,8 @@ class Director:
                 if inc.units[r2]["_follow"] is None and inc.units[r2]["route"] and not inc.units[r2]["route"].get("done"):
                     inc.drive(r2)
                 await self._wait(lambda: st(second) in ("reached", "evacuating", "out"), 90 * human, f"{second} to be reached")
-        await self._exit_with(second, r2, slow)
+        await self._exit_with(second, inc.phones[second]["rescuer"] or r2, slow)
+        inc.held_units = set()
         await self._withdraw(human, slow)
 
     async def _exit_with(self, pid: str, unit: str, slow: float) -> None:

@@ -46,7 +46,7 @@ export class Beacon3D {
       this._lab(hand ? `${pk.id} placed by hand` : pk.id, "#ffe3a3", hand ? "rgba(40,32,10,.8)" : null, hand ? 0.019 : 0.024).position.copy(this.V(pk.x, pk.y, 0.7));
       this._pickable(pk.x, pk.y, 0.4, { tip: `Puck ${pk.id} (${(pk.radios || []).join(" + ")})${hand ? ": position measured with tape and placed by hand, not located by the system" : ""}` });
     }
-    for (const c of b.presence || []) {
+    for (const c of (b.presence || []).filter((q) => (q.count || 0) > 0 || (q.count_range?.[1] || 0) > 0)) {
       const r = t.twin.rooms.find((q) => q.id === c.room); if (!r) continue;
       const [cx, ylo] = chipSpot(r, b);
       const s = this._lab(`${c.count_range ? `${c.count_range[0]}–${c.count_range[1]}` : c.count} devices · not people`, "#dce6f0", "rgba(40,52,66,.92)", 0.02);

@@ -432,7 +432,9 @@ async function loadLayout() {
     const lay = await getJSON(`/api/layout?room=${encodeURIComponent(room)}&n=2`);
     S.layout = { ...lay, room: lay.room || room };
     plan.setLayout(S.layout);
-    $("layout-why").innerHTML = `<b>Where to put two pucks</b>${esc(lay.why || "")}${lay.mirror_falls ? `<div class="mf">${esc(lay.mirror_falls)}</div>` : ""}`;
+    const first = String(lay.why || "").split(/(?<=\.)\s/)[0];
+    $("layout-why").innerHTML = `<b>Where to put two pucks</b>${esc(first)}${lay.mirror_falls ? `<div class="mf">Mirror images fall in ${esc(lay.mirror_falls)}.</div>` : ""}`;
+    $("layout-why").title = lay.why || "";
     $("layout-why").hidden = false;
   } catch (e) {
     S.layoutOn = false; $("btn-layout").setAttribute("aria-pressed", "false");

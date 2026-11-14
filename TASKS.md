@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 12:48 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 12:50 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -37,7 +37,7 @@ These need hands, hardware or accounts, so only you can do them. Each links to t
 5. **Start the Beacon server where the phones can reach it** (laptop or UNO Q): `bash run_demo.sh --source live --lan` in `sandtable-beacon-victim-phones/`. Venue Wi-Fi may block device-to-device traffic; a phone hotspot is the usual answer. UNO Q guide: `sandtable-beacon-victim-phones/hardware/UNO_Q.md`.
 6. **Place the pucks and tell the board where they are.** The stock firmware cannot range board to board, so tape-measure each puck's position and click it onto the room plan. Put both pucks along the same wall so the room's walls can rule out the mirror-image answer.
 7. **First real range.** Open the app on one iPhone, walk the room, and check the ring, the two candidates and the fix on the board against where you actually stand. Write down what you measure: the write-ups currently say "simulated" everywhere and need real numbers.
-8. **CoStar toolkit and keys.** Until they are plugged in, the building record, the twin and the aerial view are labelled stand-ins, and CoStar scores use of their data at 30%. Guide: `sandtable-live-fireground-twin/docs/TOOLKIT_SWAP.md`. Keys go in a local `.env` file, never in git. Check CoStar's terms before committing anything recorded from their APIs.
+8. **Keys on your laptop.** The command board runs on your laptop and needs the sponsor keys there; the UNO Q needs none. In `sandtable-live-fireground-twin/`, copy `.env.example` to `.env` (git-ignored) and paste the Vexcel API key and the three Matterport values (API key, API token, SDK key) from the CoStar track message in Discord. Unzip the CoStar hackathon kit somewhere outside the repository and point the board at it. Run `python -m sandtable.adapters.check` to see what is missing. Open the board at `http://localhost:1810`: the Matterport SDK key only works on `localhost`. Guide: `sandtable-live-fireground-twin/docs/TOOLKIT_SWAP.md`. **Never commit keys or anything fetched with them**: the repository keeps the stand-in data, and live sponsor data stays on your machine.
 9. **An Anthropic API key** in `.env` (`ANTHROPIC_API_KEY`) for live agent decisions. Without it the command agent replays recorded decisions.
 10. **Rehearse the 2-minute demo** from `sandtable-live-fireground-twin/PITCH.md`, on the real hardware, at least three times. Record a fallback video of it working.
 11. **Submit.** Devpost text is drafted in `sandtable-live-fireground-twin/DEVPOST.md`. Choose one main track, and tick CoStar, Best Hardware Hack, Best Physical AI and Amazon Practical AI. Add the video (2 minutes at most) and your Discord usernames. This repository must stay public.

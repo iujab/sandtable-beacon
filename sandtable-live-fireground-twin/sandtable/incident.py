@@ -277,37 +277,41 @@ class Incident:
             if r is None:
                 continue
             if v["status"] == "assigned":
-                a = r["assignment"] or {}
-                if a.get("target") != v["id"] or r["x"] is None or r["_follow"] is not None:
-                    continue
-                if v.get("kind") == "phone" and v.get("geometry") == "candidates":
-                    # at a candidate point: whether the person is there is the crew's observation (report_search), not the arrival
-                    if r["route"] and r["route"].get("done") and not v.get("at_candidate"):
-                        v["at_candidate"] = {"x": v["x"], "y": v["y"], "by": r["id"]}
-                    continue
-                arrived = bool(r["route"] and r["route"].get("done"))
-                if v.get("match") == "room":                      # a ring or a zone: reached when the crew is in that room
-                    near = r["room"] == v["room"]
-                    arrived = arrived and near
-                else:
-                    near = math.hypot(r["x"] - v["x"], r["y"] - v["y"]) <= config.CONTACT_M
-                if arrived or near:
-                    v["status"], v["reached_t"] = "reached", self.clock()
-                    if self.phase in ("operations", "rescue"):
-                        self.phase = "egress"
-                    if v.get("kind") == "phone":
-                        self._log("phone", f"{r['label']} has reached phone {v['id']} in {v['room_label']}: {v['what']}", r["id"])
-                        self._situation("phone_reached", r["id"], {"phone": v["id"], "rescuer": r["id"], "geometry": v["geometry"], "room": v["room"],
-                                                                   "room_label": v["room_label"], "node": v["node"], "people": v["people"]})
+                # the assigned rescuer, or any other crew sent to this person (the first to arrive reaches them)
+                crews = [r] + [u for u in self.units.values() if u is not r and (u["assignment"] or {}).get("target") == v["id"]]
+                for r in crews:
+                    a = r["assignment"] or {}
+                    if a.get("target") != v["id"] or r["x"] is None or r["_follow"] is not None:
+                        continue
+                    if v.get("kind") == "phone" and v.get("geometry") == "candidates":
+                        # at a candidate point: whether the person is there is the crew's observation (report_search), not the arrival
+                        if r["route"] and r["route"].get("done") and not v.get("at_candidate"):
+                            v["at_candidate"] = {"x": v["x"], "y": v["y"], "by": r["id"]}
+                        continue
+                    arrived = bool(r["route"] and r["route"].get("done"))
+                    if v.get("match") == "room":                      # a ring or a zone: reached when the crew is in that room
+                        near = r["room"] == v["room"]
+                        arrived = arrived and near
                     else:
-                        self._log("victim", f"{r['label']} has reached {v['id']} in {v['room_label']}: {v['what']}", r["id"])
-                        self._situation("victim_reached", r["id"], {"victim": v["id"], "rescuer": r["id"], "room": v["room"], "room_label": v["room_label"], "node": v["node"]})
+                        near = math.hypot(r["x"] - v["x"], r["y"] - v["y"]) <= config.CONTACT_M
+                    if arrived or near:
+                        v["status"], v["reached_t"], v["rescuer"] = "reached", self.clock(), r["id"]
+                        if self.phase in ("operations", "rescue"):
+                            self.phase = "egress"
+                        if v.get("kind") == "phone":
+                            self._log("phone", f"{r['label']} has reached phone {v['id']} in {v['room_label']}: {v['what']}", r["id"])
+                            self._situation("phone_reached", r["id"], {"phone": v["id"], "rescuer": r["id"], "geometry": v["geometry"], "room": v["room"],
+                                                                       "room_label": v["room_label"], "node": v["node"], "people": v["people"]})
+                        else:
+                            self._log("victim", f"{r['label']} has reached {v['id']} in {v['room_label']}: {v['what']}", r["id"])
+                            self._situation("victim_reached", r["id"], {"victim": v["id"], "rescuer": r["id"], "room": v["room"], "room_label": v["room_label"], "node": v["node"]})
+                        break
             elif v["status"] == "evacuating" and r["x"] is not None:
                 v["x"], v["y"] = round(r["x"] - 0.8, 2), round(r["y"], 2)
                 if r["status"] == "out":
                     v["status"], v["out_t"] = "out", self.clock()
                     self._log("phone" if v.get("kind") == "phone" else "victim", f"{v['id']} is out of the floor with {r['label']}" +
-                              (f" ({v['people']} people)" if v.get("kind") == "phone" and v.get("people") else ""), r["id"])
+                              (f" ({v['people']} {'person' if v['people'] == 1 else 'people'})" if v.get("kind") == "phone" and v.get("people") else ""), r["id"])
 
     def set_scan(self, scan: dict, brief: dict) -> None:
         """A scout scan has landed: keep it, put the people it located on the board as route targets, tell the agent."""

@@ -679,9 +679,14 @@ class BeaconSession:
             if device.get(k) is not None:
                 dev_info[k] = str(device[k])[:40]
         clean = []
+        skipped = 0
+        seen = self.__dict__.setdefault("_seen_readings", {})
         for i, item in enumerate(items):
             if not isinstance(item, dict):
                 raise ValueError(f"obs[{i}]: an observation must be an object")
+            if item.get("dry_run"):
+                skipped += 1            # a puck host started with --dry-run: sample values, never use them
+                continue
             it = dict(item)
             if dev_eid and it.get("kind") not in NO_EID_KINDS and "eid" not in it:
                 it["eid"] = dev_eid
@@ -689,6 +694,16 @@ class BeaconSession:
                 o = self.validate(it, now)
             except ValueError as exc:
                 raise ValueError(f"obs[{i}]: {exc}")
+            # The iOS app re-sends each board's latest reading (with its original time) in every batch for up to 25 s,
+            # because boards are shared by taking turns: the same reading must count once.
+            if o["kind"] in ("uwb", "sos", "bearing") and item.get("t") is not None:
+                key = (o.get("eid"), o["kind"], o.get("accessory") or o.get("puck"))
+                if key in seen and o["t"] <= seen[key]:
+                    skipped += 1
+                    continue
+                seen[key] = o["t"]
+                if len(seen) > 4000:
+                    seen.clear()
             if abs(o["t"] - now) > 120.0:
                 o["t"] = now
             if dev_info and o["kind"] == "report":
@@ -704,7 +719,7 @@ class BeaconSession:
             self._pending.append(({"kind": "_device", "eid": dev_eid.lower(), "t": now, "device": dev_info}, origin))
         eid = (dev_eid or next((o.get("eid") for o in clean if o.get("eid")), None))
         phone = self.phone_by_eid(eid.lower()) if eid else None
-        return {"ok": True, "accepted": len(clean), "unknown_accessories": unknown, "ack": self.ack(phone)}
+        return {"ok": True, "accepted": len(clean), "skipped": skipped, "unknown_accessories": unknown, "ack": self.ack(phone)}
 
     # ---- lookups
     def phone_by_eid(self, eid: str | None) -> dict | None:

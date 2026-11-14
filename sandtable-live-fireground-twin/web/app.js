@@ -277,7 +277,7 @@ function showAar() {
 
 // ---------------------------------------------------------------- scout: scan layer, card, smoke, feeds
 function onScoutChange() {
-  const view = scout.view();
+  const view = S.mode === "scout" ? scout.view() : null;
   twin3d?.setScout(view); plan.setScout(view);
   aerial.setVictim?.(scout.mainVictim(), scout.scan);
   if (scout.onScreen && scout.animate && S.mode !== "scout" && scout.phase === "thrown") setMode("scout", true);
@@ -477,11 +477,13 @@ function setMode(m, quiet) {
   for (const r of document.querySelectorAll('#story-menu input[name="script"]')) r.checked = r.value === S.script;
   if (!S._tabPinned) setTab(m === "beacon" ? "acc" : m === "scout" ? (scout.onScreen ? "scout" : "record") : "record");
   $("btn-place").hidden = m !== "beacon"; if (m !== "beacon" && S.place) stopPlacing();
+  if (scout && beacon) { const sv = m === "scout" ? scout.view() : null; twin3d?.setScout(sv); plan.setScout(sv); onBeaconChange(); }
   renderBadges(); renderBeaconHead(); renderScanHead(); renderThrow(); renderLegend(); applyFocus();
   if (S.state && !quiet) renderState();
 }
 function onBeaconChange() {
-  const view = beacon.view();
+  // each mode draws its own layer: phones in Beacon, the radar scan in Scout (both keep their data)
+  const view = S.mode === "beacon" ? beacon.view() : null;
   twin3d?.setBeacons(view, S.selected); plan.setBeacons(view, S.selected); aerial.setBeacons?.(view);
   $("acc-dot").hidden = !beacon.b;
   if (!S._pinned && S.mode === "beacon" && !beacon.phone(S.selected) && !S.state?.mayday) {

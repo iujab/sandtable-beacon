@@ -1,8 +1,40 @@
 # Arduino UNO Q: a puck host, and optionally the whole command post
 
-> **Written from documentation and forum reports; not executed on a board.** No UNO Q was used to write or test this.
+> **Written from documentation and forum reports, then partly checked on the owner's UNO Q** (Saturday 14 November,
+> about ten minutes over SSH; see the next section). Everything not listed there is still unexecuted.
 > Sources are cited inline; the notes are in `docs/research/puck_hardware.md` section 3. The UNO Q is **optional**:
 > with Qorvo's stock firmware a puck needs only power, and the iPhone app reports every range.
+
+## What was checked on the real UNO Q (14 November)
+
+Seen on the board, over SSH as user `arduino`:
+
+- Debian 13 (trixie), kernel 7.0, aarch64, 4 cores, 3.6 GB RAM, about 4 GB of disk free, Python 3.13.5, `git` present.
+- **USB host through a hub works, and the serial driver is there.** With a USB-C multiport hub on the UNO Q's port, two
+  DWM3001CDK boards appeared as two SEGGER J-Link devices and as `/dev/ttyACM0` and `/dev/ttyACM1` (`cdc_acm`). The
+  `arduino` user is in the `dialout` group, so it opens them without `sudo`. How the hub and the UNO Q were powered was
+  not seen.
+- **`python3 -m venv .venv` fails as shipped**: the image has no `ensurepip` (Debian's `python3-venv` is not installed)
+  and `sudo` asks for the board's password. This works without `sudo`:
+  ```bash
+  python3 -m venv --without-pip .venv
+  curl -sS -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py && .venv/bin/python /tmp/get-pip.py && rm /tmp/get-pip.py
+  .venv/bin/python -m pip install -r requirements.txt
+  ```
+  The install took 83 seconds on the venue Wi-Fi, and every dependency imported.
+- `git clone` of this repository and `python3 -m beacon.host --help` ran.
+- Bluetooth: `bluetoothctl` is installed, the controller is powered, and an ordinary (active) scan from the SSH shell
+  listed about 300 advertisers in the hall. The passive scan that `--cold-scan` asks for was not tried.
+
+Not seen, or not finished:
+
+- **The test suite did not finish on the UNO Q**: the SSH session ended while it ran. The Beacon server, the puck host
+  against a server, and RTT were not run there.
+- **Which firmware the two boards carry is still unknown.** In two scans no advertiser offered the Nearby Interaction
+  firmware's Bluetooth services, and neither serial port answered `help` at 115200 baud. That fits boards without that
+  firmware. It also fits boards that were connected to a phone at that moment (the stock firmware stops advertising
+  while connected), so it settles nothing. The check with Qorvo's iPhone app (`hardware/BRINGUP.md`) is still the test.
+- SEGGER's tools are not installed there; J-Link access without `sudo` was not tried.
 
 **Tonight it is part of puck A**: one battery bank powers the UNO Q (through a USB-C hub/dongle with a PD input) and
 board A1, which plugs into the hub. The UNO Q joins the Android phone's Wi-Fi hotspot like everything else
@@ -32,7 +64,7 @@ Two jobs it can do, independently:
 - **SEGGER J-Link software exists for Linux arm64** (DEB and TGZ), so the UNO Q can in principle read a board's RTT log
   through J9 ([SEGGER](https://www.segger.com/news/seggers-complete-j-link-software-now-available-for-linux-on-arm/)).
 
-**Not confirmed:** that the stock UNO Q kernel has the `cdc_acm` driver (users see `/dev/ttyACM*`, which suggests it);
+**Confirmed on the owner's board:** the stock kernel has the `cdc_acm` driver (section above). **Not confirmed:**
 the current limit of the host-mode power switch; whether a bare USB-C-to-micro-B cable (no hub) puts the UNO Q into host
 mode while it is powered some other way; whether passive Bluetooth scanning works on the WCN3980; whether SEGGER's arm64
 build supports the board's on-board J-Link on this kernel (likely). The third-party fix that forces host mode by writing
@@ -56,8 +88,8 @@ A battery bank works as the PD supply only if it delivers 5 V / 3 A over USB-C P
    first-run setup asks for a Wi-Fi network).
 2. Find its address (your router's or hotspot's client list; or `hostname -I` in a terminal on the board). Call it
    `UNOQ_IP`.
-3. `ssh <user>@UNOQ_IP` from the laptop. The user name is the one set during the board's first-run setup (often
-   `arduino`; not confirmed).
+3. `ssh <user>@UNOQ_IP` from the laptop. The user name is the one set during the board's first-run setup (`arduino`
+   on the owner's board).
 4. Get the project onto the UNO Q (needs internet once, so do it before you leave, or on a hotspot with mobile data):
    ```bash
    git clone https://github.com/iujab/sandtable-beacon
@@ -156,13 +188,14 @@ Runs the Beacon server (port 1885) on the UNO Q; the laptop and the iPhones only
 
 ```bash
 cd ~/sandtable-beacon/sandtable-beacon-victim-phones
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt       # needs internet; every dependency is a wheel
-.venv/bin/python -m beacon.demo --source live --lan       # live mode, reachable from the Wi-Fi
+python3 -m venv --without-pip .venv                       # the image has no ensurepip, so plain "-m venv" fails
+curl -sS -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py && .venv/bin/python /tmp/get-pip.py && rm /tmp/get-pip.py
+.venv/bin/python -m pip install -r requirements.txt       # needs internet; every dependency is a wheel (83 s on the owner's board)
+.venv/bin/python -m beacon.demo --source live --lan       # live mode, reachable from the Wi-Fi (not yet run on the board)
 ```
 
-- `python3 -m venv` fails with "ensurepip is not available": Debian ships venv separately; run `sudo apt install python3-venv`
-  (on the UNO Q, not on any other machine), then repeat.
+- The other way to get `venv` with pip: `sudo apt install python3-venv` (needs the board's password), then plain
+  `python3 -m venv .venv`.
 - The board: `http://UNOQ_IP:1885/` from the laptop. In the iOS app: server address `UNOQ_IP:1885`.
 - Check from an iPhone's Safari: `http://UNOQ_IP:1885/healthz` must answer `{"ok": true, ... "source": "live" ...}`.
 - Both jobs at once: start the server, then the host with `--server http://127.0.0.1:1885`.

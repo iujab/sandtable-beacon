@@ -1,8 +1,8 @@
 # Vendored: the Beacon module (lane L16)
 
-A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T14:34:32-0600.
+A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T16:48:52-0600.
 
-Source: commit `095fd6736b8c58f65ace804557286a4951bb645b` (2026-11-14T14:20:11-06:00): "Recorded agent run for the final walk-through; final screenshots; manifest". Copied with `git archive`, so only committed files are here.
+Source: commit `816ccb981c56a4f9c60f66c8c6f912d91f7396e7` (2026-11-14T16:48:39-06:00): "UNO Q guide: what was checked on the owner's board (USB host with two boards, serial driver, install without sudo); what was not". Copied with `git archive`, so only committed files are here.
 
 It is that team's work, credited to them; it is copied (not linked) so this repository stands alone. Do not edit it here: change the sibling project and re-run `python scripts/vendor_beacon.py`. This file is generated from the copy.
 
@@ -10,18 +10,18 @@ It is that team's work, credited to them; it is copied (not linked) so this repo
 
 | Directory | Files | Bytes |
 |---|---|---|
-| top level | 4 | 26,426 |
+| top level | 4 | 26,489 |
 | `apps/` | 18 | 160,498 |
 | `beacon/` | 28 | 614,158 |
 | `docs/` | 9 | 272,930 |
 | `figures/` | 22 | 5,240,561 |
 | `fixtures/` | 26 | 582,526 |
-| `hardware/` | 10 | 113,119 |
+| `hardware/` | 10 | 115,584 |
 | `results/` | 4 | 398,088 |
 | `scripts/` | 6 | 163,387 |
 | `tests/` | 16 | 209,004 |
 | `web/` | 16 | 315,325 |
-| **total** | **159** | **8,096,022** |
+| **total** | **159** | **8,098,550** |
 
 Skipped: nothing among the committed files of the copied directories. Never copied: `data/`, virtualenvs, caches, build outputs, `.env*`, keys and signing material, any `live` directory.
 
@@ -33,7 +33,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 
 | File | Bytes |
 |---|---|
-| `README.md` | 21,440 |
+| `README.md` | 21,503 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.pbxproj` | 11,924 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.xcworkspace/contents.xcworkspacedata` | 135 |
 | `apps/ios/SandtableBeacon.xcodeproj/xcshareddata/xcschemes/SandtableBeacon.xcscheme` | 2,912 |
@@ -141,7 +141,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `hardware/FLASH.md` | 10,319 |
 | `hardware/LAYOUT.md` | 5,994 |
 | `hardware/PUCK.md` | 16,432 |
-| `hardware/UNO_Q.md` | 11,376 |
+| `hardware/UNO_Q.md` | 13,841 |
 | `hardware/jlink/.gitignore` | 119 |
 | `hardware/jlink/flash_qani.jlink` | 1,425 |
 | `hardware/layout_table.py` | 14,336 |

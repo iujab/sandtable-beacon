@@ -57,19 +57,9 @@ class Director:
         return False
 
     def _fire_room(self) -> str:
-        """A suite whose tenant carries a life hazard, as far from Stair A as the floor allows."""
-        inc, twin = self.s.incident, self.s.twin
-        floor_no = int(twin.floor()["label"])
-        hazard_suites = {t["suite"] for t in self.s.provider.costar.list_tenants(floor_no) if t.get("life_hazard")}
-        best = None
-        for r in twin.rooms("suite"):
-            route = twin.route("stairA", r["id"])
-            if not route["ok"]:
-                continue
-            key = (r.get("suite") in hazard_suites, route["length_m"], r["id"])
-            if best is None or key > best[0]:
-                best = (key, r["id"])
-        return best[1]
+        """A suite whose tenant carries a life hazard, as far from Stair A as the floor allows (any twin: see scout.session.fire_room)."""
+        from .scout.session import fire_room
+        return fire_room(self.s.twin, self.s.provider)
 
     def _hazard_edge(self, rit: dict, down: dict) -> str | None:
         """The corridor edge just ahead of the rescue team, provided another way round exists."""
@@ -279,9 +269,12 @@ class Director:
         try:
             from .beacon_link import SCENE
             scene = json.loads(SCENE.read_text(encoding="utf-8"))
-            self._say("reset" + ("" if self.beacon == "story" else " (here and on the Beacon server)"))
+            fixture_twin = s.provider.modes.get("matterport") != "live" and scene.get("room") in s.twin._rooms
+            if not fixture_twin:                            # a live twin: the recorded run and its scene belong to the fixture building
+                scene = self._scene_for(self._fire_room())
+            self._say("reset" + ("" if self.beacon == "story" and fixture_twin else " (here and on the Beacon server)"))
             await s.reset()                                 # also ends any earlier replay
-            story = self.beacon == "story" and link.start_story()
+            story = self.beacon == "story" and fixture_twin and link.start_story()
             if not story:
                 await link.remote("POST", "/api/reset", {})
             await asyncio.sleep(1.0)
@@ -289,7 +282,7 @@ class Director:
             await s.alarm()
             await self._wait(lambda: s.preplan is not None and inc.phase == "operations", 240 * slow, "the pre-plan")
             await asyncio.sleep(1.0)
-            room = scene.get("room") or self._fire_room()
+            room = scene.get("room") if scene.get("room") in s.twin._rooms else self._fire_room()
             label = s.twin.room(room)["label"]
             await self._e1_to_door(room, human)
 
@@ -420,6 +413,28 @@ class Director:
             self._script_fallback(f"the agent gave no exit order, so the script brings {pid} out with {inc.units[unit]['label']}")
             inc.assign(unit, "exit", "exit", source="script-fallback")
         await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish its turn")
+
+    def _scene_for(self, room: str) -> dict:
+        """Two pucks and two simulated phones inside any room of any twin (for a live twin): pucks one metre in from the door and
+        at the room's centre; phones in the two corners farthest from the door, one metre in. What geometry each phone gets
+        (a fix, two candidates) is whatever the Beacon module computes for that room."""
+        from .scout.session import room_door
+        twin = self.s.twin
+        poly = twin.room(room)["polygon"]
+        c = twin.room_centre(room)
+        d = (room_door(twin, room) or {}).get("at") or poly[0]
+
+        def toward(p, q, m):
+            L = math.dist(p, q) or 1.0
+            return [round(p[0] + (q[0] - p[0]) * min(1.0, m / L), 2), round(p[1] + (q[1] - p[1]) * min(1.0, m / L), 2)]
+        corners = sorted(poly, key=lambda v: -math.dist(v, d))
+        p1, p2 = toward(d, c, 1.0), [round(c[0], 2), round(c[1], 2)]
+        ph = [toward(corners[0], c, 1.0), toward(corners[1] if len(corners) > 1 else c, c, 1.0)]
+        reports = [{"status": "trapped", "text": "Two of us here, smoke under the door", "people": 2, "can_move": False, "battery_pct": 38},
+                   {"status": "injured", "text": "Leg hurt", "people": 1, "can_move": False, "battery_pct": 71}]
+        return {"room": room, "floor": twin.room(room).get("floor") or twin.exercise_floor, "derived": True,
+                "pucks": [{"id": "P1", "x": p1[0], "y": p1[1]}, {"id": "P2", "x": p2[0], "y": p2[1]}],
+                "phones": [{"key": f"victim-phone-{i + 1}", "x": q[0], "y": q[1], "report": reports[i]} for i, q in enumerate(ph)]}
 
     def _beacon_target(self) -> str | None:
         """Whom the script expects the rescue to go to: the Beacon accountability's first priority when it is a phone here,

@@ -66,9 +66,10 @@ enum PhoneCapabilities {
 
     static func line() -> String {
         let caps = NISession.deviceCapabilities
-        return "UWB distance: " + yesNo(caps.supportsPreciseDistanceMeasurement)
-            + "  ·  direction: " + yesNo(caps.supportsDirectionMeasurement)
-            + "  ·  camera assistance: " + yesNo(caps.supportsCameraAssistance)
+        let distance = yesNo(caps.supportsPreciseDistanceMeasurement)
+        let direction = yesNo(caps.supportsDirectionMeasurement)
+        let camera = yesNo(caps.supportsCameraAssistance)
+        return "UWB distance: \(distance)  ·  direction: \(direction)  ·  camera assistance: \(camera)"
     }
 
     private static func yesNo(_ value: Bool) -> String {
@@ -119,7 +120,8 @@ final class PuckManager: NSObject, ObservableObject {
         isRunning = true
         if !loggedCapabilities {
             loggedCapabilities = true
-            BeaconLog.shared.add("This phone: " + PhoneInfo.modelName + " (" + PhoneInfo.identifier + "). " + PhoneCapabilities.line())
+            let caps = PhoneCapabilities.line()
+            BeaconLog.shared.add("This phone: \(PhoneInfo.modelName) (\(PhoneInfo.identifier)). \(caps)")
         }
         if central == nil {
             // Same options as the sample. Creating the manager shows the Bluetooth prompt
@@ -154,6 +156,9 @@ final class PuckManager: NSObject, ObservableObject {
         candidates.removeAll()
         distanceCache.removeAll()
         rssiCache.removeAll()
+        // Cleared so the banner goes away once Nearby Interaction is allowed in Settings
+        // (the next session sets it again if it is still denied).
+        nearbyPermissionDenied = false
         refreshRows()
         BeaconLog.shared.add("Stopped looking for rescue beacons")
     }
@@ -247,6 +252,13 @@ final class PuckManager: NSObject, ObservableObject {
             return
         }
         let key = link.key
+        // The same board (same Bluetooth identifier) came back with another "#ABCD" on a
+        // new connection: the suffix is not stable on this firmware (Setup warns).
+        if let old = knownKeys[link.identifier], let oldSuffix = keySuffix(old),
+           let newSuffix = keySuffix(key), oldSuffix != newSuffix, !suffixUnstable {
+            suffixUnstable = true
+            BeaconLog.shared.add("Key of the same board changed between connections: " + old + " -> " + key)
+        }
         knownKeys[link.identifier] = key
         if link.suffixChanged {
             suffixUnstable = true
@@ -257,6 +269,14 @@ final class PuckManager: NSObject, ObservableObject {
         if let r = link.rssi {
             rssiCache[key] = TimedValue(value: Double(r), t: link.rssiTime)
         }
+    }
+
+    /// "name#1A2B" -> "1A2B"; nil when the key has no suffix.
+    private func keySuffix(_ key: String) -> String? {
+        guard let hash = key.lastIndex(of: "#") else {
+            return nil
+        }
+        return String(key[key.index(after: hash)...])
     }
 
     /// Take turns: release a board `holdSeconds` after its first distance, or 8 s after

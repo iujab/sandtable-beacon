@@ -3,10 +3,10 @@
  "runs": {
   "sample": {
    "keys": [
-    "f561971e401d974a329fc0469a7c1f83cea8c79db2a4a05cb4aa06d36ca08c3f",
-    "0f4585607ede239756e4e7b04b7815efaf65d47be8b08304516da4af22a2ab1c",
-    "529c9bde553d0d3b6f140f7e5d5e59c1868b99850a5b6b03d8122c6b7d5b9106",
-    "d6b3a886c717bbd7f005b01b68584f6109a03adc39ab0d05c809d6134735e1cf"
+    "94a096e537fce4f194bc0b8d4390e625df0da948229f2ca2cf0da96820628eab",
+    "91f9636e327333af83351f3abcbe5e2e447eb370cf56856ccd66c9808e93804b",
+    "58791946f7764f339c81c0a75d96fbfcb47716cfd378c428d8ad83fcca100fb2",
+    "62a4dd319555045a162497990591b6f0c6d006b89ae98af763ec8769f93f0e42"
    ],
    "models": [
     "claude-sonnet-5-5"
@@ -16,8 +16,8 @@
      {
       "route": {
        "attack_stair": "Stair B",
-       "leads_to": "the phone itself (B1: fix, within about 1 m)",
-       "length_m": 20,
+       "leads_to": "Suite 310, then the phone's spot in the south-west quarter of the room (B1: fix, within a metre or two)",
+       "length_m": 17,
        "to": "Suite 310",
        "via": [
         "South corridor",
@@ -46,14 +46,14 @@
     ],
     "data": "SAMPLE (hand-made sample of the feed, not a measurement)",
     "limits_acknowledged": [
-     "All data is SAMPLE/simulated, not a measurement; the feed is not live.",
-     "Only B1 is a position. B2 is a ring, B3 is two candidate spots and B4 is a room; none of them is 'go to the phone'.",
-     "Devices heard in Suite 310 (3 to 5) are devices, not people.",
-     "Expected head counts are estimates from floor area and code load factors, so people unaccounted for is a range: 13 to 64 on the floor, 0 to 3 in Suite 310.",
-     "The record has no property-manager contact, so no tenant roll call is possible from it.",
-     "Occupant reports (status, people, can move) are what they typed or picked and may be stale; B3's mobility is not reported.",
-     "Seven occupied suites are unscanned. The 4 vacant-on-record suites (303, 308, 309, 311) are unscanned and the record can be wrong about them.",
-     "Other occupants without the app or without a phone cannot be heard."
+     "All data is a hand-made SAMPLE and simulated, not a measurement, and the feed is not live.",
+     "Only B1 is a position. B2 is a ring, B3 is two candidate spots, B4 is a room. The crews are ordered to search these, not to go to the phone.",
+     "Occupant reports (trapped, injured, number of people, can move) are what the occupants typed or picked. They may be out of date, and B3 gave no answer on whether it can move.",
+     "Devices heard without the app are devices, not people.",
+     "Expected head counts are estimates from floor area and code load factors, so the unaccounted number is a range: 13 to 64 on the floor, including 0 to 3 in Suite 310.",
+     "No property-manager contact is in the record, so no tenant roll call is possible.",
+     "Suites 303, 308, 309 and 311 are vacant on record and unscanned. No phone or device was heard there, so no record check was filed. The record could still be wrong for these suites.",
+     "Only Suite 310 holds pucks, so no other suite has been checked. People in the other occupied suites cannot be ruled out."
     ],
     "limits_standing": [
      "Devices heard without the app are devices, not people.",
@@ -63,25 +63,25 @@
     "next_puck": {
      "room": "r301",
      "suite": "301",
-     "why": "Top of the puck plan: hospital outpatient, patients may be non-ambulatory, no puck in range yet. Door from the East corridor, 32 m from the fire room, 22 m from Stair B. Told to ALL, E1 after the Suite 310 search. 2 pucks left in kit."
+     "why": "Ranked first by the record: hospital outpatient department, patients may be non-ambulatory. It has no puck in range, 22 m from Stair B via the East corridor. 2 pucks are left in the kit."
     },
     "orders": [
      {
       "priority": "emergency",
       "target": "B1",
-      "text": "RIT from Command: Stair B, South corridor, West corridor, into Suite 310. Fix about 2 m from south wall, 2 m from west wall, within 1 m. Occupant reports trapped, 2 people, cannot move. Bring gear for two. Sample data.",
+      "text": "RIT from Command: rescue in Suite 310 via Stair B, South corridor, West corridor, 17 m. Occupant reports trapped, 2 people, cannot move. Position is a fix in the south-west quarter, within a metre or two. Bring extraction gear for two.",
       "to": "RIT"
      },
      {
       "priority": "urgent",
       "target": "310",
-      "text": "E1 from Command: Search Suite 310. Check both spots: 2 m from west wall, 3 m from north wall; 2 m from south wall, 4 m from west wall. Trapped, 1 person. Search room for injured one, sheltering one.",
+      "text": "E1 from Command: search Suite 310 via Stair B, South then West corridor. Injured, 1 person, cannot move: about 5 m from puck, no position. Trapped, 1 person: check north-west and south-west quarters. Sheltering, 1, can move: room only.",
       "to": "E1"
      },
      {
       "priority": "urgent",
-      "target": null,
-      "text": "ALL from Command: Suite 310 is the fire room: 4 phones, 5 people reported, 1 safe outside. Record estimate: 13 to 64 more unaccounted on floor. Next puck: Suite 301, East corridor door, E1 after search. Sample data.",
+      "target": "301",
+      "text": "ALL from Command: Suite 310 has 4 phones, 5 people reported, 1 out safe. Floor unaccounted 13 to 64, record estimate. Next puck Suite 301, hospital outpatient, East corridor door, 22 m from Stair B. First free crew throws it.",
       "to": "ALL"
      }
     ],
@@ -91,28 +91,35 @@
       "rank": 1,
       "suite": "310",
       "target": "B1",
-      "why": "Only true fix, high confidence: trapped, 2 people, cannot move. Dental office, patients may be sedated."
+      "why": "Occupant reports trapped, 2 people, cannot move. This is the only true fix, in the south-west quarter. The tenant is a dental office, so patients may be sedated."
      },
      {
       "action": "search",
       "rank": 2,
       "suite": "310",
-      "target": "B3",
-      "why": "Two candidate spots, not a position. Occupant reports trapped, 1 person, mobility not reported. Check both, most probable first."
+      "target": "B2",
+      "why": "Occupant reports injured, 1 person, cannot move. The phone is on a ring of about 5 m around the puck in Suite 310, so this is range only and E1 searches the arc."
      },
      {
       "action": "search",
       "rank": 3,
       "suite": "310",
-      "target": "B2",
-      "why": "Ring of about 5 m around puck P1, not a position. Occupant reports injured, 1 person, cannot move. Search the arc in the fire room."
+      "target": "B3",
+      "why": "Occupant reports trapped, 1 person. There are two candidate spots, north-west and south-west, so E1 checks both. Moving a puck to a wall would decide between them."
      },
      {
       "action": "search",
       "rank": 4,
       "suite": "310",
       "target": "B4",
-      "why": "Room-level fix only (Bluetooth). Occupant reports sheltering, 1 person, can move."
+      "why": "Occupant reports sheltering, 1 person, can move. The phone is placed by Bluetooth signal strength only, so E1 searches the room."
+     },
+     {
+      "action": "scan",
+      "rank": 5,
+      "suite": "301",
+      "target": null,
+      "why": "Highest-ranked suite with no puck in range: hospital outpatient department, about 4 expected (estimate, range 2 to 9)."
      }
     ],
     "priorities_source": "agent",
@@ -120,19 +127,21 @@
     "run": "phones#1",
     "sample": true,
     "simulated": true,
-    "summary": "RIT goes first to Suite 310 via Stair B, South corridor and West corridor (about 20 m), to the B1 fix: occupant reports trapped, 2 people, cannot move. E1 searches the rest of Suite 310: both candidate spots for the trapped occupant, the 5 m arc around puck P1 for the injured occupant who cannot move, and the room for the sheltering occupant who can move. All data is SAMPLE/simulated.",
+    "summary": "RIT goes first to Suite 310, south-west quarter, for the trapped occupant with 2 people who cannot move (fix, within a metre or two), via Stair B, South corridor and West corridor, 17 m. E1 searches the rest of Suite 310 for an injured occupant who cannot move (ring only), a trapped occupant (two candidate spots, north-west and south-west) and a sheltering occupant who can move (room only). The next puck goes to Suite 301, a hospital outpatient department whose patients may not leave unaided, through the East corridor door, 22 m from Stair B.",
     "type": "agent_plan"
    },
-   "recorded_at": "2026-11-14T12:51:22-0600",
+   "recorded_at": "2026-11-14T13:06:37-0600",
    "recorded_with": "claude-cli",
    "steps": 4
   },
   "suite-310": {
    "keys": [
-    "e6c581232b6668bf4a8e69c1845453f6be0a9494a45b39859553297332f535c1",
-    "a59e6537a2c568327f56992496c84aabe78bf5e8c26b162061917a89c8aa140c",
-    "42f525c9545492a66403196f53aa2df0eb2280709b795d8644dce2994e55e3f9",
-    "4454fad92a432928b196ff3afda00b5ff9377b571616f77c71d46c59369de828"
+    "e3e1f71fdf40945c2aa41809d20fcabb0063c5dade44fd9c8b0da0c945cbe580",
+    "dccc9c5d50314ffd49219e629e7d04883db031db2cc5f6d8fa3a2404895a2b4f",
+    "04ef24f7a1481496d52c7761119aac6bebedd55e428ec9e166d06f5d08ee4009",
+    "f3d37cf89accd5f733f2340d684667a9bc9ffb4a0afd5dee362459fa9080d8ac",
+    "4b63da02ada92c063e84116076b8fe4f80b3c950d78147c3749f7d149ef5cf82",
+    "ae2c2e9d12da2a2bc6d54bbeb5b3f2c4aafecc3705ee6fe70e796e0d5240cf68"
    ],
    "models": [
     "claude-sonnet-5-5"
@@ -142,8 +151,23 @@
      {
       "route": {
        "attack_stair": "Stair B",
-       "leads_to": "the phone itself (B3: fix, within about 1 m)",
+       "leads_to": "the phone itself (B2: fix, within about 1 m)",
        "length_m": 21,
+       "to": "Suite 310",
+       "via": [
+        "South corridor",
+        "West corridor"
+       ]
+      },
+      "target": "B2",
+      "task": "rescue",
+      "unit": "RIT"
+     },
+     {
+      "route": {
+       "attack_stair": "Stair B",
+       "leads_to": "the phone itself (B3: fix, within about 1 m)",
+       "length_m": 20,
        "to": "Suite 310",
        "via": [
         "South corridor",
@@ -152,34 +176,19 @@
       },
       "target": "B3",
       "task": "rescue",
-      "unit": "RIT"
-     },
-     {
-      "route": {
-       "attack_stair": "Stair B",
-       "leads_to": "Suite 309",
-       "length_m": 22,
-       "to": "Suite 309",
-       "via": [
-        "South corridor",
-        "West corridor"
-       ]
-      },
-      "target": "309",
-      "task": "search",
       "unit": "E1"
      }
     ],
     "data": "SIMULATED (phones, pucks and devices from the simulator, not a measurement)",
     "limits_acknowledged": [
-     "All phone, puck and device data is simulated, not a measurement.",
-     "B2 is a ring, not a position: the search covers the arc, and the twin clips the ring.",
+     "All phone, puck and device data is simulated.",
      "The 1 to 2 devices heard in Suite 310 are devices, not people.",
-     "Expected head counts are estimates from floor area and building-code load factors, so the unaccounted figure (13 to 66 on the floor, 0 to 5 in Suite 310) is a range.",
-     "Occupant reports are what they typed or picked and may be stale; people may have moved.",
-     "People without the app or without a phone are not heard at all.",
-     "Suites 303, 308, 309 and 311 are vacant on record but the record may be wrong; no phone or device was located in them, so no record check was filed. Suite 309 is being searched only because B2's arc crosses it.",
-     "No property-manager contact is in the record, so no tenant roll call is possible."
+     "Expected head counts are estimates from floor area and building-code load factors, so unaccounted people are a range (13 to 66 floor-wide), never one number.",
+     "The occupants' reports are what they typed or picked and may be out of date.",
+     "Seven occupied suites are unscanned, so nothing is known about them yet.",
+     "Vacant-on-record suites 303, 308, 309 and 311 have no pucks, so the record could be wrong there.",
+     "The record has no property-manager contact, so no tenant roll call is possible.",
+     "E1's puck run to Suite 301 depends on E1 finishing the rescue handoff first."
     ],
     "limits_standing": [
      "Devices heard without the app are devices, not people.",
@@ -189,32 +198,32 @@
     "next_puck": {
      "room": "r301",
      "suite": "301",
-     "why": "Top-ranked unscanned suite: hospital outpatient with possible non-ambulatory patients, door from the East corridor, 22 m from Stair B."
+     "why": "Highest-ranked suite with no puck in range: hospital outpatient, patients may be non-ambulatory. Door from East corridor, 22 m from Stair B."
     },
     "orders": [
      {
       "priority": "emergency",
-      "target": "B3",
-      "text": "RIT from Command: Rescue in Suite 310, the fire room. Stair B, South corridor, West corridor, 21 m. Occupant reports trapped, 2 people, cannot move. Fix about 2 m from south and west walls, within 1 m. Bring litter.",
+      "target": "B2",
+      "text": "RIT from Command: Rescue in Suite 310, trapped occupants. Phone fix about 2 m from south wall, 2 m from west wall, within 1 m. Occupant reports 2 people, trapped, cannot move. Route Stair B, South corridor, West corridor.",
       "to": "RIT"
      },
      {
       "priority": "urgent",
-      "target": "B2",
-      "text": "E1 from Command: Search Suite 309, then the arc through 310, 311 and South corridor. Stair B, South corridor, West corridor, 22 m. One occupant reports injured, cannot move. Range only, about 8 m from fire room puck; not a position.",
-      "to": "E1"
-     },
-     {
-      "priority": "routine",
-      "target": "301",
-      "text": "E1 from Command: After Suite 309, carry next puck to Suite 301, door from East corridor, 22 m from Stair B. Hospital outpatient; patients may not walk unaided.",
+      "target": "B3",
+      "text": "E1 from Command: Suite 310, injured occupant. Phone fix about 2 m from north wall, 4 m from west wall, within 1 m. Occupant reports injured, 1 person, cannot move. Route Stair B, South corridor, West corridor.",
       "to": "E1"
      },
      {
       "priority": "urgent",
       "target": null,
-      "text": "ALL from Command: 3 people reported inside by phone, all in or near Suite 310; 1 reported out safe. 1 to 2 devices heard, not people. Still unaccounted on floor: estimated 13 to 66, from record estimates. Data simulated.",
+      "text": "ALL from Command: Suite 310: 2 phones located, 3 people reported, 1 out safe. 1 to 2 devices heard, not people. Floor unaccounted, estimate: 13 to 66. Next puck: Suite 301, East corridor door; first free crew takes it.",
       "to": "ALL"
+     },
+     {
+      "priority": "routine",
+      "target": "301",
+      "text": "E1 from Command: When the Suite 310 injured occupant is handed off, carry the next puck to Suite 301, hospital outpatient on record. Route Stair B, South corridor, East corridor, door from East corridor, about 22 metres.",
+      "to": "E1"
      }
     ],
     "priorities": [
@@ -222,22 +231,22 @@
       "action": "rescue",
       "rank": 1,
       "suite": "310",
-      "target": "B3",
-      "why": "Fix within about 1 m in the fire room; occupant reports trapped, 2 people, cannot move; dental patients may be sedated."
+      "target": "B2",
+      "why": "Occupant reports 2 people trapped, cannot move; high-confidence fix; dental office, patients may be sedated. RIT assigned."
      },
      {
-      "action": "search",
+      "action": "rescue",
       "rank": 2,
-      "suite": "309",
-      "target": "B2",
-      "why": "Ring of about 8 m around the puck in Suite 310, not a position; its arc lies mostly in Suite 309 (40%), then 310, 311 and the South corridor. Occupant reports injured, 1 person, cannot move."
+      "suite": "310",
+      "target": "B3",
+      "why": "Occupant reports 1 person injured, cannot move; high-confidence fix. E1 assigned because RIT is on the other fix."
      },
      {
       "action": "scan",
       "rank": 3,
       "suite": "301",
       "target": null,
-      "why": "Highest-ranked suite with no puck in range; hospital outpatient, expected people an estimate of 2 to 9."
+      "why": "Hospital outpatient on record, expected about 4 (estimate, range 2 to 9), no puck in range. E1 told to carry the next puck once free."
      }
     ],
     "priorities_source": "agent",
@@ -245,12 +254,12 @@
     "run": "phones#1",
     "sample": false,
     "simulated": true,
-    "summary": "RIT goes first to Suite 310 (the fire room) for B3: a fix, reported trapped, 2 people, cannot move, via Stair B, South corridor and West corridor, 21 m. E1 searches Suite 309 and then the rest of B2's arc (310, 311, South corridor) for one occupant reported injured who cannot move; B2 is a range only, not a position. E1 carries the next puck to Suite 301 (hospital outpatient, patients may not walk unaided). All units heard that 3 people are reported inside by phone, 1 is out safe, and 13 to 66 are still unaccounted for on the floor (simulated data, record estimates).",
+    "summary": "RIT goes first to Suite 310 via Stair B, South corridor and West corridor (21 m) for the occupant reporting 2 people trapped who cannot move. E1 takes the injured occupant in Suite 310 (20 m, same route), who reports 1 person who cannot move. Both are high-confidence phone fixes, within about 1 m. Floor-wide unaccounted is an estimated 13 to 66 people, and Suite 310 alone 0 to 5. E1 has been told to carry the next puck to Suite 301 once the injured occupant is handed off.",
     "type": "agent_plan"
    },
-   "recorded_at": "2026-11-14T12:51:58-0600",
+   "recorded_at": "2026-11-14T12:59:56-0600",
    "recorded_with": "claude-cli",
-   "steps": 4
+   "steps": 6
   },
   "suite-310+309": {
    "keys": [
@@ -383,6 +392,761 @@
    "recorded_at": "2026-11-14T12:53:26-0600",
    "recorded_with": "claude-cli",
    "steps": 4
+  },
+  "walk-through": {
+   "brief": {
+    "accountability": {
+     "floor": "f3",
+     "next_puck": {
+      "door": [
+       25.6,
+       12.97
+      ],
+      "room": "r301",
+      "suite": "301",
+      "text": "Next puck: Suite 301 (no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment))"
+     },
+     "priorities": [
+      {
+       "action": "rescue",
+       "rank": 1,
+       "room": "r310",
+       "suite": "310",
+       "target": "B1",
+       "text": "Rescue Suite 310: 3 people reported by 2 phones, 2 cannot move, 2 located; tenant: dental patients may be sedated or mid-procedure"
+      },
+      {
+       "action": "scan",
+       "rank": 2,
+       "room": "r301",
+       "suite": "301",
+       "target": null,
+       "text": "Throw a puck into Suite 301: no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment)"
+      },
+      {
+       "action": "scan",
+       "rank": 3,
+       "room": "r307",
+       "suite": "307",
+       "target": null,
+       "text": "Throw a puck into Suite 307: no puck in range yet; the record expects about 4 people (patients with limited mobility possible)"
+      },
+      {
+       "action": "scan",
+       "rank": 4,
+       "room": "r302",
+       "suite": "302",
+       "target": null,
+       "text": "Throw a puck into Suite 302: no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility)"
+      },
+      {
+       "action": "scan",
+       "rank": 5,
+       "room": "r306",
+       "suite": "306",
+       "target": null,
+       "text": "Throw a puck into Suite 306: no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility; patients with limited mobility possible)"
+      },
+      {
+       "action": "scan",
+       "rank": 6,
+       "room": "r304",
+       "suite": "304",
+       "target": null,
+       "text": "Throw a puck into Suite 304: no puck in range yet; the record expects about 4 people (therapy patients with limited mobility; medical patients, some with limited mobility)"
+      },
+      {
+       "action": "scan",
+       "rank": 7,
+       "room": "r300",
+       "suite": "300",
+       "target": null,
+       "text": "Throw a puck into Suite 300: no puck in range yet; the record expects about 4 people (few occupants; staff only)"
+      },
+      {
+       "action": "scan",
+       "rank": 8,
+       "room": "r305",
+       "suite": "305",
+       "target": null,
+       "text": "Throw a puck into Suite 305: no puck in range yet; the record expects about 4 people"
+      }
+     ],
+     "record_checks": [],
+     "source": {
+      "costar_mode": "fixture",
+      "real_sponsor_data": false,
+      "text": "Building record: public open data with named sources; CoStar-only fields are empty. Tenant names withheld. Not CoStar data."
+     },
+     "suites": [
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Medical & diagnostic laboratories",
+       "life_hazard": "few occupants; staff only",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 7,
+       "room": "r300",
+       "room_label": "Suite 300",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "300",
+       "tenant": "Medical & diagnostic laboratories (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (few occupants; staff only)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Hospitals",
+       "life_hazard": "hospital outpatient department: patients may be non-ambulatory or under treatment",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 2,
+       "room": "r301",
+       "room_label": "Suite 301",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "301",
+       "tenant": "Hospitals (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (hospital outpatient department: patients may be non-ambulatory or under treatment)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Offices of physicians (except mental health specialists)",
+       "life_hazard": "medical patients, some with limited mobility",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 4,
+       "room": "r302",
+       "room_label": "Suite 302",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "302",
+       "tenant": "Physicians (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "no tenant on record for this suite (fixture: no active business registration); estimate",
+        "high": 0,
+        "low": 0,
+        "people": 0
+       },
+       "industry": null,
+       "life_hazard": null,
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": null,
+       "room": "r303",
+       "room_label": "Suite 303",
+       "safe_outside": 0,
+       "state": "vacant-on-record",
+       "suite": "303",
+       "tenant": null,
+       "unaccounted": {
+        "high": 0,
+        "low": 0
+       },
+       "vacant": true,
+       "why": null
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Offices of physical, occupational & speech therapists, & audiologists; Offices of physicians (except mental health specialists)",
+       "life_hazard": "therapy patients with limited mobility; medical patients, some with limited mobility",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 6,
+       "room": "r304",
+       "room_label": "Suite 304",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "304",
+       "tenant": "Physical, occupational & speech therapists, & audiologists (name withheld); Physicians (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (therapy patients with limited mobility; medical patients, some with limited mobility)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "1,040 sf (twin room area) at 150 sf per person (business load factor, building-code maximum 7), 50% present, open hours assumed; estimate",
+        "high": 7,
+        "low": 1,
+        "people": 4
+       },
+       "industry": "Other accounting services",
+       "life_hazard": null,
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 8,
+       "room": "r305",
+       "room_label": "Suite 305",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "305",
+       "tenant": "Other accounting services (name withheld)",
+       "unaccounted": {
+        "high": 7,
+        "low": 1
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Offices of physicians (except mental health specialists); Offices of all other miscellaneous health practitioners",
+       "life_hazard": "medical patients, some with limited mobility; patients with limited mobility possible",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 5,
+       "room": "r306",
+       "room_label": "Suite 306",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "306",
+       "tenant": "Physicians (name withheld); All other miscellaneous health practitioners (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (medical patients, some with limited mobility; patients with limited mobility possible)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Offices of podiatrists",
+       "life_hazard": "patients with limited mobility possible",
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": 3,
+       "room": "r307",
+       "room_label": "Suite 307",
+       "safe_outside": 0,
+       "state": "unscanned",
+       "suite": "307",
+       "tenant": "Podiatrists (name withheld)",
+       "unaccounted": {
+        "high": 9,
+        "low": 2
+       },
+       "vacant": false,
+       "why": "no puck in range yet; the record expects about 4 people (patients with limited mobility possible)"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "no tenant on record for this suite (fixture: no active business registration); estimate",
+        "high": 0,
+        "low": 0,
+        "people": 0
+       },
+       "industry": null,
+       "life_hazard": null,
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": null,
+       "room": "r308",
+       "room_label": "Suite 308",
+       "safe_outside": 0,
+       "state": "vacant-on-record",
+       "suite": "308",
+       "tenant": null,
+       "unaccounted": {
+        "high": 0,
+        "low": 0
+       },
+       "vacant": true,
+       "why": null
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "no tenant on record for this suite (fixture: no active business registration); estimate",
+        "high": 0,
+        "low": 0,
+        "people": 0
+       },
+       "industry": null,
+       "life_hazard": null,
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": null,
+       "room": "r309",
+       "room_label": "Suite 309",
+       "safe_outside": 0,
+       "state": "vacant-on-record",
+       "suite": "309",
+       "tenant": null,
+       "unaccounted": {
+        "high": 0,
+        "low": 0
+       },
+       "vacant": true,
+       "why": null
+      },
+      {
+       "app_registered": 3,
+       "cold_devices": 2,
+       "cold_range": [
+        2,
+        3
+       ],
+       "expected": {
+        "basis": "885 sf (twin room area) at 100 sf per person (outpatient load factor, building-code maximum 9), 50% present, open hours assumed; estimate",
+        "high": 9,
+        "low": 2,
+        "people": 4
+       },
+       "industry": "Offices of dentists",
+       "life_hazard": "dental patients may be sedated or mid-procedure",
+       "located": 2,
+       "people_reported": 3,
+       "phones_opt_in": 2,
+       "priority": 1,
+       "room": "r310",
+       "room_label": "Suite 310",
+       "safe_outside": 1,
+       "state": "people-reported",
+       "suite": "310",
+       "tenant": "Dentists (name withheld)",
+       "unaccounted": {
+        "high": 5,
+        "low": 0
+       },
+       "vacant": false,
+       "why": "3 people reported by 2 phones, 2 cannot move, 2 located; tenant: dental patients may be sedated or mid-procedure"
+      },
+      {
+       "app_registered": 0,
+       "cold_devices": 0,
+       "cold_range": [
+        0,
+        0
+       ],
+       "expected": {
+        "basis": "no tenant on record for this suite (fixture: no active business registration); estimate",
+        "high": 0,
+        "low": 0,
+        "people": 0
+       },
+       "industry": null,
+       "life_hazard": null,
+       "located": 0,
+       "people_reported": 0,
+       "phones_opt_in": 0,
+       "priority": null,
+       "room": "r311",
+       "room_label": "Suite 311",
+       "safe_outside": 0,
+       "state": "vacant-on-record",
+       "suite": "311",
+       "tenant": null,
+       "unaccounted": {
+        "high": 0,
+        "low": 0
+       },
+       "vacant": true,
+       "why": null
+      }
+     ],
+     "text": "Floor record: 8 occupied suites, about 32 people expected (estimate, up to 70). Phones: 2 inside reporting 3 people, 2 located; 1 reported safe outside. 7 occupied suites have no puck in range. First: Rescue Suite 310: 3 people reported by 2 phones, 2 cannot move, 2 located; tenant: dental patients may be sedated or mid-procedure.",
+     "totals": {
+      "app_registered": 3,
+      "cold_devices": 2,
+      "expected_high": 70,
+      "expected_people": 32,
+      "located": 2,
+      "people_reported": 3,
+      "phones_opt_in": 2,
+      "safe_outside": 1,
+      "suites": 12,
+      "suites_unscanned": 7,
+      "suites_vacant_on_record": 4,
+      "unaccounted_high": 66,
+      "unaccounted_low": 13
+     }
+    },
+    "floor": "f3",
+    "limits": [
+     "SIMULATED: every number on this feed comes from the simulator's stated noise model (hello.noise), not from a measurement.",
+     "A phone with no app cannot be ranged or identified: cold presence is a band of advertising devices per puck, never a position or an identity. Devices are not people: watches, earbuds and laptops advertise too, and some phones do not.",
+     "Cold count band: count = devices in the near and mid bands of one puck (signal at least -75 dBm: a few metres in line of sight; attributed to the puck's room); lower bound = half the count rounded down, but never fewer than the opt-in phones the feed places in that room (they advertise too); upper bound = the count plus half the far-band devices rounded up (some far devices are in the room behind furniture or bodies). Over-count causes: address rotation and several advertising sets per device. Under-count causes: idle phones that do not advertise, bodies. Entries from several pucks in one room hear the same devices: do not add them up.",
+     "A ring stays a ring: x and y are published only when the geometry is a fix. One puck gives a ring, two pucks two mirror-image candidates, three pucks not in a line (or one puck plus the phone's own bearing) one fix.",
+     "Bluetooth signal strength gives metres, not centimetres: a Bluetooth-only phone is a band or a room, never a precise point.",
+     "The twin prunes positions (outside the building, inside a wall, the wrong room for a line-of-sight link). This twin is a synthetic interior fitted to the real footprint, so pruning is only as good as its invented walls.",
+     "Floors come from the occupant's own report when given; otherwise the pucks' floor is assumed.",
+     "A phone not heard for 20 s is marked stale and its uncertainty grows by 0.25 m per second; it is dropped after 15 minutes.",
+     "Two pucks leave two mirror-image candidates. The twin removes one only when it is impossible; a possible candidate is dismissed only on stated evidence (the occupant's suite, or command's search room), and the phone then carries that assumption."
+    ],
+    "phones": [
+     {
+      "confidence": 0.9,
+      "geometry": "fix",
+      "id": "B1",
+      "method": "uwb-twr",
+      "report": {
+       "battery_pct": 40,
+       "can_move": false,
+       "floor_reported": 3,
+       "home_suite": "310",
+       "people": 2,
+       "safe_outside": false,
+       "status": "trapped",
+       "still": true
+      },
+      "room": "r310",
+      "room_label": "Suite 310",
+      "sigma_m": 0.5,
+      "stale": false,
+      "text": "Phone B1: 2 people, cannot move, trapped. UWB fix in Suite 310, 1.5 m from the south wall and 2.5 m from the west wall, within 0.5 m",
+      "x": 2.5,
+      "y": 1.5
+     },
+     {
+      "confidence": 0.9,
+      "geometry": "fix",
+      "id": "B2",
+      "method": "uwb-twr",
+      "report": {
+       "battery_pct": 60,
+       "can_move": false,
+       "floor_reported": 3,
+       "home_suite": "310",
+       "people": 1,
+       "safe_outside": false,
+       "status": "injured",
+       "still": true
+      },
+      "room": "r310",
+      "room_label": "Suite 310",
+      "sigma_m": 0.5,
+      "stale": false,
+      "text": "Phone B2: 1 person, cannot move, injured. UWB fix in Suite 310, 2.5 m from the north wall and 3 m from the west wall, within 0.5 m",
+      "x": 3.0,
+      "y": 6.0
+     },
+     {
+      "confidence": null,
+      "geometry": "none",
+      "id": "B3",
+      "method": "ble-presence",
+      "report": {
+       "battery_pct": 90,
+       "can_move": true,
+       "floor_reported": null,
+       "home_suite": "310",
+       "people": 1,
+       "safe_outside": true,
+       "status": "ok",
+       "still": true
+      },
+      "room": null,
+      "room_label": null,
+      "stale": false,
+      "text": "Phone B3: says safe outside (I am out). Accounted for, not a victim"
+     }
+    ],
+    "presence": [
+     {
+      "count": 2,
+      "count_range": [
+       2,
+       2
+      ],
+      "id": "C1",
+      "puck": "P1",
+      "room": "r310",
+      "room_label": "Suite 310",
+      "zones": {
+       "far": 3,
+       "mid": 0,
+       "near": 0
+      }
+     },
+     {
+      "count": 2,
+      "count_range": [
+       2,
+       3
+      ],
+      "id": "C2",
+      "puck": "P2",
+      "room": "r310",
+      "room_label": "Suite 310",
+      "zones": {
+       "far": 5,
+       "mid": 0,
+       "near": 0
+      }
+     }
+    ],
+    "pucks": [
+     {
+      "id": "P1",
+      "room": "r310",
+      "x": 9.0,
+      "y": 7.0
+     },
+     {
+      "id": "P2",
+      "room": "r310",
+      "x": 9.0,
+      "y": 3.0
+     }
+    ],
+    "rig_scale": 1.0,
+    "room": "r310",
+    "room_label": "Suite 310",
+    "rungs": {
+     "bearing": true,
+     "ble": true,
+     "cold": true,
+     "uwb": true
+    },
+    "schema": "sandtable.beacons.brief/1",
+    "simulated": true,
+    "source": "sim",
+    "unplaced_pucks": 0
+   },
+   "keys": [
+    "f4ff09d1b0f6a7fce38767a4a89e3288e51f92e5271f8524d0991634973d2a43",
+    "46698cfd11b6c9be6fd81c332cf05ad2ba71af6d29f043fe9294b340c06e927c",
+    "dfff13867e1a9e0783e1e4df0c5578cdb5c69e8a24cf2cedcd384d9e2851ae37",
+    "9a365a08275a0bc1d4081a0fbc7d254025d69d6f5ee5453a141fb945dfd8c649",
+    "00b0fd36a5821d9862732d581f68ae4bdb683ea823c890c8c5f9804f32b7e167"
+   ],
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "plan": {
+    "assignments": [
+     {
+      "route": {
+       "attack_stair": "Stair B",
+       "leads_to": "Suite 310, then the phone's spot in the south-west quarter of the room (B1: fix, within a metre or two)",
+       "length_m": 17,
+       "to": "Suite 310",
+       "via": [
+        "South corridor",
+        "West corridor"
+       ]
+      },
+      "target": "B1",
+      "task": "rescue",
+      "unit": "RIT"
+     },
+     {
+      "route": {
+       "attack_stair": "Stair B",
+       "leads_to": "Suite 310, then the phone's spot in the north-west quarter of the room (B2: fix, within a metre or two)",
+       "length_m": 17,
+       "to": "Suite 310",
+       "via": [
+        "South corridor",
+        "West corridor"
+       ]
+      },
+      "target": "B2",
+      "task": "rescue",
+      "unit": "E1"
+     }
+    ],
+    "data": "SIMULATED (phones, pucks and devices from the simulator, not a measurement)",
+    "limits_acknowledged": [
+     "All data is simulated, not a measurement.",
+     "The unaccounted range of 13 to 66 people comes from the record's head-count estimates (floor area and load factors, open hours assumed), not a count.",
+     "Devices heard in Suite 310 without the app are devices, not people.",
+     "Occupant reports (trapped, injured, number of people, cannot move) are what they typed or picked and may be out of date.",
+     "Each fix is good to within a metre or two only. Suite 310 may hold more people than the three reported; the record puts the range still unaccounted there at 0 to 5.",
+     "Seven occupied suites have no puck in range and nothing is known about them yet.",
+     "Four suites (303, 308, 309, 311) are vacant on record and not scanned. No phone or device was heard there, so no record check was filed. The record can still be wrong.",
+     "The record has no property-manager contact, so no tenant roll call is possible."
+    ],
+    "limits_standing": [
+     "Devices heard without the app are devices, not people.",
+     "A ring is a distance from one puck, not a position; candidates are separate spots, any may be right.",
+     "Expected head counts are estimates from floor area and building-code load factors, not a census; unaccounted for is a range."
+    ],
+    "next_puck": {
+     "room": "r301",
+     "suite": "301",
+     "why": "Highest-ranked suite with no puck in range: hospital outpatient department, patients may not leave unaided. E1 has been told to carry the puck after the rescue."
+    },
+    "orders": [
+     {
+      "priority": "emergency",
+      "target": "B1",
+      "text": "RIT from Command: Rescue in Suite 310, south-west quarter, fix within a metre or two. Occupant reports trapped, 2 people, cannot move. Route: Stair B, South corridor, West corridor, 17 metres. Bring carry equipment for two.",
+      "to": "RIT"
+     },
+     {
+      "priority": "emergency",
+      "target": "B2",
+      "text": "E1 from Command: Rescue in Suite 310, north-west quarter, fix within a metre or two. Occupant reports injured, 1 person, cannot move. Same route: Stair B, South corridor, West corridor, 17 metres. Then carry next puck to Suite 301.",
+      "to": "E1"
+     },
+     {
+      "priority": "urgent",
+      "target": null,
+      "text": "ALL from Command: Simulated data. Suite 310: three people reported, two located inside, one out. Floor still unaccounted by record estimate: 13 to 66 people. Devices heard are not people. Next puck: Suite 301, East corridor door.",
+      "to": "ALL"
+     },
+     {
+      "priority": "urgent",
+      "target": "310",
+      "text": "ALL from Command: Correction, simulated data. Suite 310: three people reported inside by two phones, both located; one person safe outside. Still unaccounted on floor, record estimate: 13 to 66 people. Devices heard are not people.",
+      "to": "ALL"
+     }
+    ],
+    "priorities": [
+     {
+      "action": "rescue",
+      "rank": 1,
+      "suite": "310",
+      "target": "B1",
+      "why": "Fix within a metre or two. Occupant reports trapped, 2 people, cannot move. Fire room, dental suite where patients may be sedated."
+     },
+     {
+      "action": "rescue",
+      "rank": 2,
+      "suite": "310",
+      "target": "B2",
+      "why": "Fix within a metre or two. Occupant reports injured, 1 person, cannot move. Same route as the first rescue."
+     },
+     {
+      "action": "scan",
+      "rank": 3,
+      "suite": "301",
+      "target": null,
+      "why": "Hospital outpatient suite with no puck in range, and the record expects about 4 people (range 2 to 9). Patients may be non-ambulatory. Entry from the East corridor, 22 m from Stair B."
+     }
+    ],
+    "priorities_source": "agent",
+    "record_checks": [],
+    "run": "phones#1",
+    "sample": false,
+    "simulated": true,
+    "summary": "RIT goes first to Suite 310, south-west quarter, to rescue the occupant who reported trapped, 2 people, cannot move. E1 takes the occupant in the north-west quarter who reported injured, 1 person, cannot move. Both go by Stair B, South corridor and West corridor (17 m, route checked). E1 then carries the next puck to Suite 301. All data is simulated.",
+    "type": "agent_plan"
+   },
+   "recorded_at": "2026-11-14T13:07:51-0600",
+   "recorded_with": "claude-cli",
+   "steps": 5
   }
  }
 }

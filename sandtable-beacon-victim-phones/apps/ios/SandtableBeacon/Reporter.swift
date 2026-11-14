@@ -157,15 +157,19 @@ final class Reporter: ObservableObject {
         // the last 25 s. They are sent in EVERY batch with the time they were measured
         // (`t`), so a board this phone released (take turns) keeps counting on the server.
         // The same (accessory, t) pair can therefore arrive several times.
+        // The server rejects the WHOLE batch (HTTP 400) if one value is out of its range
+        // (d_m must be > 0 and < 150, rssi -130 to 10), and a reading is repeated for 25 s,
+        // so values outside those ranges are clamped or left out here.
         for reading in pucks.readings(now: now) {
-            if let d = reading.distance {
+            if let d = reading.distance, d.isFinite, d < 149.9 {
                 var o = WireObservation(kind: "uwb", t: round3(reading.distanceTime), eid: eid)
                 o.accessory = reading.key
-                o.d_m = round3(d)
+                // A phone lying on the board can measure 0.00 m; send at least 1 cm.
+                o.d_m = max(0.01, round3(d))
                 obs.append(o)
             }
             // Bluetooth signal strength of the board, measured on the phone.
-            if let rssi = reading.rssi {
+            if let rssi = reading.rssi, rssi >= -130, rssi <= 10 {
                 var o = WireObservation(kind: "sos", t: round3(reading.rssiTime), eid: eid)
                 o.accessory = reading.key
                 o.rssi = rssi
@@ -235,7 +239,10 @@ final class Reporter: ObservableObject {
             return
         }
         if inFlight >= 2 && !isBye {
-            serverDetail = "server slow: batch dropped"
+            // Keep the real error ("server unreachable (...)") on screen when there is one.
+            if serverOK != false {
+                serverDetail = "server slow: batch dropped"
+            }
             return
         }
         var request = URLRequest(url: url)
@@ -268,7 +275,16 @@ final class Reporter: ObservableObject {
         }
         if code < 200 || code >= 300 {
             serverOK = false
-            serverDetail = "server answered HTTP \(code)"
+            // FastAPI answers {"detail": "obs[0]: ..."}: show it, it names the bad field.
+            var text = "server answered HTTP \(code)"
+            if let data = data, let reply = try? JSONDecoder().decode(ServerErrorReply.self, from: data),
+               let detail = reply.detail, !detail.isEmpty {
+                text += ": " + String(detail.prefix(160))
+            }
+            if text != serverDetail {
+                BeaconLog.shared.add(text)
+            }
+            serverDetail = text
             return
         }
         serverOK = true

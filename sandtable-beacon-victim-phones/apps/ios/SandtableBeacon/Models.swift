@@ -220,6 +220,12 @@ struct IngestResponse: Codable {
     var ack: WireAck?
 }
 
+/// The body of an HTTP error from the server (FastAPI: {"detail": "..."}). A
+/// non-string detail (a list, from a validation error) just fails to decode.
+struct ServerErrorReply: Decodable {
+    var detail: String?
+}
+
 // MARK: - Suite directory: GET /api/directory
 
 /// One entry of the building's suite list. The server may send `floor` and `suite`
@@ -229,8 +235,9 @@ struct DirectoryEntry: Decodable, Identifiable {
     var floor: String?
     var label: String?
 
+    /// Unique per row: the same suite number may exist on two floors.
     var id: String {
-        return suite
+        return (floor ?? "") + "/" + suite
     }
 
     enum CodingKeys: String, CodingKey {

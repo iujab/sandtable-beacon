@@ -8,3 +8,11 @@ __pycache__/
 .pytest_cache/
 *.log
 hardware/puck/render/parts/
+# Sponsor data (CoStar, Matterport, Vexcel) and everything derived from it lives under a directory named `live`:
+# never committed, never published (scripts/check_publishable.sh refuses it too).
+live/
+**/live/
+.env.*
+!.env.example
+.secrets/
+*.zip

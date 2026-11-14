@@ -78,7 +78,9 @@ export const GEOMETRY_SHORT = { fix: "fix", candidates: "candidates", ring: "rin
 // The phone hardware line (v1 additions A5): model, UWB chip and what the chip can give.
 export function chipWords(report) {
   const r = report || {};
-  const chipText = { U1: "U1: distance and direction", U2: "U2: distance; direction only with the camera" }[r.chip];
+  // iPhone 14 and later report no direction to an accessory without camera assistance, whatever the chip (docs/research/ios_ni.md).
+  const needsCamera = r.chip === "U2" || /iPhone (1[4-9]|Air)/.test(r.model || "");
+  const chipText = r.chip ? `${r.chip}: ${needsCamera ? "distance; direction only with the camera" : "distance and direction"}` : undefined;
   const parts = [];
   if (r.model) parts.push(r.model);
   if (chipText) parts.push(chipText);

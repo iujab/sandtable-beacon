@@ -223,7 +223,6 @@ def build(session, agent_plan: dict | None = None, recorder: Recorder | None = N
     session = _resolve(session)
     rec = recorder if recorder is not None else RECORDER
     b = beacons_of(session) or (rec.last or {})
-    fed = rec.observations > 0
     if b:
         rec.observe(b)
     if not isinstance(session, dict):
@@ -284,7 +283,9 @@ def build(session, agent_plan: dict | None = None, recorder: Recorder | None = N
                    "data": {"SAMPLE": "SAMPLE: the hand-made sample of the feed, not a measurement.",
                             "SIMULATED": "SIMULATED: phones, pucks and devices come from the simulator's stated noise model, not from a measurement.",
                             "LIVE": "LIVE: opt-in phones reporting through the app."}[stamp]},
-        "history": {"source": "recorded from the stream" if fed or rec.events else "latest state only (no history was recorded)",
+        "history": {"source": ("recorded from the stream (events and geometries)" if rec.events else
+                               "geometries polled from the latest state; no event timeline was fed to the report" if rec.observations > 1 else
+                               "latest state only (no history was recorded)"),
                     "observations": rec.observations, "events": len(rec.events)},
         "timeline": events,
         "phones": phones,
@@ -399,9 +400,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.45
 .pl-r.fire { fill: var(--p-fire); stroke: var(--alarm); stroke-width: .08; }
 .pl-wall { stroke: var(--p-wall); stroke-width: .14; stroke-linecap: square; }
 .pl-door { stroke: var(--p-suite); stroke-width: .3; }
-.pl-sn { font: 700 .62px var(--cond); fill: var(--p-label); text-anchor: start; letter-spacing: .02em; }
+.pl-sn { font: 700 .44px var(--cond); fill: var(--p-label); text-anchor: start; letter-spacing: .02em; }
 .pl-puck { fill: var(--p-ink); stroke: var(--p-halo); stroke-width: .06; }
-.pl-puck-t { font: 400 .42px var(--mono); fill: var(--p-ink); paint-order: stroke; stroke: var(--p-halo); stroke-width: .14px; }
+.pl-puck-t { font: 400 .36px var(--mono); fill: var(--p-ink); paint-order: stroke; stroke: var(--p-halo); stroke-width: .14px; }
 .ph-pt { fill: var(--person); }
 .ph-sigma { fill: none; stroke: var(--person); stroke-width: .06; }
 .ph-ring { fill: none; stroke: var(--person); stroke-opacity: .22; stroke-linecap: butt; }
@@ -410,7 +411,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.45
 .ph-cand-link { stroke: var(--person); stroke-width: .05; stroke-dasharray: .25 .25; opacity: .7; }
 .ph-ghost { stroke: var(--p-sub); stroke-width: .08; }
 .ph-zone { fill: url(#hz); stroke: var(--person); stroke-width: .08; }
-.ph-t { font: 700 .48px var(--cond); fill: var(--person-soft); paint-order: stroke; stroke: var(--p-halo); stroke-width: .18px; }
+.ph-t { font: 700 .4px var(--cond); fill: var(--person-soft); paint-order: stroke; stroke: var(--p-halo); stroke-width: .18px; }
 .pl-scale line { stroke: var(--p-ink); stroke-width: .08; } .pl-scale text { font: 500 .5px var(--sans); fill: var(--p-ink); }
 .tl { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 30px; }
 .tl li { display: grid; grid-template-columns: 52px 98px 1fr; gap: 8px; padding: 4px 0; font-size: 13.5px; break-inside: avoid; border-bottom: 1px dashed var(--line); }
@@ -526,8 +527,9 @@ def _svg_plan(rep: dict) -> str:
                 if longest is None or a1 - a0 > longest[1] - longest[0]:
                     longest = (a0, a1)
             am = math.radians((longest[0] + longest[1]) / 2)
-            o.append(f'<text class="ph-t" x="{X(cx + (rad + 0.45) * math.cos(am))}" y="{Y(cy + (rad + 0.45) * math.sin(am))}" '
-                     f'text-anchor="middle">{pid} ring {rad:.1f} m</text>')
+            lx = min(max(cx + (rad + 0.45) * math.cos(am), x0 + 1.4), x1 - 1.4)
+            ly = min(max(cy + (rad + 0.45) * math.sin(am), y0 + 0.6), y1 - 0.4)
+            o.append(f'<text class="ph-t" x="{X(lx)}" y="{Y(ly)}" text-anchor="middle">{pid} ring {rad:.1f} m</text>')
         elif g == "candidates" and f.get("candidates"):
             cs = f["candidates"]
             for a, b in zip(cs, cs[1:]):
@@ -639,7 +641,7 @@ def to_html(rep: dict) -> str:
                '<span class="aside">beacon events, minutes:seconds from the first one</span></div>'
                + ('<ul class="tl">' + "".join(f'<li class="k-{_e(e["name"])}"><span class="t">{_e(e["at"])}</span><span class="kind">{_e(str(e["name"] or "").replace("_", " "))}</span>'
                                               f'<span>{_e(e["text"])}</span></li>' for e in ev) + "</ul>"
-                  if ev else '<p class="none">No events recorded (the report was built from the latest state only).</p>')
+                  if ev else '<p class="none">No beacon events were fed to this report.</p>')
                + "</div></section>")
 
     # 4. phones
@@ -649,9 +651,19 @@ def to_html(rep: dict) -> str:
         st = "out" if L.get("safe_outside") else (L.get("status") or "unknown")
         who = (f'{_e(L.get("people"))} {"person" if L.get("people") == 1 else "people"}' if L.get("people") is not None else "people not reported")
         mv = "cannot move" if L.get("can_move") is False else "can move" if L.get("can_move") else ""
-        seq = "".join(f'<li><span class="tm">{_e(s["at"])}</span><span class="g {_e(s["geometry"])}">{_e(s["geometry"])}</span>'
-                      + (f' <span class="by" style="display:inline">{_e(s["where"])}</span>' if s.get("where") else "")
-                      + (f' <span class="by" style="display:inline">({_e(s["note"])})</span>' if s.get("note") else "") + "</li>" for s in p.get("sequence") or [])
+        steps = list(p.get("sequence") or [])
+
+        def li(s):
+            return (f'<li><span class="tm">{_e(s["at"])}</span><span class="g {_e(s["geometry"])}">{_e(s["geometry"])}</span>'
+                    + (f' <span class="by" style="display:inline">{_e(s["where"])}</span>' if s.get("where") else "")
+                    + (f' <span class="by" style="display:inline">({_e(s["note"])})</span>' if s.get("note") else "") + "</li>")
+        if len(steps) > 7:                                     # a geometry that flips back and forth: first, a count, last
+            mid = steps[2:-3]
+            kinds = " / ".join(sorted({s["geometry"] for s in mid if s.get("geometry")}))
+            seq = "".join(li(s) for s in steps[:2]) + (f'<li><span class="by" style="display:inline">{len(mid)} more changes ({_e(kinds)}) '
+                                                       f'from {_e(mid[0]["at"])} to {_e(mid[-1]["at"])}</span></li>') + "".join(li(s) for s in steps[-3:])
+        else:
+            seq = "".join(li(s) for s in steps)
         assum = "".join(f'<span class="by">Rests on: {_e(a)}</span>' for a in L.get("assumptions") or [])
         rows.append(f'<tr><td><span class="id">{_e(p["id"])}</span><span class="by">first heard {_e(p.get("first_heard"))}'
                     f'{"" if p.get("heard_now") else ", no longer heard"}</span></td>'

@@ -1022,7 +1022,7 @@ def _prune_reason(ctx, pk, ranges, bearing, prior, x, y, noise) -> str:
                 return f"beyond UWB range of {p['id']}"
             nw = ctx.twin.walls_crossed((p["x"], p["y"]), (x, y), ctx.floor)
             if nw > u["max_walls"]:
-                return f"behind {nw} walls from {p['id']}: UWB does not range through more than {u['max_walls']}"
+                return f"behind {nw} walls from {p['id']}: the range model allows ranging through {u['max_walls']} wall at most"
         for r in ranges:
             if r["kind"] == "uwb" and r.get("los") is not None and float(r["los"]) >= _R["los_threshold"]:
                 p = pk[r["puck"]]

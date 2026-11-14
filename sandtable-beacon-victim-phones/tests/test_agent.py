@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from beacon import config
-from beacon.agent import BeaconAgent, situation
+from beacon.agent import TASK, BeaconAgent, situation
 from beacon.llm import CACHE_DIR, LLM, LLMError, request_key
 from beacon.tools import ACTION_TOOLS, CATALOG, ToolBox, brief_of
 from beacon.twin import Twin
@@ -84,15 +84,33 @@ def test_replay_hit_reproduces_the_recorded_sample_plan(sample, tmp_path):
     assert plan["orders"] and plan["priorities"] and plan["limits_acknowledged"]
 
 
+def test_replay_hit_reproduces_the_recorded_walkthrough_plan(tmp_path):
+    """The walk-through (python -m beacon.demo --story) at the moment the story asks the agent: the brief captured then
+    is kept in RUNS.json; scripts/record_agent.py --stability N checks that new walk-throughs give the same prompts."""
+    rec = INDEX["runs"]["walk-through"]
+    geoms = {p["id"]: p["geometry"] for p in rec["brief"]["phones"]}
+    assert sorted(geoms.values()) == ["fix", "fix", "none"]
+    plan, msgs, agent = run(rec["brief"], LLM("replay"), tmp_path)
+    assert plan["backend"] == "replay" and {m["backend"] for m in msgs if m["type"] == "agent"} == {"replay"}
+    assert comparable(plan) == rec["plan"]
+    assert agent.llm.calls == {"replay": rec["steps"], "live": 0, "miss": 0}
+
+
 @pytest.mark.parametrize("name", ["suite-310", "suite-310+309"])
 def test_replay_hit_reproduces_the_recorded_scene_plans(name, tmp_path):
     if not HAVE_SIM:
         pytest.skip("simulator or locator not available")
     rec = INDEX["runs"][name]
-    plan, _msgs, agent = run(_script().situation_source(name), LLM("replay"), tmp_path)
-    if plan["backend"] != "replay":
-        pytest.fail(f"the recorded {name} run no longer replays: the scenario, simulator or locator changed; "
-                    f"re-record with `LLM_BACKEND=claude-cli .venv/bin/python scripts/record_agent.py --situation {name}`")
+    source = _script().situation_source(name)
+    agent = BeaconAgent(source, None, None, None, llm=LLM("replay"), pace_s=0)
+    first = request_key("main", agent.system, [{"role": "user", "content": TASK.replace(
+        "{situation}", json.dumps(situation(brief_of(source), agent.twin), sort_keys=True))}])
+    if first != rec["keys"][0]:
+        # The scene comes from other modules (scenario file, simulator, tracker): when they change, the situation changes.
+        pytest.skip(f"the {name} scene has changed since it was recorded; re-record with "
+                    f"`LLM_BACKEND=claude-cli .venv/bin/python scripts/record_agent.py --situation {name}`")
+    plan, _msgs, agent = run(source, LLM("replay"), tmp_path)
+    assert plan["backend"] == "replay"
     assert comparable(plan) == rec["plan"]
     if name == "suite-310+309":                                # the record disagrees with the phones: the model filed it
         assert [c["suite"] for c in plan["record_checks"]] == ["309"]

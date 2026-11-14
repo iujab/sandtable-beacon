@@ -282,6 +282,11 @@ final class PuckLink: NSObject {
         send(Data([MessageId.initialize.rawValue]))
     }
 
+    private func canWrite(_ characteristic: CBCharacteristic) -> Bool {
+        let props = characteristic.properties
+        return props.contains(.write) || props.contains(.writeWithoutResponse)
+    }
+
     /// Writes one message to the board's rx characteristic.
     /// Like the sample: truncate to maximumWriteValueLength and write in one go.
     /// Differs from the sample: the sample always writes `.withResponse`; we use
@@ -445,6 +450,14 @@ extension PuckLink: CBPeripheralDelegate {
             if PuckUUIDs.txAll.contains(characteristic.uuid) && txCharacteristic == nil {
                 txCharacteristic = characteristic
             }
+        }
+        // Differs from the sample: the sample always writes to "rx". If "rx" cannot be
+        // written but "tx" can (UUIDs named from the other side's point of view), write
+        // to "tx" instead, so the board still receives initialize (0x0A).
+        if let rx = rxCharacteristic, let tx = txCharacteristic, !canWrite(rx), canWrite(tx) {
+            rxCharacteristic = tx
+            txCharacteristic = rx
+            log("rx is not writable but tx is: writing to tx")
         }
         // Differs from the sample: the sample calls setNotifyValue(true) on both rx and tx.
         // We call it on whichever of the two can notify or indicate (normally tx only).

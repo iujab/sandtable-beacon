@@ -179,6 +179,51 @@ def main(argv=None) -> int:
     return 0
 
 
+_live_room: str | None = None
+
+
+def _live_mode() -> bool:
+    return os.environ.get("SANDTABLE_DATA_MODE") == "live" or any(os.environ.get(k) == "live" for k in ("COSTAR_MODE", "MATTERPORT_MODE", "VEXCEL_MODE"))
+
+
+def _live_beacon_bundle(vendored: Path):
+    """The vendored Beacon module reads its twin and site from fixed paths (its fixtures/building/). In live mode it must prune and
+    join against the live twin and record, so a runnable copy is assembled under data/live/beacon_bundle/ (private, git-ignored):
+    its code and web pages, plus fixtures/building/{twin,site}.json written from the live provider. Nothing here is committed."""
+    global _live_room
+    import shutil
+    try:
+        sys.path.insert(0, str(ROOT))
+        from sandtable import config
+        from sandtable.adapters import get_provider
+        from sandtable.scout.session import fire_room
+        from sandtable.spatial import Twin
+        provider = get_provider()
+        twin_raw, site = provider.twin_raw(), provider.site()
+        live_dir = getattr(config, "LIVE_DIR", config.DATA_DIR / "live")
+        bundle = live_dir / "beacon_bundle"
+        tmp = live_dir / "beacon_bundle.tmp"
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        for part in ("beacon", "web"):
+            if (vendored / part).is_dir():
+                shutil.copytree(vendored / part, tmp / part, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        if (vendored / "fixtures" / "beacon").is_dir():
+            shutil.copytree(vendored / "fixtures" / "beacon", tmp / "fixtures" / "beacon")
+        (tmp / "fixtures" / "building").mkdir(parents=True, exist_ok=True)
+        (tmp / "fixtures" / "building" / "twin.json").write_text(json.dumps(twin_raw), encoding="utf-8")
+        (tmp / "fixtures" / "building" / "site.json").write_text(json.dumps(site), encoding="utf-8")
+        if bundle.exists():
+            shutil.rmtree(bundle)
+        tmp.rename(bundle)
+        _live_room = fire_room(Twin(twin_raw), provider)
+        print("[demo] live mode: the Beacon module runs on the live twin and record (a private copy under data/live/beacon_bundle/)", flush=True)
+        return bundle
+    except Exception as exc:                                           # never print data: the type of the failure only
+        print(f"[demo] live mode: Beacon bundle failed ({type(exc).__name__})", flush=True)
+        return None
+
+
 def _start_beacon(args):
     """Point the board at a Beacon server: --beacon-url, or one already answering on the port, or the vendored copy started here.
     Returns the subprocess this launcher owns (or None). Any failure leaves the board on the labelled sample."""
@@ -199,8 +244,18 @@ def _start_beacon(args):
         print("[demo] Beacon module not vendored (python scripts/vendor_beacon.py): the board relays the labelled SAMPLE", flush=True)
         return None
     env = dict(os.environ)
+    data_root = Path(os.environ.get("SANDTABLE_DATA_DIR") or (ROOT / "data"))
+    env["BEACON_DATA_DIR"] = str(data_root / "beacon")
+    if _live_mode():
+        bundle = _live_beacon_bundle(vendored)
+        if bundle is None:
+            print("[demo] live mode: could not assemble the Beacon module on the live twin: the board relays the labelled SAMPLE", flush=True)
+            return None
+        vendored = bundle
+        env["BEACON_DATA_DIR"] = str(bundle.parent / "beacon")
+        if _live_room:
+            env["BEACON_ROOM"] = _live_room
     env["PYTHONPATH"] = str(vendored) + os.pathsep + env.get("PYTHONPATH", "")
-    env["BEACON_DATA_DIR"] = str(Path(os.environ.get("SANDTABLE_DATA_DIR") or (ROOT / "data")) / "beacon")
     for k in ("PORT", "HOST"):
         env.pop(k, None)
     cmd = [sys.executable, "-m", "beacon.demo", "--host", "127.0.0.1", "--port", str(args.beacon_port)]

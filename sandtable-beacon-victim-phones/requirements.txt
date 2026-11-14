@@ -7,3 +7,4 @@ httpx>=0.27
 pytest>=8
 matplotlib>=3.9
 segno>=1.6
+anthropic>=0.40           # optional at runtime: imported lazily by beacon/llm.py for LLM_BACKEND=anthropic (the demo runs without it)

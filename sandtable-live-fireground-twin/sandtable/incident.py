@@ -88,9 +88,9 @@ class Incident:
         """Park units at the attack stair. Simulated tags are teleported there; virtual units are placed."""
         try:
             base = self.twin.resolve("stairA")["at"]
-        except ValueError:                               # a twin without a labelled Stair A: any stair, else the first sweep
+        except ValueError:                               # a twin without a labelled Stair A: any stair, else its first exit
             stair_rooms = self.twin.rooms("stair")
-            base = self.twin.room_centre(stair_rooms[0]["id"]) if stair_rooms else self.twin.data["graph"]["nodes"][0]["at"]
+            base = self.twin.room_centre(stair_rooms[0]["id"]) if stair_rooms else list(self._exit_points()[0][1])
         for i, u in enumerate(self.units.values()):
             at = (base[0] - 1.2 + 2.4 * i, base[1])
             u["assignment"], u["route"], u["_follow"], u["_logical"], u["status"] = None, None, None, None, "staged"
@@ -196,6 +196,42 @@ class Incident:
             u["_still_out"] = 0
         u["still_s"] = round(t - (u["_still_since"] or t), 1)
 
+    # ---- exits, for any twin (the fixture has stairs; a scanned suite may only have entrances)
+    def _exit_points(self) -> list[tuple[str | None, list]]:
+        if getattr(self, "_exits_cache", None) is None:
+            pts = [(e["node"], self.twin.node(e["node"])["at"]) for e in self.twin.exits() if e.get("node")]
+            if not pts:
+                pts = [(d.get("node"), self.twin.node(d["node"])["at"] if d.get("node") else d["at"]) for d in self.twin.data.get("doors", []) if d.get("kind") == "exit"]
+            if not pts:
+                pts = [(n["id"], n["at"]) for n in self.twin.data["graph"]["nodes"] if n.get("kind") == "exit"]
+            if not pts:
+                n = self.twin.data["graph"]["nodes"][0]
+                pts = [(n["id"], n["at"])]
+            self._exits_cache = pts
+        return self._exits_cache
+
+    def _in_exit(self, u: dict) -> bool:
+        """In a stair (the fixture), or, in a twin with no stair rooms, at one of its exits."""
+        if self.twin.rooms("stair"):
+            return bool(u["room"]) and self.twin.room(u["room"])["kind"] == "stair"
+        return u["x"] is not None and min(math.dist((u["x"], u["y"]), at) for _n, at in self._exit_points()) <= 2.0
+
+    def _staging_ref(self):
+        try:
+            self.twin.resolve("stairA")
+            return "stairA"
+        except ValueError:
+            node, at = self._exit_points()[0]
+            return node or list(at)
+
+    def _nearest_exit_node(self, start, blocked) -> str:
+        best = None
+        for node, at in self._exit_points():
+            r = self.twin.route(start, node or list(at), blocked)
+            if r["ok"] and (best is None or r["length_m"] < best[0]):
+                best = (r["length_m"], node or list(at))
+        return best[1] if best else (self._exit_points()[0][0] or list(self._exit_points()[0][1]))
+
     def _adjacent(self, a: str, b: str) -> bool:
         """Rooms a crew can pass between: joined by a door or opening, or two parts of the open corridor."""
         if self.twin.room(a)["kind"] == "corridor" and self.twin.room(b)["kind"] == "corridor":
@@ -210,7 +246,7 @@ class Incident:
         active = self.phase in ("operations", "mayday", "rescue", "egress")
         for u in self.units.values():
             self._advance(u, dt, now)
-            in_stair = bool(u["room"]) and self.twin.room(u["room"])["kind"] == "stair"
+            in_stair = self._in_exit(u)
             if active and u["x"] is not None:
                 if not in_stair and u["status"] in ("staged", "out"):
                     u["status"], u["_was_interior"] = "interior", True
@@ -707,7 +743,7 @@ class Incident:
         u = self.units[unit_id]
         carry: list[str] = []
         blocked = self.blocked_refs()
-        start = self._unit_node(u) or ([u["x"], u["y"]] if u["x"] is not None else "stairA")
+        start = self._unit_node(u) or ([u["x"], u["y"]] if u["x"] is not None else self._staging_ref())
         if task in ("hold", "stage") and target is None:
             u["assignment"], u["route"], u["_follow"] = {"task": task, "target": None, "target_label": None}, None, None
             self._log("assign", f"{u['label']}: {task}", unit_id)
@@ -722,6 +758,8 @@ class Incident:
             label = victim["label"]
         elif target in (None, "exit"):
             dst, label = "exit", "nearest clear stair"
+            if not self.twin.exits():                           # a twin without stairs (one scanned suite): its entrances are the exits
+                dst, label = self._nearest_exit_node(start, blocked), "nearest exit"
         else:
             dst, label = target, None
         legs = [start] + list(via or []) + [dst]
@@ -749,7 +787,8 @@ class Incident:
         u["route"] = {"polyline": route["polyline"], "length_m": route["length_m"], "valid": True, "done": False, "nodes": route["nodes"],
                       "rooms": route["rooms"], "steps": route["steps"], "dst": route["dst_resolved"]}
         if victim is not None and task in RESCUE_TASKS and victim["status"] in ("located", "assigned"):
-            victim["rescuer"], victim["status"], victim["assigned_t"] = unit_id, "assigned", self.clock()
+            victim["rescuer"], victim["status"] = unit_id, "assigned"
+            victim["assigned_t"] = victim.get("assigned_t") or self.clock()      # the first order counts
         if task == "exit":
             u["status"] = "exiting" if u["status"] != "mayday" else "mayday"
             if self.mayday and unit_id != self.mayday["unit"] and self.contact_done:
@@ -823,7 +862,8 @@ class Incident:
         if position is None and u is not None and u["x"] is not None:
             position = [u["x"], u["y"], 1.2]
         if position is None:
-            c = self.twin.room_centre(self.twin.rooms("corridor")[0]["id"])
+            rooms = self.twin.rooms("corridor") or self.twin.rooms()
+            c = self.twin.room_centre(rooms[0]["id"])
             position = [c[0], c[1], 1.2]
         if len(position) == 2:
             position = [position[0], position[1], 1.2]

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,7 +25,7 @@ from .director import Director
 from .hubclient import HubLink
 from .incident import Incident
 from .scout import feeds
-from .scout.session import ScoutSession
+from .scout.session import ScoutSession, floor_number
 from .spatial import Twin
 
 log = logging.getLogger("sandtable.server")
@@ -244,6 +245,16 @@ class AppState:
         elapsed = round((ended or now) - inc.started_t, 1) if inc.started_t else 0.0
         differences = [{"id": m.get("id"), "kind": "twin", "text": m.get("text"), "source": "scout radar (" + ("sample" if (inc.scan or {}).get("sample") else "simulated") + ")",
                         "at": (m.get("where") or {}).get("at"), "room": (inc.scan or {}).get("room")} for m in (inc.scan or {}).get("mismatches") or []]
+        try:                                            # the twin's georeference against the record's property point: flag, never snap
+            out_l = self.twin.floor()["outline"]
+            glat, glon = self.twin.to_geo(sum(p[0] for p in out_l) / len(out_l), sum(p[1] for p in out_l) / len(out_l))
+            off = math.hypot((glat - float(prop["lat"])) * 111320.0, (glon - float(prop["lon"])) * 111320.0 * math.cos(math.radians(glat)))
+            if off > 50.0:
+                differences.append({"id": "georef", "kind": "twin", "source": "cross-check of matterport and costar",
+                                    "text": f"The twin's floor sits about {off:.0f} m from the building record's property point: check on the aerial "
+                                            "whether the record's point is the parcel or the tower (not corrected automatically)."})
+        except (KeyError, TypeError, ValueError):
+            pass
         differences += [{"id": c.get("id"), "kind": "record", "text": c.get("text"), "source": "cross-check of " + " and ".join(c.get("layers") or []),
                          "room": next((r["id"] for r in self.twin.rooms("suite") if c.get("suite") and r.get("suite") == c.get("suite")), None)}
                         for c in prov.site().get("cross_checks") or []]
@@ -275,7 +286,7 @@ class AppState:
                              "elapsed_s": elapsed, "storyboard": self.director.status()},
                 "building": {"address": prop.get("address"), "city": prop.get("city"), "property_type": prop.get("property_type"), "stories": prop.get("stories"),
                              "year_built": prop.get("year_built"), "construction": prop.get("construction"), "rba_sf": prop.get("rba_sf"), "missing": missing,
-                             "life_hazards": [{"suite": t["suite"], "text": t["life_hazard"]} for t in prov.costar.list_tenants(int(self.twin.floor()["label"])) if t.get("life_hazard")]},
+                             "life_hazards": [{"suite": t.get("suite"), "text": t["life_hazard"]} for t in prov.costar.list_tenants(floor_number(self.twin)) if t.get("life_hazard")]},
                 "provenance": {"costar": {**(labels.get("costar") or {}), "word": word.get(prov.modes.get("costar"), prov.modes.get("costar"))},
                                "matterport": {**(labels.get("matterport") or {}), "word": word.get(prov.modes.get("matterport"), prov.modes.get("matterport"))},
                                "vexcel": {**(labels.get("vexcel") or {}), "word": word.get(prov.modes.get("vexcel"), prov.modes.get("vexcel"))},
@@ -446,6 +457,17 @@ async def vision_image(image_id: str):
         except ValueError as exc:
             raise HTTPException(404, str(exc))
     return FileResponse(path, media_type="image/png")
+
+
+@app.get("/api/live/config")
+async def live_config():
+    """What the browser needs for the live Matterport Showcase embed. The SDK key is domain-restricted to localhost and must reach
+    the browser; it is returned only when MATTERPORT_MODE is live (nulls in fixture mode) and is never logged."""
+    mode = S().provider.modes.get("matterport", "fixture")
+    live = mode == "live"
+    return {"matterport": {"mode": mode, "sdk_key": config.env("MATTERPORT_SDK_KEY") or None if live else None,
+                           "model_id": (getattr(S().provider.matterport, "model_id", None) or getattr(getattr(S().provider.matterport, "client", None), "model_id", None)
+                                        or config.env("MATTERPORT_MODEL_ID") or None) if live else None}}
 
 
 @app.get("/api/aar")
@@ -732,8 +754,9 @@ async def ws(sock: WebSocket):
 
 
 app.mount("/fixtures", StaticFiles(directory=str(config.FIXTURES)), name="fixtures")
-(config.DATA_DIR / "vexcel").mkdir(parents=True, exist_ok=True)          # live Vexcel images are downloaded here and served read-only
-app.mount("/live/vexcel", StaticFiles(directory=str(config.DATA_DIR / "vexcel")), name="live-vexcel")
+LIVE_VEXCEL = getattr(config, "LIVE_DIR", config.DATA_DIR / "live") / "vexcel"   # live Vexcel images (private: under data/live/), served read-only
+LIVE_VEXCEL.mkdir(parents=True, exist_ok=True)
+app.mount("/live/vexcel", StaticFiles(directory=str(LIVE_VEXCEL)), name="live-vexcel")
 if (config.WEB_DIR / "index.html").exists():
     app.mount("/", StaticFiles(directory=str(config.WEB_DIR), html=True), name="web")
 else:

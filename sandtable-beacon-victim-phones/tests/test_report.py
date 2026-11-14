@@ -89,7 +89,7 @@ def test_recorder_keeps_the_geometry_sequence_and_the_timeline(sample):
     assert [s["geometry"] for s in seq] == ["ring", "candidates", "fix"]
     assert [s["at"] for s in seq] == ["00:00", "00:05", "00:15"]
     assert [e["name"] for e in r["timeline"]] == ["phone_new"]
-    assert r["history"]["source"] == "recorded from the stream"
+    assert r["history"]["source"].startswith("recorded from the stream")
     rec.feed({"type": "reset"})
     assert rec.phones == {} and rec.events == []
 

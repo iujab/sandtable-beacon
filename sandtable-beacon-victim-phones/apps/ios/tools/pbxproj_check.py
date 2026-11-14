@@ -12,6 +12,7 @@ Run in a throwaway environment (do not add pbxproj to the project's requirements
 
 from __future__ import annotations
 
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -56,6 +57,45 @@ def main() -> int:
 
     for obj in project.objects.get_objects_in_section(*project.objects.get_sections()):
         walk(obj, f"{obj.isa} {obj.get_id()}")
+
+    # Ids must be unique in the raw text (a loader keyed by id would silently merge two
+    # objects with the same id), and every object must be reachable from rootObject.
+    raw = PROJECT.read_text(encoding="utf-8")
+    defined = re.findall(r"^\t\t([0-9A-F]{24}) (?:/\*.*?\*/ )?= \{", raw, flags=re.M)
+    dupes = sorted({i for i in defined if defined.count(i) > 1})
+    if dupes:
+        errors.append(f"duplicate object ids: {dupes}")
+    if len(defined) != len(ids):
+        errors.append(f"{len(defined)} objects defined in the text, {len(ids)} loaded")
+    body = {}
+    for obj in project.objects.get_objects_in_section(*project.objects.get_sections()):
+        found: set = set()
+
+        def collect(value):
+            if isinstance(value, str):
+                if value in ids:
+                    found.add(value)
+            elif isinstance(value, (list, tuple)):
+                for v in value:
+                    collect(v)
+            elif hasattr(value, "get_keys"):
+                for k in value.get_keys():
+                    if k != "isa":
+                        collect(value[k])
+
+        collect(obj)
+        body[obj.get_id()] = found
+    reachable, todo = set(), [root]
+    while todo:
+        cur = todo.pop()
+        if cur in reachable:
+            continue
+        reachable.add(cur)
+        todo.extend(body.get(cur, ()))
+    orphans = sorted(ids - reachable)
+    if orphans:
+        errors.append(f"objects not reachable from rootObject: {orphans}")
+    print(f"  {len(defined)} objects, ids unique: {not dupes}, all reachable from rootObject: {not orphans}")
 
     refs = {r.get_id(): r for r in section(project, "PBXFileReference")}
     groups = section(project, "PBXGroup")
@@ -141,6 +181,19 @@ def main() -> int:
               f"device family {bs['TARGETED_DEVICE_FAMILY']}, Info.plist generated: {bs['GENERATE_INFOPLIST_FILE']}")
     if target_configs != 2:
         errors.append(f"expected 2 target build configurations, found {target_configs}")
+    project_configs = [c for c in section(project, "XCBuildConfiguration") if "INFOPLIST_FILE" not in c.buildSettings.get_keys()]
+    for cfg in project_configs:
+        if str(cfg.buildSettings["SDKROOT"]) != "iphoneos":
+            errors.append(f"project {cfg.name}: SDKROOT is not iphoneos")
+    native = section(project, "PBXNativeTarget")
+    if len(native) != 1 or str(native[0].productType) != "com.apple.product-type.application":
+        errors.append("expected one PBXNativeTarget with productType com.apple.product-type.application")
+    plist_refs = [r for r in refs.values() if str(r.path) == "Info.plist"]
+    if not plist_refs or str(plist_refs[0].lastKnownFileType) != "text.plist.xml":
+        errors.append("Info.plist file reference missing or not text.plist.xml")
+    for ref in refs.values():
+        if str(ref.path).endswith(".swift") and str(ref.lastKnownFileType) != "sourcecode.swift":
+            errors.append(f"{ref.path}: lastKnownFileType is not sourcecode.swift")
 
     # Shared scheme and workspace data: valid XML, pointing at the native target.
     targets = section(project, "PBXNativeTarget")

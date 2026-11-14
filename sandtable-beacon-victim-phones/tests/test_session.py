@@ -155,7 +155,8 @@ def test_cold_presence_count_range(twin_raw, site_raw):
         _run(s2, P3, eid=f"0000000{i}", xy=xy, n=2)
     b2 = s2.step(T0 + 0.5)
     c2 = b2["presence"][0]
-    assert c2["count"] == 1 and c2["count_range"][0] == 3 and c2["count_range"][1] >= 3
+    # the published count is never below the opt-in phones known in the room; the raw bands stay in `zones`
+    assert c2["count"] == 3 and c2["zones"]["mid"] == 1 and c2["count_range"][0] == 3 and c2["count_range"][1] >= 3
     # old scans age out
     assert s.step(T0 + config.COLD_WINDOW_S + 5)["presence"] == []
 

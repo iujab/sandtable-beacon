@@ -32,7 +32,7 @@ async function send() {
   sending = true;
   try {
     const r = report();
-    await postJSON("/api/sim/phone", { key, x: +S.x.toFixed(2), y: +S.y.toFixed(2), floor: view ? view.floorId : undefined, opt_in: S.opt_in, uwb: S.uwb, pointing: S.pointing, camera_assist: S.uwb && S.chip === "U2" && S.pointing && S.camera_assist, chip: r.chip, model: r.model, report: r });
+    await postJSON("/api/sim/phone", { key, x: +S.x.toFixed(2), y: +S.y.toFixed(2), floor: view ? view.floorId : undefined, opt_in: S.opt_in, uwb: S.uwb, pointing: S.pointing, camera_assist: S.uwb && S.pointing && S.camera_assist, chip: r.chip, model: r.model, report: r });
     simOk = true; joined = true;
     setState(S.opt_in ? "Sent to the simulator." : "Sent: a cold phone (no app), counted as a device only.");
   } catch (e) {
@@ -94,7 +94,7 @@ function renderApp() {
   $("opt-in").checked = S.opt_in; $("uwb").checked = S.uwb; $("pointing").checked = S.pointing; $("camera").checked = S.camera_assist;
   for (const r of document.querySelectorAll('input[name="model"]')) r.checked = r.value === S.chip;
   $("models").classList.toggle("off", !S.uwb);
-  $("cam-row").classList.toggle("off", !(S.uwb && S.chip === "U2" && S.pointing));
+  $("cam-row").classList.toggle("off", !(S.uwb && S.pointing));
   $("bat").value = S.battery; $("bat-v").textContent = `${S.battery}%`;
   drawMe();
 }

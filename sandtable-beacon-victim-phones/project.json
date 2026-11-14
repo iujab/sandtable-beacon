@@ -14,19 +14,25 @@
  "abstract": "Beacon is the headline mode of Sandtable, the incident-command board for fire crews. A crew throws small UWB pucks (Qorvo DWM3001CDK boards) into a smoke-filled room. An occupant who opened the Beacon app on their iPhone is ranged by every puck over ultra-wideband, through Apple's Nearby Interaction accessory protocol, and the app sends a status with it: how many people, whether they can move, battery, floor. A locator fuses the ranges with the 3D twin's walls and is honest about geometry: one puck gives a ring, two give two candidates, the twin's walls or a third puck give a position. The building record's tenant roster is compared with the phones still inside, so the command agent gets an accountability table, search priorities and a report. Without the app a puck host can only count nearby Bluetooth devices, with no identities. Simulated end to end so far; the hardware path is written for tonight.",
  "aha": "A ring appears around the first puck: a trapped person's iPhone. The second puck, dropped carelessly, leaves two possible spots and the board says it cannot choose. Slide that puck to the wall and one spot falls outside the room: a position, and the tenant roster says how many people should still be in that suite.",
  "how_it_works": [
-  "building"
+  "An occupant opens the Beacon app on their iPhone and presses a status button (opt-in, random rotating id)",
+  "Each puck (Qorvo DWM3001CDK, stock firmware) ranges that iPhone over UWB through Apple's Nearby Interaction accessory protocol; the app posts each distance to the server",
+  "A locator fuses the ranges with the twin's walls: one puck a ring, two pucks two mirror spots, and the twin or the occupant's stated suite decides, visibly",
+  "The building record's tenant roster is joined to the twin's rooms and the phones: expected people, people reported inside, safe outside, unaccounted",
+  "A command agent turns that into radio orders, search priorities, where the next puck goes and record checks; an incident report closes the loop",
+  "Everything is published to the Sandtable command board as JSON, WebSocket, GeoJSON and Cursor-on-Target"
  ],
  "stack": [
   "Python 3.13",
   "FastAPI",
   "numpy",
-  "Swift / SwiftUI (NearbyInteraction, CoreBluetooth)",
-  "Qorvo DWM3001CDK stock Nearby Interaction firmware",
-  "uwb-kit conventions"
+  "matplotlib",
+  "Swift / SwiftUI (Core Bluetooth, Nearby Interaction)",
+  "Qorvo DWM3001CDK with Qorvo's stock Nearby Interaction firmware",
+  "Claude Sonnet 5.5 through the Claude CLI (recorded, replayed)"
  ],
  "sponsor_tech": {
-  "costar": "tenant roster by suite against phones heard (fixture record: public open data, not CoStar)",
-  "matterport": "room polygons and walls of the twin prune the position ambiguity (synthetic fixture twin)"
+  "costar": "tenant roster by suite (tenant, kind of business, area, vacancy, life hazards) joined to the phones inside: expected people with a stated basis, unaccounted band, search priorities, next puck, record checks. Fixture: public open data, not CoStar data; mapping to the live toolkit in docs/COSTAR_TIE_IN.md",
+  "matterport": "the twin's room polygons, walls, doors and routes: walls turn two rings into one position; doors and routes feed the next-puck plan and the rescue order. Fixture: synthetic interior, not a Matterport scan"
  },
  "hardware": {
   "used": [
@@ -41,36 +47,36 @@
  },
  "status": "building",
  "progress": {
-  "percent": 32,
-  "phase": "building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now",
+  "percent": 78,
+  "phase": "simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet",
   "done": [
-   "Feed contract for the command board: docs/BEACON_FEED.md (v1 frozen, additions A1 to A8 for the live iPhone path and the two-puck demo)",
-   "Research with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md; summary and decisions in docs/PHONE_FEASIBILITY.md",
-   "Locator and tracker (ring, two candidates, position; never a dot where the geometry only supports a ring): 37 tests pass",
-   "Two-puck layout recommendation (beacon/layout.py) and visible dismissal of a mirror spot on stated evidence (beacon/prune.py)",
-   "Tenant roster against phones: accountability table, priorities, where the next puck goes (beacon/roster.py)",
-   "Privacy design: docs/PRIVACY.md"
+   "Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885",
+   "Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)",
+   "Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md",
+   "iOS occupant app source and Xcode project in apps/ios (uncompiled; syntax-parsed; under independent review)",
+   "Locator and tracker, two-puck layout, visible dismissal of a mirror spot on stated evidence",
+   "Evaluation with figures: results/eval_two_puck.json (how often two pucks give one answer), eval_layouts.json (two boards on one device), eval_beacon.json (by method and puck count)",
+   "Tenant roster against phones: accountability table, priorities, where the next puck goes; command agent and incident report",
+   "Puck host for the UNO Q (python -m beacon.host): heartbeat, experimental debug-channel reader, optional Bluetooth device count; tested against stubs only",
+   "Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md"
   ],
   "left_software": [
-   "Server: simulated flow and live mode (POST /api/ingest from the iPhone app), then a clean-clone check of `bash run_demo.sh --source live --lan`",
-   "iOS occupant app in apps/ios (Swift, uncompiled): finish, syntax-check, independent API review; expect compiler errors on first build and paste them back",
-   "Board on port 1885: two-puck walk-through, 'cannot choose' state, puck placement, QR code for the app",
-   "Evaluation: two-puck layouts (how often two pucks give one answer), two boards on one device, error against number of pucks",
-   "Puck host for the UNO Q (heartbeat, experimental debug-channel reader, optional cold Bluetooth count)",
-   "Command agent turn (tenant roster against phones: priorities, radio orders, next puck) and the incident report page",
-   "README, PITCH, DEVPOST, tests, independent skeptical review"
+   "Fix what the independent iOS review finds; then your first Xcode build will tell us the rest (paste the errors back)",
+   "Recorded command-agent runs for the walk-through (so the board shows a real model's plan, not the labelled fallback)",
+   "Fix what the skeptical-judge review finds",
+   "After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do"
   ],
   "left_hardware": [
-   "1. (5 min) Power one DWM3001CDK from USB. Install Qorvo's free 'Qorvo Nearby Interaction' app from the App Store on the iPhone 14 and see whether the board already shows up and ranges. If it does, that board needs no flashing.",
-   "2. (15 to 30 min, once) Get the firmware: Qorvo 'Nearby Interaction' package for the DWM3001CDK (file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex inside the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582. It is an email form; a work or school address works better than Gmail. Keep the .hex outside the repository folder.",
-   "3. (10 min per board) Flash through the on-board J-Link: micro-USB DATA cable into port J9, SEGGER J-Flash Lite (free, segger.com), device NRF52833_XXAA, erase, program, reset. Guide: hardware/FLASH.md (being written).",
-   "4. (5 min per board) Prove each board with Qorvo's app: distance on the phone, check it against a tape measure at 1 m and 3 m.",
-   "5. (20 to 40 min) Build our app: open apps/ios/SandtableBeacon.xcodeproj in Xcode, choose your team, run on the iPhone 14, then the iPhone 15. Guide: docs/IOS_BUILD.md (being written). If it does not compile, paste the errors back.",
-   "6. (10 min) Network: open a hotspot on the Android phone; join it with the laptop and both iPhones. On the laptop: `bash run_demo.sh --source live --lan` (Windows: see README). Open the board, scan its QR code with each iPhone's camera to fill in the server address.",
-   "7. (10 min) Pucks: puck A on a battery bank beside the UNO Q, puck B on the Android phone through a USB-OTG adapter into the board's J-Link port (J9). Stand both upright, 15 cm or more off the floor, component-free side toward the room. Both just inside the 'door wall' of your taped room, about 4 m apart in building metres (hardware/BRINGUP.md gives the taped-rectangle distances).",
-   "8. (5 min) On the board, click each puck onto the plan where it stands and set the exercise scale. Press a status button in the app on the iPhone 14: a ring, then a position.",
-   "9. (15 min) Second victim: iPhone 15. Switch 'Take turns' on in the app on both phones (the stock firmware serves one phone per board), or power two more boards so each puck position has one board per phone.",
-   "10. (10 min) Rehearse the two-minute run-through and the fallback ladder in hardware/BRINGUP.md."
+   "1. (5 min) hardware/BRINGUP.md step 1: power one DWM3001CDK and see whether it already ranges with Qorvo's free App Store app 'Qorvo Nearby Interaction'. If yes, skip flashing for that board.",
+   "2. (15 to 30 min incl. the email wait) BRINGUP step 0.1: download Qorvo's Nearby Interaction firmware (DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex in the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582; use a work or school email. Keep the .hex in data/ or outside the repository.",
+   "3. (5 min first board, 2 min each after) hardware/FLASH.md: micro-USB DATA cable into port J9, SEGGER J-Flash Lite, device NRF52833_XXAA, erase, program, reset.",
+   "4. (5 min) BRINGUP step 3: prove one board and one iPhone with Qorvo's app; compare the distance with a tape measure.",
+   "5. (10 min) BRINGUP step 4: hotspot on the Android phone; laptop and both iPhones join it; `bash run_demo.sh --source live --lan` on the laptop.",
+   "6. (30 to 45 min) docs/IOS_BUILD.md and BRINGUP step 5: open apps/ios/SandtableBeacon.xcodeproj, choose your team, run on the iPhone 14; scan the board's QR code to fill in the server address; press Trapped: a ring appears on the board. If it does not compile, paste the errors back.",
+   "7. (20 min) BRINGUP step 6: puck A on a battery bank beside the UNO Q; puck B on the Android phone through USB-OTG into port J9; run the 10-minute soak test (does the phone or the bank cut the power?).",
+   "8. (10 min) BRINGUP step 7 and hardware/LAYOUT.md: tape the rectangle, stand both pucks just inside the door-wall edge, click them onto the plan, set the exercise scale: one position.",
+   "9. (10 min) BRINGUP step 8: second victim on the iPhone 15: 'Take turns' on both phones, or two more boards so each puck position has one board per phone.",
+   "10. (15 min) BRINGUP steps 9 and 10: rehearse the run-through twice and read the fallback ladder."
   ],
   "needs_from_owner": [
    "Qorvo Nearby Interaction firmware for the DWM3001CDK (step 2 above): only you can submit Qorvo's download form",
@@ -80,7 +86,7 @@
    "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
    "CoStar toolkit and keys if they exist (none on the build machine): the roster comparison runs on a public-data fixture until then"
   ],
-  "updated": "2026-11-14T12:48:25-06:00"
+  "updated": "2026-11-14T13:06:31-06:00"
  },
  "owner_questions": [
   {
@@ -120,22 +126,52 @@
    "a": "On the laptop, with the laptop and both iPhones joined to a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic); the Android phone powering puck B can be that hotspot. The board shows a QR code; scanning it with the iPhone camera opens our app with the server address filled in. Fallbacks: the server on the UNO Q on the same hotspot, or this machine over the tailnet if the iPhones run the tailnet client."
   }
  ],
- "rubric": {},
+ "rubric": {
+  "Use of the data (30%)": "record x twin x live phones: the walls change the position, the roster changes the priorities; a vacant-on-record suite with phones in it becomes a record check",
+  "Agentic depth (30%)": "a tool-using command agent (phones, accountability, next-puck plan, routes, radio, assignments, record checks) whose recorded real runs replay; every step shown on the board",
+  "Usefulness (25%)": "search and evacuation drills on a real building with two pucks and the occupants' own phones; a roll call that does not need a clipboard; record feedback",
+  "Demo and polish (15%)": "ring, cannot choose, slide the puck to the wall, one position: physical and visible in 30 seconds; SIM and fixture labels everywhere"
+ },
  "self_score": {
-  "creativity": 3,
+  "creativity": 4,
   "utility": 3,
-  "charity": 4,
-  "avidity": 3,
-  "track_fit": 3,
+  "charity": 5,
+  "avidity": 4,
+  "track_fit": 4,
   "demo_risk": 3
  },
  "demo": {
   "port": 1885,
   "url_path": "/",
   "command": "bash run_demo.sh --tailnet",
-  "running": false
+  "running": true
  },
- "images": [],
+ "images": [
+  {
+   "path": "figures/ui_03_fix_two_pucks.png",
+   "caption": "Two pucks on the door wall: one position; the mirror spot is ruled out by the twin (simulated)"
+  },
+  {
+   "path": "figures/ui_02_cannot_choose.png",
+   "caption": "Second puck dropped mid-room: two possible spots, and the board says it cannot choose (simulated)"
+  },
+  {
+   "path": "figures/ui_01_ring.png",
+   "caption": "One puck: a ring, clipped by the twin's walls (simulated)"
+  },
+  {
+   "path": "figures/eval_two_puck_map.png",
+   "caption": "Simulated: where in the room two pucks give one answer, for three layouts and for three pucks"
+  },
+  {
+   "path": "figures/ui_05_phone.png",
+   "caption": "The simulated victim's phone page"
+  },
+  {
+   "path": "hardware/two_puck_layout.svg",
+   "caption": "The two-puck layout for the demo table"
+  }
+ ],
  "tests": {
   "command": "bash run_tests.sh",
   "passed": 0,
@@ -156,8 +192,19 @@
  "team": {
   "lead_model": "claude-fable-5-2",
   "builders": [
-   "R1-R3 (Opus): web research with sources: iOS Nearby Interaction and Qorvo firmware; Android/BLE/noise models; DWM3001CDK hardware, hosts and geometry",
-   "W1 (Opus): noise models, locator, tracker and their tests"
+   "R1 (Opus): iOS Nearby Interaction and Qorvo firmware research with sources",
+   "R2 (Opus): Android, Bluetooth and noise-model research with sources",
+   "R3 (Opus): DWM3001CDK hardware, puck hosts and geometry research with sources",
+   "W1 (Opus): noise models, locator, tracker and tests",
+   "W2 (Opus): simulator, scenarios, evaluation and figures",
+   "W3 (Opus): session, feeds, server, walk-through, launcher and tests",
+   "W4 (Opus): command agent, tools, incident report",
+   "W5 (Opus): board, simulated phone page, screenshots",
+   "W7 (Opus): iOS occupant app and Xcode project (uncompiled)",
+   "W8 (Opus): puck host and hardware guides",
+   "Reviewer (Opus): independent compile-minded review of the iOS source",
+   "Judge (Opus): independent skeptical review",
+   "Lead (Fable): feed contract, architecture, roster, stated-evidence pruning, two-puck layout, integration, documents"
   ]
  }
 }

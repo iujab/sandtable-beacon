@@ -198,7 +198,7 @@ function renderPhones(b) {
     const rU = (p.ranges || []).filter((q) => q.kind === "uwb"), rB = (p.ranges || []).filter((q) => q.kind !== "uwb");
     const ranges = (rU.length ? `<span class="rk">UWB</span>${rU.map(chip).join("")}` : "") + (rB.length ? `<span class="rk">Bluetooth</span>${rB.map(chip).join("")}` : "");
     const stated = (q) => q.by === "occupant-statement" || q.by === "search-room";
-    const pruned = (p.pruned || []).map((q) => stated(q) ? `<div class="pc-dismissed">Dismissed on a statement: ${esc(q.reason || "")}</div>` : `<div class="pc-pruned">Impossible: ${esc(q.reason || "removed by the twin")}</div>`).join("");
+    const pruned = (p.pruned || []).map((q) => stated(q) ? `<div class="pc-dismissed">Dismissed on a statement: ${esc(q.reason || "")}</div>` : `<div class="pc-pruned">Ruled out by the twin: ${esc(q.reason || "removed by the twin")}</div>`).join("");
     const choose = p.geometry === "candidates" ? `<div class="pc-choose">${esc(p.text || `Two possible spots: cannot choose between them yet`)}</div>` : "";
     const assume = (p.assumptions || []).map((a) => `<div class="pc-assume" title="${esc(a.text || "")}"><b>Assumption</b>${esc(a.text || plan.assumptionTag(a))}</div>`).join("");
     const conflict = p.conflict ? `<div class="pc-conflict">${esc(typeof p.conflict === "string" ? p.conflict : p.conflict.text || JSON.stringify(p.conflict))}</div>` : "";
@@ -297,7 +297,7 @@ function renderLadder(b) {
     const avail = rungs[r.key] === true, n = b ? r.uses(b) : 0;
     const what = r.key === "cold" ? `heard by ${n} puck${n === 1 ? "" : "s"}` : `${n} phone${n === 1 ? "" : "s"}`;
     let state = n ? `in use: ${what}` : avail ? "available" : rungs[r.key] === false ? "not from this source" : "unknown";
-    if (r.key === "uwb" && rungs.bearing && (n || avail)) state += " · direction too";
+    if (r.key === "uwb" && b && (b.phones || []).some((q) => q.bearing)) state += " · with a phone's direction";
     return `<div class="rung ${n ? "inuse" : avail ? "avail" : "off"}" title="Gives: ${esc(r.gives)}"><span class="lt"></span><span class="rh">${esc(r.title)}</span><span class="stt">${esc(state)}</span>` +
       `<div class="nd"><b>Phone:</b> ${esc(r.phone)} · <b>Puck:</b> ${esc(r.puck)}</div><div class="gv">${esc(r.gives)}</div></div>`;
   }).join("");

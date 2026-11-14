@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 12:55 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 1:07 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -8,8 +8,8 @@ Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am t
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | building | 72% | Sponsor keys arrived (Matterport, Vexcel; CoStar extract pending): three builders taking the layers live in private (nothing sponsor-derived is published). In parallel: the owner two-puck Beacon scene on the board, replay-deterministic script, board polish. Then recordings, replay checks, independent judge, packaging. |
-| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 32% | building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now |
+| Command board | `sandtable-live-fireground-twin/` | building | 75% | Live sponsor layers (private): CoStar record reads from the kit (72 current tenants on the chosen 12-storey Los Angeles office), Matterport twin of a scanned suite normalised with real walls and doorways; Vexcel imagery being fetched; server being generalised to run the board on the live twin. Fixture demo: beacon and scout agent turns recorded with a real model; replay determinism under a slow model being fixed before re-recording. |
+| Phones and pucks | `sandtable-beacon-victim-phones/` | building | 78% | simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet |
 
 Everything runs today on a simulator and labelled stand-in data. **Nothing has run on the real boards or phones yet.** That is the work below.
 
@@ -52,6 +52,7 @@ These need hands, hardware or accounts, so only you can do them. Each links to t
 - [What phone ranging can and cannot do](sandtable-beacon-victim-phones/docs/PHONE_FEASIBILITY.md)
 - [Privacy](sandtable-beacon-victim-phones/docs/PRIVACY.md)
 - [The feed the phones part publishes](sandtable-beacon-victim-phones/docs/BEACON_FEED.md)
+- [Pitch for this part](sandtable-beacon-victim-phones/PITCH.md)
 - [Write-up for this part](sandtable-beacon-victim-phones/README.md)
 - [Write-up for the command board](sandtable-live-fireground-twin/README.md)
 - [The 2-minute demo script](sandtable-live-fireground-twin/PITCH.md)
@@ -67,7 +68,7 @@ Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Sponsor keys arrived (Matterport, Vexcel; CoStar extract pending): three builders taking the layers live in private (nothing sponsor-derived is published). In parallel: the owner two-puck Beacon scene on the board, replay-deterministic script, board polish. Then recordings, replay checks, independent judge, packaging.
+**Being worked on now:** Live sponsor layers (private): CoStar record reads from the kit (72 current tenants on the chosen 12-storey Los Angeles office), Matterport twin of a scanned suite normalised with real walls and doorways; Vexcel imagery being fetched; server being generalised to run the board on the live twin. Fixture demo: beacon and scout agent turns recorded with a real model; replay determinism under a slow model being fixed before re-recording.
 
 **Left to build (agents):**
 
@@ -90,8 +91,7 @@ Taken from each part's `project.json` at sync time.
 
 **Needed from you:**
 
-- The CoStar Data Extract zip (the hackathon kit): put it under .secrets/costar-kit/ on the build machine, or unzip it on the laptop and set COSTAR_KIT_DIR
-- On the laptop: copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost)
+- On the laptop: unzip the CoStar kit OUTSIDE the repository and set COSTAR_KIT_DIR; copy .env.example to .env and paste the Matterport token id/secret, SDK key and the Vexcel key; open the board at http://localhost:1810 (the Matterport SDK key only works on localhost). Details: docs/TOOLKIT_SWAP.md (being rewritten)
 - ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)
 - Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for
 
@@ -119,30 +119,27 @@ Taken from each part's `project.json` at sync time.
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)
 
-**Being worked on now:** building; nothing has touched hardware yet. Done: feed contract, locator, roster. In progress (builders): simulator and evaluation, server (simulated and live modes), board, iOS app, bring-up guides and puck host, command agent. Guides the owner needs (hardware/FLASH.md, hardware/BRINGUP.md, docs/IOS_BUILD.md) are being written now
+**Being worked on now:** simulated flow works end to end (two-puck walk-through, board, feeds, report); guides for the hardware are written; in progress: independent review of the iOS source, recorded command-agent runs, a skeptical-judge review. Nothing has touched hardware yet
 
 **Left to build (agents):**
 
-- Server: simulated flow and live mode (POST /api/ingest from the iPhone app), then a clean-clone check of `bash run_demo.sh --source live --lan`
-- iOS occupant app in apps/ios (Swift, uncompiled): finish, syntax-check, independent API review; expect compiler errors on first build and paste them back
-- Board on port 1885: two-puck walk-through, 'cannot choose' state, puck placement, QR code for the app
-- Evaluation: two-puck layouts (how often two pucks give one answer), two boards on one device, error against number of pucks
-- Puck host for the UNO Q (heartbeat, experimental debug-channel reader, optional cold Bluetooth count)
-- Command agent turn (tenant roster against phones: priorities, radio orders, next puck) and the incident report page
-- README, PITCH, DEVPOST, tests, independent skeptical review
+- Fix what the independent iOS review finds; then your first Xcode build will tell us the rest (paste the errors back)
+- Recorded command-agent runs for the walk-through (so the board shows a real model's plan, not the labelled fallback)
+- Fix what the skeptical-judge review finds
+- After the first real ranges: tune the noise model and the exercise scale handling to what the boards really do
 
 **Left to do with real hardware (you):**
 
-1. 1. (5 min) Power one DWM3001CDK from USB. Install Qorvo's free 'Qorvo Nearby Interaction' app from the App Store on the iPhone 14 and see whether the board already shows up and ranges. If it does, that board needs no flashing.
-2. 2. (15 to 30 min, once) Get the firmware: Qorvo 'Nearby Interaction' package for the DWM3001CDK (file DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex inside the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582. It is an email form; a work or school address works better than Gmail. Keep the .hex outside the repository folder.
-3. 3. (10 min per board) Flash through the on-board J-Link: micro-USB DATA cable into port J9, SEGGER J-Flash Lite (free, segger.com), device NRF52833_XXAA, erase, program, reset. Guide: hardware/FLASH.md (being written).
-4. 4. (5 min per board) Prove each board with Qorvo's app: distance on the phone, check it against a tape measure at 1 m and 3 m.
-5. 5. (20 to 40 min) Build our app: open apps/ios/SandtableBeacon.xcodeproj in Xcode, choose your team, run on the iPhone 14, then the iPhone 15. Guide: docs/IOS_BUILD.md (being written). If it does not compile, paste the errors back.
-6. 6. (10 min) Network: open a hotspot on the Android phone; join it with the laptop and both iPhones. On the laptop: `bash run_demo.sh --source live --lan` (Windows: see README). Open the board, scan its QR code with each iPhone's camera to fill in the server address.
-7. 7. (10 min) Pucks: puck A on a battery bank beside the UNO Q, puck B on the Android phone through a USB-OTG adapter into the board's J-Link port (J9). Stand both upright, 15 cm or more off the floor, component-free side toward the room. Both just inside the 'door wall' of your taped room, about 4 m apart in building metres (hardware/BRINGUP.md gives the taped-rectangle distances).
-8. 8. (5 min) On the board, click each puck onto the plan where it stands and set the exercise scale. Press a status button in the app on the iPhone 14: a ring, then a position.
-9. 9. (15 min) Second victim: iPhone 15. Switch 'Take turns' on in the app on both phones (the stock firmware serves one phone per board), or power two more boards so each puck position has one board per phone.
-10. 10. (10 min) Rehearse the two-minute run-through and the fallback ladder in hardware/BRINGUP.md.
+1. 1. (5 min) hardware/BRINGUP.md step 1: power one DWM3001CDK and see whether it already ranges with Qorvo's free App Store app 'Qorvo Nearby Interaction'. If yes, skip flashing for that board.
+2. 2. (15 to 30 min incl. the email wait) BRINGUP step 0.1: download Qorvo's Nearby Interaction firmware (DWM3001CDK-QANI-FreeRTOS_full_QNI_3_0_0.hex, or the QANI hex in the DW3_QM33 SDK) from qorvo.com/products/d/da008212 or /da008582; use a work or school email. Keep the .hex in data/ or outside the repository.
+3. 3. (5 min first board, 2 min each after) hardware/FLASH.md: micro-USB DATA cable into port J9, SEGGER J-Flash Lite, device NRF52833_XXAA, erase, program, reset.
+4. 4. (5 min) BRINGUP step 3: prove one board and one iPhone with Qorvo's app; compare the distance with a tape measure.
+5. 5. (10 min) BRINGUP step 4: hotspot on the Android phone; laptop and both iPhones join it; `bash run_demo.sh --source live --lan` on the laptop.
+6. 6. (30 to 45 min) docs/IOS_BUILD.md and BRINGUP step 5: open apps/ios/SandtableBeacon.xcodeproj, choose your team, run on the iPhone 14; scan the board's QR code to fill in the server address; press Trapped: a ring appears on the board. If it does not compile, paste the errors back.
+7. 7. (20 min) BRINGUP step 6: puck A on a battery bank beside the UNO Q; puck B on the Android phone through USB-OTG into port J9; run the 10-minute soak test (does the phone or the bank cut the power?).
+8. 8. (10 min) BRINGUP step 7 and hardware/LAYOUT.md: tape the rectangle, stand both pucks just inside the door-wall edge, click them onto the plan, set the exercise scale: one position.
+9. 9. (10 min) BRINGUP step 8: second victim on the iPhone 15: 'Take turns' on both phones, or two more boards so each puck position has one board per phone.
+10. 10. (15 min) BRINGUP steps 9 and 10: rehearse the run-through twice and read the fallback ladder.
 
 **Needed from you:**
 
@@ -155,12 +152,15 @@ Taken from each part's `project.json` at sync time.
 
 **Finished:**
 
-- Feed contract for the command board: docs/BEACON_FEED.md (v1 frozen, additions A1 to A8 for the live iPhone path and the two-puck demo)
-- Research with sources: docs/research/ios_ni.md, puck_hardware.md, android_ble_models.md; summary and decisions in docs/PHONE_FEASIBILITY.md
-- Locator and tracker (ring, two candidates, position; never a dot where the geometry only supports a ring): 37 tests pass
-- Two-puck layout recommendation (beacon/layout.py) and visible dismissal of a mirror spot on stated evidence (beacon/prune.py)
-- Tenant roster against phones: accountability table, priorities, where the next puck goes (beacon/roster.py)
-- Privacy design: docs/PRIVACY.md
+- Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885
+- Live mode: `bash run_demo.sh --source live --lan` accepts the iPhone app's reports at POST /api/ingest (tested with example batches, not with a phone)
+- Guides: hardware/FLASH.md, hardware/BRINGUP.md (first power-up, two-puck layout, networking, two phones, fallback ladder), hardware/LAYOUT.md, hardware/PUCK.md, hardware/UNO_Q.md, docs/IOS_BUILD.md
+- iOS occupant app source and Xcode project in apps/ios (uncompiled; syntax-parsed; under independent review)
+- Locator and tracker, two-puck layout, visible dismissal of a mirror spot on stated evidence
+- Evaluation with figures: results/eval_two_puck.json (how often two pucks give one answer), eval_layouts.json (two boards on one device), eval_beacon.json (by method and puck count)
+- Tenant roster against phones: accountability table, priorities, where the next puck goes; command agent and incident report
+- Puck host for the UNO Q (python -m beacon.host): heartbeat, experimental debug-channel reader, optional Bluetooth device count; tested against stubs only
+- Feed contract for the command board: docs/BEACON_FEED.md (v1 plus additions A1 to A9); research with sources in docs/research/; docs/PHONE_FEASIBILITY.md; docs/PRIVACY.md
 
 **Known limitations:**
 

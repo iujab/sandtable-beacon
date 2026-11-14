@@ -8,6 +8,7 @@
 #
 #   bash scripts/record_all.sh                       app on 1810, hub on 1910 (stops whatever runs there)
 #   PORT=1913 HUB_PORT=1914 bash scripts/record_all.sh
+#   DEMO_ARGS="--no-beacon" ...                    extra launcher arguments (do not start the vendored Beacon server)
 #   SCRIPTS="beacon" SCENARIOS="hardware/scenarios/sandtable_rig_3A2T.json" bash scripts/record_all.sh
 # The beacon script records against the labelled Beacon sample (SANDTABLE_BEACON=sample) unless told otherwise: a
 # recording only replays against the same phones, so the demo must then run with the same source.
@@ -28,7 +29,7 @@ for sc in $SCENARIOS; do
     name="record_$(basename "$sc" .json)_$script"
     log="data/$name.log"
     PORT="$PORT" HUB_PORT="$HUB_PORT" bash scripts/stop_demo.sh >/dev/null; sleep 1
-    LLM_BACKEND="$BACKEND" LLM_RECORD=1 "$PY" -m sandtable.demo --scenario "$sc" --port "$PORT" --hub-port "$HUB_PORT" > "$log" 2>&1 &
+    LLM_BACKEND="$BACKEND" LLM_RECORD=1 "$PY" -m sandtable.demo --scenario "$sc" --port "$PORT" --hub-port "$HUB_PORT" ${DEMO_ARGS:-} > "$log" 2>&1 &
     for i in $(seq 1 60); do                                   # wait for the board and the hub link
       curl -s -m 2 "$BASE/healthz" | "$PY" -c "import json,sys; sys.exit(0 if json.load(sys.stdin).get('hub_connected') else 1)" 2>/dev/null && break
       sleep 1

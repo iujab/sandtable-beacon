@@ -50,9 +50,18 @@ class LLM:
     def __init__(self, backend: str | None = None, record: bool | None = None, cache_dir: Path | None = None):
         self.backend = backend or config.LLM_BACKEND
         self.record = config.LLM_RECORD if record is None else record
-        self.cache_dir = cache_dir or config.LLM_CACHE_DIR
+        self._cache_dir = cache_dir
         self.refresh = os.environ.get("LLM_REFRESH") == "1"
         self.calls = {"replay": 0, "live": 0, "miss": 0}
+
+    @property
+    def cache_dir(self) -> Path:
+        """The replay cache, resolved per call: fixtures/llm_cache/ in fixture mode, data/live/llm_cache/ once any sponsor layer is live."""
+        return self._cache_dir or config.llm_cache_dir()
+
+    @cache_dir.setter
+    def cache_dir(self, value: Path | None) -> None:
+        self._cache_dir = value
 
     def cache_path(self, key: str) -> Path:
         return self.cache_dir / f"{key}.json"
@@ -79,6 +88,7 @@ class LLM:
             raise LLMError(f"unknown LLM_BACKEND {self.backend!r}")
         self.calls["live"] += 1
         if self.record:
+            config.guard_write(path)                  # live mode: recordings only under data/live/, fixtures/llm_cache/ is read-only
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps({"key": key, "backend": self.backend, "model": model, "tier": tier,
                                         "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),

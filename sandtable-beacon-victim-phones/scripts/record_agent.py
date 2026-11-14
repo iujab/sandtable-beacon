@@ -9,6 +9,9 @@ Situations (built without the server, deterministic):
   sample     fixtures/beacon/sample_beacons.json (the hand-made sample; also the fake engine's "fix" phase)
   suite-310  the scripted scene fixtures/beacon/scenarios/suite-310.json run through the real simulator, session and
              locator on a FIXED clock (0.1 s steps from a fixed epoch, 30 s), so its brief is the same on every run
+  walk-through  the scripted walk-through itself (beacon/story.py, what `python -m beacon.demo --story` plays), run in
+             process on W3's server state with the simulator, real time; the brief is captured at the exact moment the
+             story calls the command agent (step 8). The captured brief is kept in RUNS.json, so --check needs no story
   suite-310+309  the same scene plus an occupant sheltering in Suite 309, which the record lists as vacant and which
              they registered in the app (a disagreement between the record and the phones)
 
@@ -37,7 +40,7 @@ from beacon.llm import CACHE_DIR, LLM  # noqa: E402
 from beacon.tools import brief_of  # noqa: E402
 
 INDEX = CACHE_DIR / "RUNS.json"
-SITUATIONS = ("sample", "suite-310", "suite-310+309")
+SITUATIONS = ("sample", "walk-through", "suite-310", "suite-310+309")
 SCENE_EPOCH = 1794679200.0          # fixed clock for the scripted scene (Sat Nov 14 2026, 12:00 CST); never shown anywhere
 SCENE_SECONDS = 30.0
 SCENE_DT = 0.1
@@ -93,6 +96,65 @@ def situation_source(name: str, brief_file: str | None = None):
     raise SystemExit(f"unknown situation {name!r}")
 
 
+async def walkthrough_brief(script: str = "suite-310", timeout_s: float = 150.0) -> dict:
+    """Plays the real walk-through on the server's state (sim engine, wall clock) and returns brief_of(session) at the
+    moment the story asks the command agent for a plan. The agent itself is replaced by a stub that only captures."""
+    from beacon import server
+    state = server.AppState(source="sim", story=False)
+    captured: dict = {}
+
+    class Capture:
+        busy, backend, last, log = False, "capture", None, []
+
+        async def run(self, reason: str = "manual") -> dict:
+            captured["brief"] = json.loads(json.dumps(brief_of(state.session)))
+            return {}
+
+        def status(self) -> dict:
+            return {"busy": False, "backend": "capture", "plan": None, "log": []}
+    state.agent = Capture()
+    await state.startup()
+    try:
+        state.start_story(script)
+        t0 = time.time()
+        while "brief" not in captured and time.time() - t0 < timeout_s:
+            await asyncio.sleep(0.25)
+    finally:
+        await state.shutdown()
+    if "brief" not in captured:
+        raise SystemExit("the walk-through did not reach the command-agent step")
+    return captured["brief"]
+
+
+def tool_sweep_key(brief: dict) -> str:
+    """Hash of everything the read tools say about this brief (what later prompts are built from)."""
+    import hashlib
+    from beacon.tools import ToolBox
+    from beacon.twin import Twin
+    box = ToolBox(brief, Twin(config.twin_raw()), config.site_raw(), record_path=Path(tempfile.mkdtemp()) / "rc.json")
+    out = [box.call(n, {}) for n in ("get_phones", "suite_accountability", "next_puck_plan")]
+    out += [box.call("route_to", {"target": p["id"]}) for p in brief.get("phones") or []]
+    return hashlib.sha256(json.dumps(out, sort_keys=True).encode()).hexdigest()
+
+
+def first_key(brief: dict) -> str:
+    from beacon.agent import TASK, BeaconAgent, situation
+    from beacon.llm import request_key
+    agent = BeaconAgent(brief, None, None, None, llm=LLM("replay"), pace_s=0)
+    user = TASK.replace("{situation}", json.dumps(situation(brief, agent.twin), sort_keys=True))
+    return request_key("main", agent.system, [{"role": "user", "content": user}])
+
+
+def prune_orphans(index: dict) -> int:
+    keep = {k for r in index["runs"].values() for k in r["keys"]}
+    n = 0
+    for f in CACHE_DIR.glob("*.json"):
+        if f.name != "RUNS.json" and f.stem not in keep:
+            f.unlink()
+            n += 1
+    return n
+
+
 def comparable(plan: dict) -> dict:
     """The plan without the backend label (record says claude-cli, replay says replay)."""
     return {k: v for k, v in plan.items() if k != "backend"}
@@ -146,9 +208,27 @@ async def main_async(args) -> int:
     index = load_index()
     tmpdir = Path(tempfile.mkdtemp(prefix="beacon-record-"))
     failures = 0
+    if args.stability:
+        rec = index["runs"].get("walk-through") or {}
+        want = (rec.get("keys") or [None])[0]
+        want_sweep = tool_sweep_key(rec["brief"]) if rec.get("brief") else None
+        hits = 0
+        for i in range(args.stability):
+            b = await walkthrough_brief()
+            k, sw = first_key(b), tool_sweep_key(b)
+            same = k == want and sw == want_sweep
+            hits += same
+            print(f"   walk-through #{i + 1}: phones {[(p['id'], p.get('geometry')) for p in b.get('phones') or []]}; first prompt "
+                  f"{'= recorded' if k == want else 'DIFFERS'}; tool results {'= recorded' if sw == want_sweep else 'DIFFER'}")
+        print(f"== stability: {hits} of {args.stability} walk-throughs give exactly the recorded prompts")
+        return 0 if hits == args.stability else 1
     for name in names:
         t0 = time.time()
-        source = situation_source(name, args.brief_file)
+        if name == "walk-through":
+            stored = (index["runs"].get(name) or {}).get("brief")
+            source = stored if (args.check and stored) else await walkthrough_brief()
+        else:
+            source = situation_source(name, args.brief_file)
         brief = brief_of(source)
         print(f"== {name}: situation built in {time.time() - t0:.1f} s; phones {[p['id'] + ':' + str(p.get('geometry')) for p in brief.get('phones') or []]}")
         if not args.check:
@@ -165,6 +245,8 @@ async def main_async(args) -> int:
                 continue
             index["runs"][name] = {"keys": llm.keys, "models": sorted(set(llm.models)), "recorded_with": backend,
                                    "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "steps": len(llm.keys), "plan": comparable(plan)}
+            if name == "walk-through":
+                index["runs"][name]["brief"] = brief
             save_index(index)
         rec = index["runs"].get(name)
         if rec is None:
@@ -182,6 +264,8 @@ async def main_async(args) -> int:
             print(f"   summary: {plan['summary']}")
             for o in plan["orders"]:
                 print(f"   order [{o['priority']}] {o['to']}: {o['text']}")
+    if not args.check:
+        print(f"== removed {prune_orphans(index)} cache files no recorded run uses")
     return 1 if failures else 0
 
 
@@ -190,6 +274,8 @@ def main() -> None:
     ap.add_argument("--situation", choices=SITUATIONS)
     ap.add_argument("--check", action="store_true", help="no model calls: verify that replay reproduces the recorded runs")
     ap.add_argument("--brief-file", help="a saved GET /api/brief (or Beacons object) to record instead")
+    ap.add_argument("--stability", type=int, default=0, metavar="N",
+                    help="no model calls: play the walk-through N times and check that each gives exactly the recorded prompts")
     args = ap.parse_args()
     raise SystemExit(asyncio.run(main_async(args)))
 

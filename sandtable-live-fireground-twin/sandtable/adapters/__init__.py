@@ -8,9 +8,12 @@
     p.costar / p.matterport / p.vexcel   # the per-layer adapters with their tool-level methods
 
 Fixture mode reads the bundle under fixtures/ (real open data + a synthetic interior, all labelled).
-Live mode talks to the sponsor services with keys from the environment; it is written from the
-public documentation and has not been exercised without keys (see docs/TOOLKIT_SWAP.md).
+Live mode reads the sponsor services (Matterport, Vexcel) with keys from the environment and the CoStar
+Data Extract from a local folder (see docs/TOOLKIT_SWAP.md).
 A layer set to `live` with a missing key raises at start-up: it never silently falls back.
+
+Privacy: building a provider with any live layer switches the whole process to the private root
+(config.enter_live): local writes, caches and model recordings then go under data/live/ only.
 """
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ def _read(path: Path) -> dict:
 
 def _append(path: Path, item: dict, id_prefix: str) -> None:
     """Append with a deterministic id (prefix + running number), so recorded agent runs replay exactly."""
+    config.guard_write(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     items = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     item["id"] = f"{id_prefix}-{len(items) + 1}"
@@ -47,9 +51,13 @@ def _append(path: Path, item: dict, id_prefix: str) -> None:
 class CoStarFixture:
     mode = "fixture"
 
-    def __init__(self, site_path: Path = config.SITE_JSON, corrections_path: Path = config.CORRECTIONS_JSON):
-        self._site = _read(site_path)
-        self._corrections = corrections_path
+    def __init__(self, site_path: Path | None = None, corrections_path: Path | None = None):
+        self._site = _read(site_path or config.site_context_json())
+        self._corrections_arg = corrections_path
+
+    @property
+    def _corrections(self) -> Path:                     # resolved at write time: private once the process is live
+        return self._corrections_arg or config.CORRECTIONS_JSON
 
     def site(self) -> dict:
         return self._site
@@ -64,8 +72,9 @@ class CoStarFixture:
         return [a for a in self._site.get("available_spaces", []) if floor is None or a.get("floor") == floor]
 
     def file_correction(self, field: str, current: Any, proposed: Any, evidence: dict) -> dict:
+        where = "data/live/record_corrections.json" if config.live_active() else "data/record_corrections.json"
         item = {"id": None, "field": field, "current": current, "proposed": proposed, "evidence": evidence,
-                "status": "filed locally (fixture mode: written to data/record_corrections.json, not sent to CoStar)"}
+                "status": f"filed locally (fixture mode: written to {where}, not sent to CoStar)"}
         _append(self._corrections, item, "corr")
         return item
 
@@ -79,9 +88,13 @@ class CoStarFixture:
 class MatterportFixture:
     mode = "fixture"
 
-    def __init__(self, twin_path: Path = config.TWIN_JSON, overlay_path: Path = config.TAGS_OVERLAY_JSON):
+    def __init__(self, twin_path: Path = config.TWIN_JSON, overlay_path: Path | None = None):
         self._twin = _read(twin_path)
-        self._overlay = overlay_path
+        self._overlay_arg = overlay_path
+
+    @property
+    def _overlay(self) -> Path:                         # resolved at write time: private once the process is live
+        return self._overlay_arg or config.TAGS_OVERLAY_JSON
 
     def _overlay_tags(self) -> list[dict]:
         return json.loads(self._overlay.read_text(encoding="utf-8")) if self._overlay.exists() else []
@@ -95,9 +108,10 @@ class MatterportFixture:
         return self.get_model()["tags"]
 
     def add_tag(self, floor: str, position: list[float], label: str, description: str = "", kind: str = "observation") -> dict:
+        where = "data/live/twin_tags_overlay.json" if config.live_active() else "data/twin_tags_overlay.json"
         tag = {"id": None, "kind": kind, "label": label, "floor": floor,
                "position": [round(float(v), 2) for v in position], "description": description,
-               "status": "written locally (fixture mode: data/twin_tags_overlay.json, not sent to Matterport)"}
+               "status": f"written locally (fixture mode: {where}, not sent to Matterport)"}
         _append(self._overlay, tag, "obs")
         return tag
 
@@ -164,6 +178,9 @@ class Provider:
     def __init__(self, costar, matterport, vexcel):
         self.costar, self.matterport, self.vexcel = costar, matterport, vexcel
         self.modes = {"costar": costar.mode, "matterport": matterport.mode, "vexcel": vexcel.mode}
+        live = [layer for layer, mode in self.modes.items() if mode == "live"]
+        if live:                                          # the privacy guard: cannot be forgotten by a caller
+            config.enter_live(live)
 
     def site(self) -> dict:
         return self.costar.site()
@@ -196,21 +213,29 @@ _provider: Provider | None = None
 
 def build_provider(costar_mode: str | None = None, matterport_mode: str | None = None, vexcel_mode: str | None = None) -> Provider:
     cm, mm, vm = costar_mode or config.COSTAR_MODE, matterport_mode or config.MATTERPORT_MODE, vexcel_mode or config.VEXCEL_MODE
-    if cm == "live":
-        from .costar_live import CoStarLive
-        costar = CoStarLive.from_env()
-    else:
-        costar = CoStarFixture()
-    if mm == "live":
-        from .matterport_live import MatterportLive
-        matterport = MatterportLive.from_env()
-    else:
-        matterport = MatterportFixture()
-    if vm == "live":
-        from .vexcel_live import VexcelLive
-        vexcel = VexcelLive.from_env(site=costar.site())
-    else:
-        vexcel = VexcelFixture(site=costar.site())
+    live = [layer for layer, mode in (("costar", cm), ("matterport", mm), ("vexcel", vm)) if mode == "live"]
+    before = config.privacy_state()
+    if live:                      # switch to the private root BEFORE any live adapter fetches or caches anything
+        config.enter_live(live)
+    try:
+        if cm == "live":
+            from .costar_live import CoStarLive
+            costar = CoStarLive.from_env()
+        else:
+            costar = CoStarFixture()
+        if mm == "live":
+            from .matterport_live import MatterportLive
+            matterport = MatterportLive.from_env()
+        else:
+            matterport = MatterportFixture()
+        if vm == "live":
+            from .vexcel_live import VexcelLive
+            vexcel = VexcelLive.from_env(site=costar.site())
+        else:
+            vexcel = VexcelFixture(site=costar.site())
+    except Exception:
+        config.restore_privacy_state(before)       # nothing live was built (a missing key): leave the process as it was
+        raise
     return Provider(costar, matterport, vexcel)
 
 

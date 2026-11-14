@@ -17,11 +17,15 @@ fi
 PY=.venv/bin/python; [ -x "$PY" ] || PY=.venv/Scripts/python.exe
 ARGS=(); DAEMON=0
 for a in "$@"; do if [ "$a" = "--daemon" ]; then DAEMON=1; else ARGS+=("$a"); fi; done
+LOGDIR=data
+if [ "${SANDTABLE_DATA_MODE:-}" = "live" ] || [ "${COSTAR_MODE:-}" = "live" ] || [ "${MATTERPORT_MODE:-}" = "live" ] || [ "${VEXCEL_MODE:-}" = "live" ]; then
+  LOGDIR=data/live                          # live mode: the log may name rooms of the real building, so it stays private
+fi
 if [ "$DAEMON" = 1 ]; then
-  mkdir -p data
-  nohup setsid "$PY" -m sandtable.demo "${ARGS[@]}" > data/demo.log 2>&1 &
+  mkdir -p "$LOGDIR"
+  nohup setsid "$PY" -m sandtable.demo "${ARGS[@]}" > "$LOGDIR/demo.log" 2>&1 &
   echo $! > .demo.pid
-  echo "[run_demo] started in the background (pid $(cat .demo.pid)); log: data/demo.log"
+  echo "[run_demo] started in the background (pid $(cat .demo.pid)); log: $LOGDIR/demo.log"
 else
   exec "$PY" -m sandtable.demo "${ARGS[@]}"
 fi

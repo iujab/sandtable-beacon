@@ -860,8 +860,15 @@ async def api_sim_phone(request: Request):
         if report is not None and not isinstance(report, dict):
             raise ValueError("report must be an object")
         with s._lock:
+            extra = {}
+            if body.get("chip") in ("U1", "U2"):
+                extra["chip"] = body["chip"]
+            if isinstance(body.get("model"), str) and body["model"]:
+                extra["model"] = body["model"][:40]
+            if "camera_assist" in body:
+                extra["camera_assist"] = bool(body["camera_assist"])
             ph = world.upsert_phone(key, x, y, floor=body.get("floor"), opt_in=bool(body.get("opt_in", True)),
-                                    uwb=bool(body.get("uwb", True)), pointing=bool(body.get("pointing", False)), report=report)
+                                    uwb=bool(body.get("uwb", True)), pointing=bool(body.get("pointing", False)), report=report, **extra)
     except (KeyError, TypeError) as exc:
         raise HTTPException(400, f"missing or bad field: {exc}")
     except ValueError as exc:

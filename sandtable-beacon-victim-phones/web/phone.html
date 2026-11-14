@@ -74,11 +74,11 @@
     <label class="tick"><input type="checkbox" id="opt-in" checked><span><b>App installed (opt-in)</b><small>Unticked: a cold phone. Pucks can only count it as a device.</small></span></label>
     <label class="tick"><input type="checkbox" id="uwb" checked><span><b>Phone has UWB</b><small>Unticked: Bluetooth only.</small></span></label>
     <div class="models" id="models" role="radiogroup" aria-label="Phone model">
-      <label><input type="radio" name="model" value="U1" checked><span><b>iPhone 14</b><small>U1: distance and direction</small></span></label>
+      <label><input type="radio" name="model" value="U1" checked><span><b>iPhone 14</b><small>U1: distance; direction only with the camera</small></span></label>
       <label><input type="radio" name="model" value="U2"><span><b>iPhone 15</b><small>U2: distance; direction only with the camera</small></span></label>
     </div>
     <label class="tick"><input type="checkbox" id="pointing"><span><b>Holding the phone up, pointing at the door</b><small>Gives the pucks the phone's direction, when the chip can.</small></span></label>
-    <label class="tick sub" id="cam-row"><input type="checkbox" id="camera"><span><b>Camera assistance on</b><small>U2 phones give a direction only with it.</small></span></label>
+    <label class="tick sub" id="cam-row"><input type="checkbox" id="camera"><span><b>Camera assistance on</b><small>An iPhone 14 or later gives a direction only with it (a moving phone that can see).</small></span></label>
     <label class="slider"><span><b>Battery</b> <output id="bat-v">80%</output></span><input type="range" id="bat" min="1" max="100" value="80"></label>
     <div class="sim-actions"><button id="btn-remove">Remove this phone</button><a href="index.html" target="_blank" rel="noopener">Open the board</a></div>
     <div class="sim-state" id="sim-state"></div>

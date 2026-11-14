@@ -106,7 +106,7 @@ def situation(brief: dict, twin: Twin) -> dict:
                                       "people": (p.get("report") or {}).get("people"), "can_move": (p.get("report") or {}).get("can_move")}
                                      for p in inside],
             "opt_in_phones_safe_outside": len(phones) - len(inside),
-            "devices_heard_without_app": devices_band(((acc.get("totals") or {}).get("cold_devices")) or 0) if acc else None,
+            "devices_heard_without_app": devices_band(((acc.get("totals") or {}).get("cold_devices")) or 0) if acc else None,   # "some" | "none"
             "building_record": "available" if acc.get("suites") else "not available"}
 
 

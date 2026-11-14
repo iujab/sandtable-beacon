@@ -197,8 +197,8 @@ def confidence_band(c) -> str | None:
 
 
 def devices_band(n) -> str:
-    n = int(n or 0)
-    return "none" if n <= 0 else "1 to 2" if n <= 2 else "3 to 5" if n <= 5 else "6 or more"
+    """Cold device counts change from one scan window to the next: the prompt says only whether any were heard."""
+    return "some" if int(n or 0) > 0 else "none"
 
 
 def battery_band(pct) -> str | None:
@@ -208,18 +208,39 @@ def battery_band(pct) -> str | None:
 
 
 def uncertainty_words(sigma) -> str:
+    """Three wide bands of the 1-sigma radius, so that run-to-run noise does not change the words."""
     s = float(sigma or 0.5)
-    return "within about 1 m" if s <= 1.0 else f"within about {int(math.ceil(s))} m"
+    return "within a metre or two" if s <= 1.5 else "within a few metres" if s <= 3.0 else "only roughly (more than 3 m)"
 
 
-_DEVICES_RE = re.compile(r"about (\d+) devices")
+_DEVICES_RE = re.compile(r"about \d+ devices")
 
 
 def band_devices_in_text(text: str | None) -> str | None:
-    """'about 3 devices' -> 'about 3 to 5 devices': a roster sentence with the cold count in bands (stable prompts)."""
+    """'about 3 devices' -> 'some devices': a roster sentence without the cold count (it changes every scan window)."""
     if not text:
         return text
-    return _DEVICES_RE.sub(lambda m: f"{devices_band(int(m.group(1)))} devices", text)
+    return _DEVICES_RE.sub("some devices", text)
+
+
+def _compass(c: float) -> str:
+    return ("north", "east", "south", "west")[int(round((c % 360.0) / 90.0)) % 4]
+
+
+def part_of_room(twin: Twin, room_id: str | None, x, y) -> str | None:
+    """'south-west quarter' of the room: which half along each axis of the room's bounding box, named by compass from the
+    twin's georeference. Coarse on purpose: the words do not change with centimetres of noise unless the point sits
+    on a centre line of the room."""
+    if not room_id or x is None or y is None or room_id not in twin._rooms:
+        return None
+    poly = twin.room(room_id)["polygon"]
+    cx = (min(q[0] for q in poly) + max(q[0] for q in poly)) / 2
+    cy = (min(q[1] for q in poly) + max(q[1] for q in poly)) / 2
+    b = float((twin.data.get("georef") or {}).get("bearing_deg", 90.0))
+    hx = _compass(b) if float(x) >= cx else _compass(b + 180.0)          # +x of the building frame points to compass b
+    hy = _compass(b - 90.0) if float(y) >= cy else _compass(b + 90.0)    # +y points to compass b - 90
+    ns, ew = (hx, hy) if hx in ("north", "south") else (hy, hx)
+    return f"{ns}-{ew} quarter"
 
 
 def _ccw(poly) -> bool:
@@ -367,12 +388,12 @@ class ToolBox:
                   "battery": battery_band(rep.get("battery_pct")), "still": rep.get("still"),
                   "floor_reported": rep.get("floor_reported"), "home_suite": rep.get("home_suite")}
         view = {"id": p["id"], "geometry": geom, "method": p.get("method"), "stale": bool(p.get("stale"))}
-        if rep.get("safe_outside"):
+        if rep.get("safe_outside"):                    # accounted for: no motion or battery state (it changes and matters no more)
+            report = {"status": rep.get("status"), "people": rep.get("people"), "home_suite": rep.get("home_suite")}
             view.update({"safe_outside": True, "accounted_for": True, "report": report,
                          "where": "outside the building by the occupant's own report (pressed 'I am out')"})
             return view
         view["report"] = report
-        view["how_sure"] = confidence_band(p.get("confidence"))
         if p.get("assumptions"):                       # A8: a position that rests on a statement, not on the measurements alone
             view["rests_on"] = [{"kind": a.get("kind"), "room_label": self._label(a.get("room")), "text": a.get("text")} for a in p["assumptions"]]
         if p.get("conflict"):
@@ -380,17 +401,18 @@ class ToolBox:
         if geom == "fix":
             room = p.get("room") or self.twin.locate(p["x"], p["y"], self.brief.get("floor"))["room"]
             view["room_label"] = self._label(room) or p.get("room_label")
+            part = part_of_room(self.twin, room, p.get("x"), p.get("y"))
             view["where"] = ", ".join(x for x in [f"in {view['room_label']}" if view["room_label"] else None,
-                                                  wall_words(self.twin, room, p.get("x"), p.get("y")),
+                                                  f"{part} of the room" if part else None,
                                                   uncertainty_words(p.get("sigma_m"))] if x)
         elif geom == "candidates":
-            cands = sorted(p.get("candidates") or [], key=lambda c: -(c.get("weight") or 0))
+            cands = p.get("candidates") or []
             view["room_label"] = p.get("room_label")
-            view["candidates"] = []
-            for i, c in enumerate(cands, start=1):
+            spots = []
+            for c in cands:                                    # no weights and a fixed order: both drift with noise
                 room = c.get("room") or self.twin.locate(c["x"], c["y"], self.brief.get("floor"))["room"]
-                view["candidates"].append({"rank": i, "weight": tenth(c.get("weight")), "room_label": self._label(room),
-                                           "where": wall_words(self.twin, room, c.get("x"), c.get("y"))})
+                spots.append({"room_label": self._label(room), "where": part_of_room(self.twin, room, c.get("x"), c.get("y"))})
+            view["candidates"] = sorted(spots, key=lambda c: (str(c["room_label"]), str(c["where"])))
             view["where"] = (f"{'two' if len(cands) == 2 else len(cands)} possible spots, not a position: send a crew to check "
                              f"{'both' if len(cands) == 2 else 'all of them'}, or move a puck to the wall to decide")
         elif geom == "ring":
@@ -471,7 +493,7 @@ class ToolBox:
                 room = next((rid for rid, room in self.twin._rooms.items() if room.get("label") == top["room_label"]), None)
                 suite = (self.twin._rooms.get(room) or {}).get("suite")
                 if suite in rows and rows[suite].get("vacant"):
-                    out.setdefault(suite, []).append(f"phone {p['id']}'s range ring lies {top['share_pct']}% in Suite {suite}, which the record lists as vacant")
+                    out.setdefault(suite, []).append(f"phone {p['id']}'s range ring lies mostly in Suite {suite}, which the record lists as vacant")
         return [{"suite": s, "evidence": ev} for s, ev in sorted(out.items())]
 
     def t_suite_accountability(self, suite: str | None = None) -> dict:
@@ -555,14 +577,18 @@ class ToolBox:
             if rep.get("safe_outside"):
                 raise ValueError(f"{t} reports safe outside: accounted for, not a target")
             geom = ph.get("geometry")
+            # Routes lead to the room (its walking node), not to the noisy point: the length in whole metres stays put.
             if geom == "fix" and ph.get("x") is not None:
                 room = ph.get("room") or self.twin.locate(ph["x"], ph["y"], self.brief.get("floor"))["room"]
-                return [float(ph["x"]), float(ph["y"])], f"the phone itself ({t}: fix, {uncertainty_words(ph.get('sigma_m'))})", room
+                part = part_of_room(self.twin, room, ph["x"], ph["y"])
+                return room, f"{self._label(room)}, then the phone's spot in the {part} of the room ({t}: fix, {uncertainty_words(ph.get('sigma_m'))})", room
             if geom == "candidates" and ph.get("candidates"):
-                c = sorted(ph["candidates"], key=lambda c: -(c.get("weight") or 0))[0]
-                room = c.get("room") or self.twin.locate(c["x"], c["y"], self.brief.get("floor"))["room"]
+                rooms = sorted({c.get("room") or self.twin.locate(c["x"], c["y"], self.brief.get("floor"))["room"] for c in ph["candidates"]},
+                               key=lambda r: str(r))
+                room = rooms[0]
                 n = len(ph["candidates"])
-                return [float(c["x"]), float(c["y"])], f"the more probable of {n} candidate spots of {t} (weight {tenth(c.get('weight'))}); the other{'s are' if n > 2 else ' is'} just as possible to check", room
+                where = " and ".join(self._label(r) or str(r) for r in rooms)
+                return room, f"{self._label(room)}: {t} has {n} candidate spots in {where}, any of them may be right; check {'both' if n == 2 else 'all'}", room
             room = None
             if geom == "ring" and ph.get("ring"):
                 shares = self._ring_view(ph["ring"]).get("arc_crosses") or []

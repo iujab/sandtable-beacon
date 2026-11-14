@@ -1,0 +1,73 @@
+{
+ "_about": "SYNTHETIC. Hand-derived (no iPhone was involved) from apps/ios/SandtableBeacon/Models.swift (WireDevice, WireObservation, WireReport: Swift property names are the JSON keys; nil optionals are OMITTED by the synthesized Encodable, never sent as null) and Reporter.swift (buildBatch: for every board key in sorted order its uwb, sos and bearing observations, then one report; every observation carries the eid; a board's latest reading is re-sent with the time it was MEASURED for up to 25 s; prev_eid only after the random id rotated, until one batch is accepted; bye on Stop sharing). Distances put the phone at phone_truth with the two pucks of placement (the server's recommended door-wall layout for r310). Accessory keys are examples: the boards' real advertised name is not confirmed. Times are absolute Unix seconds as the app sends them; tests/test_ios_wire.py shifts them all by one constant so they are recent. Number spelling (-61 or -61.0, 1794679209 or 1794679209.0) depends on the iOS Foundation version; both parse the same.",
+ "synthetic": true,
+ "time_base": 1794679200.0,
+ "placement": {"room": "r310", "pucks": [
+   {"id": "P1", "x": 9.15, "y": 6.7, "accessory": "DWM3001CDK#1A2B"},
+   {"id": "P2", "x": 9.15, "y": 2.7, "accessory": "DWM3001CDK#9F8E"}]},
+ "phone_truth": {"x": 4.0, "y": 3.0, "floor": "f3"},
+ "batches": [
+  {"name": "b1_one_board",
+   "what": "First batch after I NEED HELP: one board (P1) ranged so far, its distance and Bluetooth signal, the person's report (note typed, suite and floor set in Setup).",
+   "expect": {"accepted": 3, "skipped": 0},
+   "body": {"device": {"eid": "a3f19c02", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+    "obs": [
+     {"kind": "uwb", "t": 1794679204.412, "eid": "a3f19c02", "accessory": "DWM3001CDK#1A2B", "d_m": 6.341},
+     {"kind": "sos", "t": 1794679204.101, "eid": "a3f19c02", "accessory": "DWM3001CDK#1A2B", "rssi": -61},
+     {"kind": "report", "t": 1794679204.5, "eid": "a3f19c02",
+      "report": {"status": "trapped", "people": 2, "can_move": false, "safe_outside": false, "platform": "ios", "app": "0.1",
+                 "battery_pct": 41, "floor_reported": 3, "baro_hpa": 1002.31, "still": true, "still_s": 42, "home_suite": "310",
+                 "text": "Two of us in the back office, smoke under the door", "model": "iPhone 14", "chip": "U1", "network": "wifi"}}
+    ]}},
+  {"name": "b2_take_turns_second_board",
+   "what": "Taking turns: P1 was released (its last distance and signal are re-sent with their ORIGINAL t, so the server must count them once), P2 is now ranged.",
+   "expect": {"accepted": 3, "skipped": 2},
+   "body": {"device": {"eid": "a3f19c02", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+    "obs": [
+     {"kind": "uwb", "t": 1794679204.412, "eid": "a3f19c02", "accessory": "DWM3001CDK#1A2B", "d_m": 6.341},
+     {"kind": "sos", "t": 1794679204.101, "eid": "a3f19c02", "accessory": "DWM3001CDK#1A2B", "rssi": -61},
+     {"kind": "uwb", "t": 1794679208.874, "eid": "a3f19c02", "accessory": "DWM3001CDK#9F8E", "d_m": 5.159},
+     {"kind": "sos", "t": 1794679208.602, "eid": "a3f19c02", "accessory": "DWM3001CDK#9F8E", "rssi": -67},
+     {"kind": "report", "t": 1794679209, "eid": "a3f19c02",
+      "report": {"status": "trapped", "people": 2, "can_move": false, "safe_outside": false, "platform": "ios", "app": "0.1",
+                 "battery_pct": 41, "floor_reported": 3, "baro_hpa": 1002.29, "still": true, "still_s": 46, "home_suite": "310",
+                 "text": "Two of us in the back office, smoke under the door", "model": "iPhone 14", "chip": "U1", "network": "wifi"}}
+    ]}},
+  {"name": "b3_eid_rotated_with_bearing",
+   "what": "The random id rotated (every 10 minutes; compressed here): every observation carries the NEW eid, the report carries prev_eid until one batch is accepted. The experimental camera-assisted bearing is on, so P2 also gets a bearing. The person changed status to injured and cleared the note (text omitted).",
+   "expect": {"accepted": 6, "skipped": 0},
+   "body": {"device": {"eid": "5c7e21d0", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+    "obs": [
+     {"kind": "uwb", "t": 1794679204.412, "eid": "5c7e21d0", "accessory": "DWM3001CDK#1A2B", "d_m": 6.341},
+     {"kind": "sos", "t": 1794679204.101, "eid": "5c7e21d0", "accessory": "DWM3001CDK#1A2B", "rssi": -61},
+     {"kind": "uwb", "t": 1794679211.374, "eid": "5c7e21d0", "accessory": "DWM3001CDK#9F8E", "d_m": 5.161},
+     {"kind": "sos", "t": 1794679208.602, "eid": "5c7e21d0", "accessory": "DWM3001CDK#9F8E", "rssi": -67},
+     {"kind": "bearing", "t": 1794679211.5, "eid": "5c7e21d0", "accessory": "DWM3001CDK#9F8E", "to_puck_compass_deg": 93.1, "sigma_deg": 25, "source": "camera-assist+compass"},
+     {"kind": "report", "t": 1794679211.5, "eid": "5c7e21d0", "prev_eid": "a3f19c02",
+      "report": {"status": "injured", "people": 2, "can_move": false, "safe_outside": false, "platform": "ios", "app": "0.1",
+                 "battery_pct": 40, "floor_reported": 3, "baro_hpa": 1002.3, "still": true, "still_s": 49, "home_suite": "310",
+                 "model": "iPhone 14", "chip": "U1", "network": "wifi"}}
+    ]}},
+  {"name": "b4_i_am_out",
+   "what": "\"I am out\": status ok with safe_outside true; prev_eid gone (b3 was accepted); bearing toggle off again; P1's reading and P2's signal are repeats for this eid (skipped), P2's distance is new.",
+   "expect": {"accepted": 2, "skipped": 3},
+   "body": {"device": {"eid": "5c7e21d0", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+    "obs": [
+     {"kind": "uwb", "t": 1794679204.412, "eid": "5c7e21d0", "accessory": "DWM3001CDK#1A2B", "d_m": 6.341},
+     {"kind": "sos", "t": 1794679204.101, "eid": "5c7e21d0", "accessory": "DWM3001CDK#1A2B", "rssi": -61},
+     {"kind": "uwb", "t": 1794679213.874, "eid": "5c7e21d0", "accessory": "DWM3001CDK#9F8E", "d_m": 5.162},
+     {"kind": "sos", "t": 1794679208.602, "eid": "5c7e21d0", "accessory": "DWM3001CDK#9F8E", "rssi": -67},
+     {"kind": "report", "t": 1794679214, "eid": "5c7e21d0",
+      "report": {"status": "ok", "people": 2, "can_move": true, "safe_outside": true, "platform": "ios", "app": "0.1",
+                 "battery_pct": 40, "floor_reported": 3, "baro_hpa": 1002.3, "still": false, "still_s": 0, "home_suite": "310",
+                 "model": "iPhone 14", "chip": "U1", "network": "wifi"}}
+    ]}},
+  {"name": "b5_bye",
+   "what": "Stop sharing: one bye observation, nothing else.",
+   "expect": {"accepted": 1, "skipped": 0},
+   "body": {"device": {"eid": "5c7e21d0", "platform": "ios", "model": "iPhone 14", "chip": "U1", "app": "0.1"},
+    "obs": [
+     {"kind": "bye", "t": 1794679215.2, "eid": "5c7e21d0"}
+    ]}}
+ ]
+}

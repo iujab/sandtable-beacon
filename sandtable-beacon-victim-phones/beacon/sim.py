@@ -164,10 +164,15 @@ SIM_MODEL: dict[str, Any] = {
 
 # Phones with UWB (the owner's hardware: iPhones ranging Qorvo DWM3001CDK pucks through Nearby Interaction).
 CHIPS: dict[str, dict] = {
-    "U1": {"model": "iPhone 14", "bearing": "pointing", "source": "ni-direction+compass", "sigma_factor": 1.0},
+    "U1": {"model": "iPhone 13", "bearing": "pointing", "source": "ni-direction+compass", "sigma_factor": 1.0},
     "U2": {"model": "iPhone 15", "bearing": "pointing+camera_assist", "source": "camera-assist+compass", "sigma_factor": 1.3},
 }
 NO_UWB_MODEL = "iPhone SE (no UWB)"
+# Developers report that the iPhone 14 family and later give NO direction to a third-party accessory without camera
+# assistance, although the iPhone 14 still has the first-generation chip (docs/research/ios_ni.md, section 4). So a phone
+# whose model is one of these needs `camera_assist` for a bearing, whatever its chip. The default U1 model is an
+# iPhone 13, which does report direction.
+DIRECTION_NEEDS_CAMERA_MODELS = ("iPhone 14", "iPhone 15", "iPhone 16", "iPhone 17", "iPhone Air")
 SIM_MODEL["chips"] = copy.deepcopy(CHIPS)
 
 # Noise keys the lead announced that may not be in models.DEFAULT_NOISE yet: fallback values used ONLY when the key is
@@ -917,7 +922,8 @@ class World:
         """U1: while pointing. U2: while pointing AND camera assistance is on."""
         if not (d.uwb and d.pointing and d.chip in CHIPS):
             return False
-        return d.camera_assist if CHIPS[d.chip]["bearing"] == "pointing+camera_assist" else True
+        needs_camera = CHIPS[d.chip]["bearing"] == "pointing+camera_assist" or str(d.model or "").startswith(DIRECTION_NEEDS_CAMERA_MODELS)
+        return d.camera_assist if needs_camera else True
 
     def _bearing_sample(self, d: _Device, pucks: list[dict], t: float) -> dict | None:
         bn = self.noise["bearing"]

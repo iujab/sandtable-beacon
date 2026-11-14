@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
-"""Build the FIXTURE site bundle from real, keyless open data.
+"""Build a site bundle (sandtable.site/1 + NAIP aerials) from real, keyless open data.
 
-Writes fixtures/building/site.json (the CoStar-shaped record + public context)
-and fixtures/aerial/{aerial.json, ortho.png, ortho_context.png}.
+Fixture (no arguments): writes fixtures/building/site.json (the CoStar-shaped record + public context)
+and fixtures/aerial/{aerial.json, ortho.png, ortho_context.png}. Its output must not change.
+
+Any Los Angeles or Houston address (the public context of a live building):
+    python scripts/build_site.py --address "<street address>" --city la|houston --out data/live/site/<slug>/ [--lat LAT --lon LON]
+    python scripts/build_site.py --from-demo        address, lat and lon from data/live/demo_building.json
+writes <out>/site.json, <out>/aerial/ and caches raw answers in <out>/_open/. The output folder must be under
+a directory named `live` (the address is the sponsor's demo building: private, never committed). With --lat/--lon
+the parcel and the footprint are the ones at that point, which is more robust than matching the address text.
+Houston sources: Harris County Appraisal District parcels, City of Houston building footprints (with height),
+Houston Water hydrants, City of Houston fire stations; TIGER roads and NAIP for both cities. Houston has no keyless
+open source for year built, building area or tenants by suite: those stay null (CoStar has them).
 
 Nothing here is CoStar, Matterport or Vexcel data. Every value carries its
 source; values that only the sponsor would have are null. Business and person
 names are deliberately withheld (suite, floor and NAICS category are kept)
 because the bundle is used for a fictional emergency exercise.
 
-Raw responses are cached under data/open/ so the script is re-runnable offline.
-Usage: python scripts/build_site.py [--refresh]
+Raw responses are cached (data/open/ for the fixture) so the script is re-runnable offline.
+Usage: python scripts/build_site.py [--refresh] [--address ... --city ... --out ...]
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -28,9 +39,15 @@ OUT_SITE = ROOT / "fixtures" / "building" / "site.json"
 AERIAL_DIR = ROOT / "fixtures" / "aerial"
 UA = {"User-Agent": "sandtable-fixture-builder/1.0 (open-data fetch)"}
 REFRESH = "--refresh" in sys.argv
+sys.path.insert(0, str(ROOT))
+from sandtable.adapters.costar_extract import HAZARD_RULES as _RULES  # noqa: E402  (one rule table for fixture and live)
+from sandtable.config import _slug as slug, demo_building, is_private  # noqa: E402
 
 # The building: a real three-storey professional (medical office) building in Los Angeles.
 HOUSE_NO, STREET_KEY, STREET_LABEL = "7325", "MEDICAL CENTER", "Medical Center Dr"
+FIXTURE = True              # False for --address: a live building's public context
+CITY = "la"
+POINT: tuple[float, float] | None = None       # (lat, lon) of the building when known
 
 PARCELS = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query"
 LARIAC = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LARIAC_Buildings_2020/MapServer/0/query"
@@ -38,6 +55,10 @@ BUSINESSES = "https://data.lacity.org/resource/6rrh-rzua.json"
 TIGER_ROADS = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/8/query"
 LAFD = "https://maps.lacity.org/lahub/rest/services/Fire_Department/MapServer"
 NAIP = "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer"
+HCAD = "https://www.gis.hctx.net/arcgis/rest/services/HCAD/Parcels/MapServer/0/query"
+COH_FOOTPRINTS = "https://geogimsms.houstontx.gov/arcgis/rest/services/EMC/BuildingFootprints_Inspections/MapServer/0/query"
+COH_HYDRANTS = "https://geogimsms.houstontx.gov/arcgis/rest/services/HW/OutsideWater_gx/MapServer/32/query"
+COH_STATIONS = "https://geogimsms.houstontx.gov/arcgis/rest/services/DIR/healthandPublicSafety_gx/MapServer/9/query"
 
 SOURCES = {
     "assessor": {"name": "Los Angeles County Assessor parcel record", "what": "address, year built, building area, use, construction class", "url": PARCELS},
@@ -48,19 +69,17 @@ SOURCES = {
     "naip": {"name": "USDA NAIP orthoimagery via the USGS National Map", "what": "aerial imagery (public domain)", "url": NAIP},
 }
 
+HOUSTON_SOURCES = {
+    "assessor": {"name": "Harris County Appraisal District parcels (Harris County GIS)", "what": "parcel outline, account, land use", "url": HCAD},
+    "lariac": {"name": "City of Houston building footprints (EMC inspections layer)", "what": "footprint, building height, base elevation", "url": COH_FOOTPRINTS},
+    "tiger": SOURCES["tiger"],
+    "lafd": {"name": "City of Houston GIS: Houston Water hydrants and HFD fire stations", "what": "hydrants and fire stations", "url": COH_HYDRANTS},
+    "naip": SOURCES["naip"],
+}
+
 # Rule table: NAICS prefix -> (life hazard, hazmat). Inferred from the category, not observed.
-HAZARD_RULES = [
-    ("6220", "hospital outpatient department: patients may be non-ambulatory or under treatment", "medical gases, sharps and biohazard waste likely"),
-    ("62121", "dental patients may be sedated or mid-procedure", "medical oxygen and nitrous oxide cylinders likely"),
-    ("62151", "few occupants; staff only", "laboratory reagents, biological samples, compressed gases likely"),
-    ("62134", "therapy patients with limited mobility", None),
-    ("62139", "patients with limited mobility possible", None),
-    ("62132", "patients with dilated pupils or impaired vision possible", None),
-    ("6219", "ambulatory care: patients may need assistance", "medical gases possible"),
-    ("6211", "medical patients, some with limited mobility", "medical oxygen possible"),
-    ("6244", "young children who need assisted evacuation", None),
-    ("6233", "elderly residents who need assisted evacuation", None),
-]
+# Shared with the live CoStar adapter (sandtable/adapters/costar_extract.py), which also matches industry text.
+HAZARD_RULES = [(pre, lh, hz) for pre, _words, lh, hz in _RULES if pre]
 
 
 def get(url: str, params: dict | None, name: str, binary: bool = False):
@@ -138,35 +157,73 @@ def nearest_on_polyline(p, line):
     return best
 
 
+def _ring(geom: dict) -> list:
+    return geom["coordinates"][0] if geom["type"] == "Polygon" else geom["coordinates"][0][0]
+
+
+def _parcel_query(where: str | None) -> dict:
+    """The parcel by address (fixture) or, for a live building with a known point, the parcel at that point."""
+    if CITY == "houston":
+        q = {"outFields": "*", "outSR": "4326", "f": "geojson"}
+        if POINT:
+            q.update({"geometry": f"{POINT[1]},{POINT[0]}", "geometryType": "esriGeometryPoint", "inSR": "4326", "spatialRel": "esriSpatialRelIntersects"})
+        else:
+            q["where"] = where
+        return get(HCAD, q, "parcel.json")
+    if POINT:
+        return get(PARCELS, {"geometry": f"{POINT[1]},{POINT[0]}", "geometryType": "esriGeometryPoint", "inSR": "4326", "spatialRel": "esriSpatialRelIntersects",
+                             "outFields": "*", "outSR": "4326", "f": "geojson"}, "parcel.json")
+    return get(PARCELS, {"where": where, "outFields": "*", "outSR": "4326", "f": "geojson"}, "parcel.json")
+
+
 def main() -> None:
     unavailable: list[str] = []
 
     # 1. parcel record ---------------------------------------------------------
-    parcel = get(PARCELS, {"where": f"SitusHouseNo='{HOUSE_NO}' AND SitusStreet LIKE '{STREET_KEY}%'", "outFields": "*", "outSR": "4326", "f": "geojson"}, "parcel.json")
+    if CITY == "houston":
+        parcel = _parcel_query(f"site_str_num={int(HOUSE_NO)} AND UPPER(site_str_name) LIKE '%{STREET_KEY}%'")
+    else:
+        parcel = _parcel_query(f"SitusHouseNo='{HOUSE_NO}' AND SitusStreet LIKE '{STREET_KEY}%'" if FIXTURE else f"SitusHouseNo='{HOUSE_NO}' AND SitusStreet LIKE '%{STREET_KEY}%'")
+    if not parcel.get("features"):
+        raise SystemExit(f"no parcel found for the address in the {CITY} parcel layer (try --lat/--lon)")
     pf = parcel["features"][0]
     pa = pf["properties"]
     pring = pf["geometry"]["coordinates"][0] if pf["geometry"]["type"] == "Polygon" else pf["geometry"]["coordinates"][0][0]
     env = f"{min(p[0] for p in pring)},{min(p[1] for p in pring)},{max(p[0] for p in pring)},{max(p[1] for p in pring)}"
     pc = (sum(p[1] for p in pring) / len(pring), sum(p[0] for p in pring) / len(pring))
+    if POINT:
+        pc = POINT
 
     # 2. building footprint and height ------------------------------------------
-    blds = get(LARIAC, {"geometry": env, "geometryType": "esriGeometryEnvelope", "inSR": "4326", "spatialRel": "esriSpatialRelIntersects", "outFields": "*", "outSR": "4326", "f": "geojson"}, "lariac_buildings.json")
+    fp_url = COH_FOOTPRINTS if CITY == "houston" else LARIAC
+    blds = get(fp_url, {"geometry": env, "geometryType": "esriGeometryEnvelope", "inSR": "4326", "spatialRel": "esriSpatialRelIntersects", "outFields": "*", "outSR": "4326", "f": "geojson"}, "lariac_buildings.json")
 
     def centroid(feat):
-        r = feat["geometry"]["coordinates"][0]
+        r = _ring(feat["geometry"]) if not FIXTURE else feat["geometry"]["coordinates"][0]
         return (sum(q[1] for q in r) / len(r), sum(q[0] for q in r) / len(r))
 
+    if not blds.get("features"):
+        raise SystemExit("no building footprint found on the parcel")
     bld = min(blds["features"], key=lambda f: dist_m(pc, centroid(f)))
-    ring = bld["geometry"]["coordinates"][0]
+    ring = _ring(bld["geometry"]) if not FIXTURE else bld["geometry"]["coordinates"][0]
     lat0, lon0 = centroid(bld)
     pts = [to_m(lat0, lon0, q[1], q[0]) for q in ring[:-1]]
     length, width, bearing, centre = min_area_rect(pts)
-    height_ft = float(bld["properties"]["HEIGHT"])
+    if CITY == "houston":                                   # City of Houston heights are in metres
+        h_m = bld["properties"].get("BLDGHEIGHT")
+        height_ft = float(h_m) / 0.3048 if h_m else float("nan")
+    else:
+        height_ft = float(bld["properties"]["HEIGHT"])
     fp_area_m2 = poly_area(pts)
 
     # 3. tenants: suite, floor and category only ----------------------------------
-    rows = get(BUSINESSES, {"$select": "street_address,naics,primary_naics_description,location_start_date,location_end_date",
-                            "$where": f"street_address like '{HOUSE_NO} {STREET_KEY}%'", "$limit": "500"}, "businesses.json")
+    if CITY == "houston":
+        rows = []                                           # no keyless Houston business listing with suites: CoStar has the tenants
+        unavailable.append("tenants: no keyless Houston open dataset lists businesses by suite (the CoStar record has them)")
+    else:
+        rows = get(BUSINESSES, {"$select": "street_address,naics,primary_naics_description,location_start_date,location_end_date",
+                                "$where": f"street_address like '{HOUSE_NO} {STREET_KEY}%'" if FIXTURE else f"street_address like '{HOUSE_NO} %{STREET_KEY}%'",
+                                "$limit": "500"}, "businesses.json")
     tenants = []
     for r in sorted(rows, key=lambda r: (r.get("street_address", ""), r.get("location_start_date", ""))):
         if r.get("location_end_date"):
@@ -200,7 +257,7 @@ def main() -> None:
     street_pt = None
     if roads:
         for f in roads["features"]:
-            if (f["properties"].get("NAME") or "").lower().startswith("medical center"):
+            if (f["properties"].get("NAME") or "").lower().startswith(STREET_KEY.lower()) if FIXTURE else STREET_KEY.lower() in (f["properties"].get("NAME") or "").lower():
                 geoms = f["geometry"]["coordinates"] if f["geometry"]["type"] == "MultiLineString" else [f["geometry"]["coordinates"]]
                 for line in geoms:
                     cand = nearest_on_polyline((0.0, 0.0), [to_m(lat0, lon0, q[1], q[0]) for q in line])
@@ -231,25 +288,28 @@ def main() -> None:
         engine = offset_from_centre(side_a, half_a + 18.0)
 
     # 5. hydrants and fire stations ----------------------------------------------
-    hyd = soft(lambda: get(f"{LAFD}/0/query", {"geometry": f"{lon0},{lat0}", "geometryType": "esriGeometryPoint", "inSR": "4326", "distance": "260", "units": "esriSRUnit_Meter",
+    hyd_url, sta_url = (COH_HYDRANTS, COH_STATIONS) if CITY == "houston" else (f"{LAFD}/0/query", f"{LAFD}/1/query")
+    hyd = soft(lambda: get(hyd_url, {"geometry": f"{lon0},{lat0}", "geometryType": "esriGeometryPoint", "inSR": "4326", "distance": "260", "units": "esriSRUnit_Meter",
                                                "outFields": "*", "outSR": "4326", "f": "geojson"}, "hydrants.json"), "LAFD hydrants", unavailable)
     hydrants = []
     for f in (hyd or {}).get("features", []):
         lon, lat = f["geometry"]["coordinates"][:2]
         props = f["properties"]
         hydrants.append({"id": f"h{len(hydrants) + 1}", "lat": round(lat, 6), "lon": round(lon, 6), "distance_m": round(dist_m((lat0, lon0), (lat, lon))),
-                         "size": props.get("SIZE_CODE") or props.get("Size") or props.get("SIZE"), "source": SOURCES["lafd"]["name"], "synthetic": False})
+                         "size": props.get("SIZE_CODE") or props.get("Size") or props.get("SIZE") or props.get("BARRELDIAMETER"), "source": SOURCES["lafd"]["name"], "synthetic": False})
     hydrants.sort(key=lambda h: h["distance_m"])
     for i, h in enumerate(hydrants):
         h["id"] = f"h{i + 1}"
-    sta = soft(lambda: get(f"{LAFD}/1/query", {"geometry": f"{lon0},{lat0}", "geometryType": "esriGeometryPoint", "inSR": "4326", "distance": "6000", "units": "esriSRUnit_Meter",
+    sta = soft(lambda: get(sta_url, {"geometry": f"{lon0},{lat0}", "geometryType": "esriGeometryPoint", "inSR": "4326", "distance": "6000", "units": "esriSRUnit_Meter",
                                                "outFields": "*", "outSR": "4326", "f": "geojson"}, "fire_stations.json"), "LAFD fire stations", unavailable)
     stations = []
     for f in (sta or {}).get("features", []):
         lon, lat = f["geometry"]["coordinates"][:2]
         props = f["properties"]
         label = next((str(props[k]) for k in ("FACILITY_N", "Name", "NAME", "STATION", "FS_CD", "FIRE_STATION") if props.get(k)), "Fire station")
-        stations.append({"name": label if "station" in label.lower() else f"LAFD Station {label}", "lat": round(lat, 6), "lon": round(lon, 6),
+        if CITY == "houston":
+            label = next((str(props[k]) for k in ("TEXT_", "LABEL", "NAME") if props.get(k)), "Fire station")
+        stations.append({"name": label if "station" in label.lower() else f"{'HFD' if CITY == 'houston' else 'LAFD'} Station {label}", "lat": round(lat, 6), "lon": round(lon, 6),
                          "distance_m": round(dist_m((lat0, lon0), (lat, lon))), "address": props.get("ADDRESS") or props.get("Address"),
                          "source": SOURCES["lafd"]["name"], "synthetic": False})
     stations.sort(key=lambda s: s["distance_m"])
@@ -268,7 +328,7 @@ def main() -> None:
             unavailable.append(f"NAIP {image_id}: no PNG returned")
             continue
         (AERIAL_DIR / f"{image_id}.png").write_bytes(raw)
-        images.append({"id": image_id, "kind": "ortho", "path": f"fixtures/aerial/{image_id}.png", "bbox": bbox, "width": px, "height": px,
+        images.append({"id": image_id, "kind": "ortho", "path": f"{AERIAL_DIR.relative_to(ROOT).as_posix()}/{image_id}.png", "bbox": bbox, "width": px, "height": px,
                        "gsd_m": round(2 * half_m / px, 3), "native_gsd_m": 0.6, "capture_date": None, "heading_deg": None,
                        "source": SOURCES["naip"]["name"], "synthetic": False,
                        "note": "Resampled by the USGS image service from 0.6 m NAIP. Stand-in for Vexcel ortho in fixture mode."})
@@ -287,6 +347,8 @@ def main() -> None:
     (AERIAL_DIR / "aerial.json").write_text(json.dumps({"schema": "sandtable.aerial/1", "placeholder": False, "images": images}, indent=1))
 
     # 7. the record ---------------------------------------------------------------
+    if not FIXTURE:
+        return write_live(locals())
     qclass = (pa.get("QualityClass1") or "").strip()
     class_text = {"A": "Class A: fire-resistive, protected structural steel frame", "B": "Class B: reinforced concrete frame",
                   "C": "Class C: masonry or concrete walls, wood or steel floors and roof", "D": "Class D: wood frame", "S": "Class S: metal frame and walls"}.get(qclass[:1])
@@ -359,5 +421,90 @@ def main() -> None:
         print("UNAVAILABLE:", *unavailable, sep="\n  ")
 
 
+def write_live(v: dict) -> None:
+    """The public-context bundle of a live building: same shape as the fixture, CoStar fields null, private output."""
+    pa, tenants, unavailable, srcs = v["pa"], v["tenants"], v["unavailable"], SOURCES
+    lat0, lon0, centre, length, width, bearing = v["lat0"], v["lon0"], v["centre"], v["length"], v["width"], v["bearing"]
+    height_ft, fp_sf = v["height_ft"], round(v["fp_area_m2"] * 10.7639)
+    stories = max(int(t["floor"]) for t in tenants if t["floor"]) if tenants else None
+    if CITY == "houston":
+        apn, use, zip5, year, rba, city = pa.get("acct_num") or pa.get("HCAD_NUM"), pa.get("land_use") or pa.get("state_class"), str(pa.get("site_zip") or "")[:5], None, None, (pa.get("site_city") or "Houston").title()
+    else:
+        apn, use, zip5, year, rba, city = pa.get("APN"), pa.get("UseDescription"), (pa.get("SitusZIP") or "")[:5], int(pa.get("YearBuilt1") or 0) or None, int(pa.get("SQFTmain1") or 0) or None, (pa.get("SitusCity") or "Los Angeles").title()
+    assessor, footprints = srcs["assessor"]["name"], srcs["lariac"]["name"]
+    ok_height = height_ft == height_ft
+    prop = {"property_id": f"APN {apn}" if apn else None, "name": None, "address": ADDRESS, "city": city, "state": "TX" if CITY == "houston" else "CA", "zip": zip5 or None,
+            "lat": round(lat0, 6), "lon": round(lon0, 6), "property_type": use, "building_class": None, "rba_sf": rba, "typical_floor_sf": fp_sf, "stories": stories,
+            "year_built": year, "year_renovated": None, "construction": None, "sprinklers": None, "elevators": None, "parking_spaces": None, "parking_ratio": None,
+            "percent_leased": None, "height_m": round(height_ft * 0.3048, 1) if ok_height else None, "owner": None, "property_manager": None}
+    only = {"source": "CoStar-only field: null in the open-data context", "synthetic": False}
+    field_sources = {"property_id": {"source": assessor, "synthetic": False}, "address": {"source": "the demo building's address", "synthetic": False},
+                     "property_type": {"source": assessor, "synthetic": False}, "typical_floor_sf": {"source": footprints + " (footprint area)", "synthetic": False},
+                     "height_m": {"source": footprints, "synthetic": False}, "rba_sf": {"source": assessor, "synthetic": False} if rba else only,
+                     "year_built": {"source": assessor, "synthetic": False} if year else only,
+                     **{k: only for k in ("building_class", "construction", "sprinklers", "elevators", "parking_spaces", "parking_ratio", "percent_leased", "owner", "property_manager", "year_renovated")}}
+    site = {"schema": "sandtable.site/1", "placeholder": False,
+            "source_note": "Public context of the live demo building, built from open data by scripts/build_site.py. Not CoStar data. Private: lives under data/live/, never committed.",
+            "property": prop, "field_sources": field_sources, "tenants": tenants, "available_spaces": [],
+            "footprint": {"type": "Polygon", "coordinates": [[[round(q[0], 7), round(q[1], 7)] for q in v["ring"]]]},
+            "frame": {"centre": {"lat": round(from_m(lat0, lon0, *centre)[0], 7), "lon": round(from_m(lat0, lon0, *centre)[1], 7)},
+                      "length_m": round(length, 2), "width_m": round(width, 2), "bearing_deg": round(bearing, 2),
+                      "note": "minimum-area bounding rectangle of the footprint; bearing is the compass bearing of the long axis"},
+            "sides": v["sides"],
+            "context": {"hydrants": v["hydrants"][:8], "fire_stations": v["stations"],
+                        "apparatus_positions": [{"id": "E1", "label": "Engine 1", "lat": round(v["engine"][0], 6), "lon": round(v["engine"][1], 6), "side": "A",
+                                                 "source": "inferred: nearest point of the address street to the building", "synthetic": True}],
+                        "entrances": [{"id": "main", "label": "Main entrance (assumed mid-facade, side A)", "lat": round(v["entrance"][0], 6), "lon": round(v["entrance"][1], 6),
+                                       "side": "A", "leads_to": "stairA", "source": "inferred from the footprint; not surveyed", "synthetic": True}],
+                        "permits": []},
+            "cross_checks": [], "open_data": list(srcs.values()), "unavailable": unavailable}
+    OUT_SITE.parent.mkdir(parents=True, exist_ok=True)
+    OUT_SITE.write_text(json.dumps(site, indent=1))
+    print(f"public context written to {OUT_SITE.parent.relative_to(ROOT) if OUT_SITE.is_relative_to(ROOT) else OUT_SITE.parent}: footprint {length:.0f} x {width:.0f} m, "
+          f"{len(v['hydrants'])} hydrants, {len(v['stations'])} stations, {len(v['images'])} images, {len(tenants)} open-data tenant rows")
+    if unavailable:
+        print("UNAVAILABLE:", *[u.split(":")[0] for u in unavailable], sep="\n  ")
+
+
+def configure(argv: list[str]) -> None:
+    """--address/--city/--out (or --from-demo): a live building's public context, written under a `live` directory."""
+    global FIXTURE, CITY, POINT, HOUSE_NO, STREET_KEY, STREET_LABEL, ADDRESS, CACHE, OUT_SITE, AERIAL_DIR, SOURCES
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--refresh", action="store_true")
+    ap.add_argument("--address")
+    ap.add_argument("--city", choices=["la", "houston"])
+    ap.add_argument("--out")
+    ap.add_argument("--lat", type=float)
+    ap.add_argument("--lon", type=float)
+    ap.add_argument("--from-demo", action="store_true", help="read address, lat and lon from data/live/demo_building.json")
+    a = ap.parse_args(argv)
+    if a.from_demo:
+        b = demo_building() or {}
+        if not b.get("address"):
+            raise SystemExit("data/live/demo_building.json is missing or has no address")
+        a.address, a.lat, a.lon = a.address or b["address"], a.lat or b.get("lat"), a.lon or b.get("lon")
+        a.city = a.city or ("houston" if (a.lat or 34) < 31.5 else "la")
+        a.out = a.out or str(ROOT / "data" / "live" / "site" / slug(a.address))
+    if not a.address:
+        return
+    if not a.city or not a.out:
+        raise SystemExit("--address needs --city la|houston and --out data/live/site/<slug>/")
+    out = Path(a.out) if Path(a.out).is_absolute() else ROOT / a.out
+    if not is_private(out / "site.json"):
+        raise SystemExit("refusing: --out must be under a directory named 'live' (e.g. data/live/site/<slug>/): the address is the sponsor's building")
+    m = re.match(r"\s*(\d+)[A-Za-z]?\s+(.+)", a.address.split(",")[0])
+    if not m:
+        raise SystemExit("the address must start with a house number")
+    street = re.sub(r"\b(N|S|E|W|NORTH|SOUTH|EAST|WEST)\b\.?\s+", "", m.group(2).upper(), count=1)
+    street = re.sub(r"\s+(ST|STREET|AVE|AVENUE|AV|DR|DRIVE|BLVD|BOULEVARD|RD|ROAD|LN|LANE|PL|PLACE|CT|COURT|PKWY|PARKWAY|WAY|HWY|FWY|CIR|TER|SQ)\.?(\s.*)?$", "", street)
+    FIXTURE, CITY, ADDRESS = False, a.city, a.address.split(",")[0].strip()
+    HOUSE_NO, STREET_KEY, STREET_LABEL = m.group(1), street.strip(), m.group(2).strip()
+    POINT = (a.lat, a.lon) if a.lat is not None and a.lon is not None else None
+    CACHE, OUT_SITE, AERIAL_DIR = out / "_open", out / "site.json", out / "aerial"
+    if CITY == "houston":
+        SOURCES = HOUSTON_SOURCES
+
+
 if __name__ == "__main__":
+    configure([x for x in sys.argv[1:]])
     main()

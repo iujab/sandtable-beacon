@@ -81,12 +81,41 @@ def layouts_block() -> str:
     return "\n".join(lines)
 
 
+def main_block() -> str:
+    d = json.loads((ROOT / "results" / "eval_beacon.json").read_text(encoding="utf-8"))
+    arms = {(a["exp"], a["method"], a["pucks"], a["twin"]): a for a in d["arms"]}
+    n = d["arms"][0]["n"]
+    nz = d["noise_model"]["noise"]
+    lines = [f"**Simulated** (`results/eval_beacon.json`; {n} trials per cell; pucks thrown from the door, not placed; the phone is in the fire room in 60% of trials and in a neighbouring suite in 40%; "
+             f"noise model: UWB {nz['uwb']['sigma_los_m']:.2f} m white noise plus a static {nz['uwb']['link_bias_sigma_m']:.2f} m bias per link, +{nz['uwb']['wall_bias_m']:.2f} m per wall, "
+             f"a body in the way on {100 * nz['uwb']['body_block_prob']:.0f}% of links; Bluetooth {nz['ble']['shadow_sigma_db']:.0f} dB shadowing; sources in `beacon/models.py`):",
+             "",
+             "| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position, share of trials |",
+             "|---|---|---|---|---|---|"]
+    names = {"ble-rssi": "Bluetooth signal strength", "uwb-twr": "UWB ranging"}
+    for method in ("ble-rssi", "uwb-twr"):
+        for k in (1, 2, 3, 4, 5):
+            a = arms.get(("main", method, k, True))
+            if not a:
+                continue
+            lines.append(f"| {names[method]} | {k} | {pct(a['geometry_share']['fix'])} | {m(a.get('fix_err_median_m'))} | {a['hpd_area_median_m2']:.1f} m2 | {pct1(a['wrong_fix_rate_of_trials'])} |")
+    mm = [arms[k] for k in arms if k[0] == "mismatch" and k[1] == "uwb-twr"]
+    if mm:
+        worst = max(a["wrong_fix_rate_of_trials"] for a in mm)
+        lines += ["", f"When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most {pct1(worst)} of trials (UWB, any puck count)."]
+    c = d.get("cold")
+    if c:
+        lines += ["", f"Cold Bluetooth count (no app): over {c['n_windows']} windows the count runs {abs(c['count_minus_true_advertising_mean']):.1f} devices low on average, the published band contains the true number of advertising devices "
+                      f"in {pct(c['band_covers_true_advertising'])} of windows, and {pct(c['count_zero_while_devices_present'])} of windows read zero while devices are in the room. It is a weak signal and the board treats it as one."]
+    return "\n".join(lines)
+
+
 TARGETS = {
     "docs/PHONE_FEASIBILITY.md": {"LAYOUT_NUMBERS": layouts_block, "TWO_PUCK_NUMBERS": two_puck_block},
     "hardware/BRINGUP.md": {"LAYOUT_NUMBERS": two_puck_block},
     "hardware/LAYOUT.md": {"LAYOUT_NUMBERS": two_puck_block},
     "hardware/PUCK.md": {"LAYOUT_NUMBERS": layouts_block},
-    "README.md": {"TWO_PUCK_NUMBERS": two_puck_block, "LAYOUT_NUMBERS": layouts_block},
+    "README.md": {"TWO_PUCK_NUMBERS": two_puck_block, "LAYOUT_NUMBERS": layouts_block, "MAIN_NUMBERS": main_block},
 }
 
 
@@ -103,7 +132,7 @@ def fill(text: str, name: str, block: str) -> tuple[str, bool]:
 
 def main() -> int:
     if "--print" in sys.argv:
-        print(two_puck_block(), "\n\n", layouts_block())
+        print(two_puck_block(), "\n\n", layouts_block(), "\n\n", main_block())
         return 0
     for rel, blocks in TARGETS.items():
         path = ROOT / rel

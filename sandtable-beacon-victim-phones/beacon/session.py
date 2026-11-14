@@ -1217,13 +1217,15 @@ class BeaconSession:
             lat, lon = self.twin.to_geo(cx, cy)
             where = f" in {label}" if label else ""
             reach = _mid_reach_m(self.noise)
+            best = min(max(count, lo), hi)        # the published count is never below the opt-in phones known in the room
             out.append({"id": self._presence_ids[key], "method": "ble-presence", "opt_in": False, "simulated": self.simulated,
                         "puck": pid, "floor": puck.get("floor"), "room": room, "room_label": label,
-                        "count": count, "count_range": [lo, hi], "zones": {"near": near, "mid": mid, "far": far},
+                        "count": best, "count_range": [lo, hi], "zones": {"near": near, "mid": mid, "far": far},
                         "window_s": o["window_s"], "confidence": 0.5, "age_s": round(now - o["t"], 1),
                         "geo": {"lat": round(lat, 7), "lon": round(lon, 7)},
-                        "text": (f"About {count} device{'s' if count != 1 else ''} advertising within about {reach:g} m of puck {pid}{where} "
-                                 f"(between {lo} and {hi}); {far} more farther away or through a wall. Devices, not people; no identities kept")})
+                        "text": (f"About {best} device{'s' if best != 1 else ''}{where} by puck {pid}'s Bluetooth count (between {lo} and {hi}): "
+                                 f"{count} heard within about {reach:g} m of the puck, {far} farther away or through a wall. "
+                                 f"Devices, not people; the opt-in phones are among them; no identities kept")})
         return out
 
     # ---- the Beacons object

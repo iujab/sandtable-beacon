@@ -36,23 +36,23 @@ The agent's `suite_accountability` tool lists every disagreement, and the agent 
 
 ## What the agent does with it (agentic depth)
 
-`beacon/agent.py`: one turn is a plan-then-act loop of up to 8 model replies over 7 tools (`get_phones`, `suite_accountability`, `next_puck_plan`, `route_to`, and the actions `radio`, `assign`, `file_record_check`). It reads the phones and the record, checks routes from the stair nearest each target, assigns the rescue team and the engine, radios orders that say how sure each location is, picks the next suite for a puck from the record's expected people and life hazards (with the door and walking distance from the twin), and files record checks. Two runs were recorded with the real model (`claude-sonnet-5-5` through the Claude CLI) and replay exactly; when no recording matches and no model is configured, a deterministic policy built from the same table acts instead and labels every message `reflex-fallback`.
+`beacon/agent.py`: one turn is a plan-then-act loop of up to 8 model replies over 7 tools (`get_phones`, `suite_accountability`, `next_puck_plan`, `route_to`, and the actions `radio`, `assign`, `file_record_check`). It reads the phones and the record, checks routes from the stair nearest each target, assigns the rescue team and the engine, radios orders that say how sure each location is, picks the next suite for a puck from the record's expected people and life hazards (with the door and walking distance from the twin), and files record checks. Four situations were recorded with the real model (`claude-sonnet-5-5` through the Claude CLI) and replay exactly; one of them is the walk-through the demo plays, and in another (an occupant in a suite the record lists as vacant) the model filed the record check itself; when no recording matches and no model is configured, a deterministic policy built from the same table acts instead and labels every message `reflex-fallback`.
 
 ## When the live CoStar toolkit replaces the fixture
 
-The toolkit and keys were not on the build machine. The right-hand column is an **assumption** from CoStar's public descriptions of its products; it must be checked against the toolkit's schema at the event before anything is claimed.
+The CoStar hackathon kit reached the build machine late (Sat 13:00 CST). The right-hand column takes the field names from the kit's own model documentation (`models/location-occupancy.md`, `company-detail.md`, `commercial-property.md`, `commercial-listing-summary.md`). **No adapter for them is written or tested in this module yet**: the roster still runs on the fixture.
 
-| Fixture field (`fixtures/building/site.json`) | Fixture source | Expected CoStar field (ASSUMPTION, unverified) |
+| Fixture field (`fixtures/building/site.json`) | Fixture source | CoStar kit field (from its model docs) |
 |---|---|---|
-| `tenants[].suite`, `tenants[].floor` | City of Los Angeles, Listing of Active Businesses | tenant record: suite / floor |
-| `tenants[].name` (withheld) | same | tenant name (shown as the kind of business on screen, never a person) |
-| `tenants[].industry`, `tenants[].naics` | same | tenant industry / NAICS or SIC code |
-| `tenants[].sf` (null here) | none in open data | tenant leased square feet |
-| `tenants[].employees` (absent here) | none in open data | tenant employee count |
-| `tenants[].lease_expiration` (null here) | none | lease expiration |
-| `available_spaces[]` (empty here) | none in open data | available / for-lease spaces (suite, floor, sf) |
-| `property.property_manager` (null here) | none | property manager contact (for the tenant roll call) |
-| `property.rba_sf`, `stories`, `year_built`, `construction` | LA County Assessor parcel record | building RBA, stories, year built, construction / class |
+| tenant rows (`tenants[]`) | City of Los Angeles, Listing of Active Businesses | location-occupancy records of the property (`propertyId`) with `toDate` null (current tenants) |
+| `tenants[].suite`, `tenants[].floor` | same | `spaces[].suite`, `spaces[].propertyFloorId` (joined to the property's `floors[]`) |
+| `tenants[].sf` (null here) | none in open data | `spaces[].squareFeetOccupied` (rentable sf; summed over the occupancy's spaces) |
+| `tenants[].employees` (absent here) | none in open data | company-detail `numEmployees` via `tenantLocationId` (staff at that location; null for many records) |
+| `tenants[].industry`, `tenants[].naics` | same | company-detail `profile.industryType` (a CoStar industry enum, not a NAICS code: the outpatient/business load-factor rule needs a mapping table) |
+| `tenants[].name` (withheld) | same | company-detail `name` (shown as the kind of business on screen, never a person) |
+| `available_spaces[]` (empty here) | none in open data | commercial-listing-summary spaces (`suite`, `floorName`); the kit warns that occupancy is not availability |
+| `property.property_manager` (null here) | none | commercial-property `contacts` (current contacts; the kit's phone numbers are fake) |
+| `property.rba_sf`, `stories`, `year_built`, `construction` | LA County Assessor parcel record | commercial-property `rentableBuildingAreaSquareFeet` and the matching fields |
 
 What changes when it lands: the basis texts switch from "twin room area" to "record area" or "record head count" (branches 1 and 2 above, already tested in `tests/test_roster.py`); vacancy comes from listed availability instead of a missing registration; the `roll_call` field of `suite_accountability` gets a contact; `file_record_check` stays local unless the toolkit offers a way to submit a correction.
 

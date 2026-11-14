@@ -39,20 +39,54 @@ BASE_LIMITS = [
 
 
 # ---------------------------------------------------------------------------- twin helpers
+def floor_number(twin) -> int | None:
+    """The exercise floor's storey number from its label ("3", "Level 3"), or None."""
+    import re
+    m = re.search(r"-?\d+", str(twin.floor().get("label") or ""))
+    return int(m.group(0)) if m else None
+
+
+def entrance_ref(twin):
+    """Where crews come in: Stair A in the fixture, else the twin's first exit (a scanned suite's entrance)."""
+    try:
+        twin.resolve("stairA")
+        return "stairA"
+    except ValueError:
+        pass
+    ex = [e for e in twin.exits() if e.get("node")]
+    if ex:
+        return ex[0]["node"]
+    for d in twin.data.get("doors", []):
+        if d.get("kind") == "exit" and d.get("node"):
+            return d["node"]
+    nodes = [n for n in twin.data["graph"]["nodes"] if n.get("kind") == "exit"] or twin.data["graph"]["nodes"]
+    return nodes[0]["id"]
+
+
 def fire_room(twin, provider) -> str:
-    """The exercise's fire room, chosen exactly like Director._fire_room(): a suite whose tenant
-    carries a life hazard, as far from Stair A as the floor allows."""
-    floor_no = int(twin.floor()["label"])
-    hazard_suites = {t["suite"] for t in provider.costar.list_tenants(floor_no) if t.get("life_hazard")}
+    """The exercise's fire room (also Director._fire_room): a suite whose tenant carries a life hazard, as far from the entrance
+    (Stair A in the fixture) as the floor allows. A twin whose rooms carry no suite numbers (one scanned suite): the room
+    farthest from its entrance, among the rooms people occupy."""
+    try:
+        tenants = provider.costar.list_tenants(floor_number(twin))
+    except Exception:
+        tenants = []
+    hazard_suites = {t.get("suite") for t in tenants if t.get("life_hazard")}
+    rooms = twin.rooms("suite") or [r for r in twin.rooms() if r["kind"] not in ("corridor", "stair", "elevator", "restroom", "mechanical", "lobby")
+                                    and r.get("floor", twin.exercise_floor) == twin.exercise_floor] or twin.rooms()
+    src = entrance_ref(twin)
     best = None
-    for r in twin.rooms("suite"):
-        route = twin.route("stairA", r["id"])
+    for r in rooms:
+        try:
+            route = twin.route(src, r["id"])
+        except ValueError:
+            continue
         if not route["ok"]:
             continue
         key = (r.get("suite") in hazard_suites, route["length_m"], r["id"])
         if best is None or key > best[0]:
             best = (key, r["id"])
-    return best[1]
+    return best[1] if best else rooms[0]["id"]
 
 
 def room_door(twin, room_id: str) -> dict | None:

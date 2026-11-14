@@ -1,76 +1,220 @@
 # Sandtable Beacon
 
-**Throw a puck into the smoke: it ranges the phones of the people trapped inside, the building's twin turns rings into positions, and the tenant roster says who is still missing.**
+**Set two pucks down inside the door: they range the phones of the people trapped in the room, the building's twin turns two rings into one position, and the tenant roster says who is still missing.**
 
-Beacon is the headline mode of Sandtable, an incident-command board for fire crews (the board itself is in `../sandtable-live-fireground-twin`). Small UWB pucks (Qorvo DWM3001CDK boards on Qorvo's stock firmware) are set down inside a room. A person who opened the Beacon app on their iPhone is ranged by each puck over ultra-wideband, and the app sends a status with it: how many people, whether they can move, battery, which suite. A locator fuses the ranges with the walls of the building's 3D twin and never draws a dot where the geometry only supports a ring. The building record's tenant roster is compared with the phones still inside.
+Beacon is the headline mode of Sandtable, an incident-command board for fire crews. A crew sets small UWB pucks (Qorvo DWM3001CDK boards on Qorvo's stock firmware) just inside a smoke-filled room. A person who opened the Beacon app on their iPhone is ranged by each puck over ultra-wideband, through Apple's Nearby Interaction accessory protocol, and the app sends a status with it: how many people, whether they can move, battery, which suite. A locator fuses the ranges with the walls of the building's 3D twin and is honest about geometry: one puck gives a ring, two give two mirror spots, and the twin's walls or the occupant's own statement decide between them, visibly. The building record's tenant roster is compared with the phones still inside, so a command agent can order the search, say where the next puck goes and file what the record got wrong. Everything on screen is simulated until real iPhones report, and says so.
 
-> **Status, Saturday afternoon: work in progress. Nothing has run on hardware. Every number and every screen is simulated and says so. The iOS app is uncompiled source.** This README is an interim one; `project.json` holds the live task list.
+![The board: a trapped phone located from two pucks; the mirror spot is ruled out by the twin](figures/ui_03_fix_two_pucks.png)
 
-## If you have the hardware in your hands
+*Simulated ranges (noise model stated on screen and in `beacon/models.py`), fixture building record and twin, both labelled.*
 
-| Step | Guide |
+Built for HackPrinceton Fall 2026. Main track: **Education** (as Sandtable). Special tracks: **CoStar "Inside and Out: AI for the Built World"**, **Best Hardware Hack**, **Best Physical AI Hack**, **Amazon Best Practical AI Innovation**.
+
+> **Status: nothing has run on hardware yet.** The iOS app is uncompiled Swift source (written on a machine with no Mac). The guides in `hardware/` are written from documentation and forum reports. `project.json` carries the live task list.
+
+## The problem
+
+- In smoke, a search crew cannot see a person three metres away. Cameras and LiDAR do not see through it either. Radio does.
+- Almost everyone trapped in an office building is holding a phone with an ultra-wideband radio in it, accurate to tens of centimetres. Nothing on the fire ground can talk to it.
+- Command knows who should be in the building only from a paper roster, if at all, while the building record already lists every tenant by suite.
+
+## What it does
+
+| Step | What happens |
 |---|---|
-| Flash Qorvo's stock firmware onto a DWM3001CDK | `hardware/FLASH.md` |
-| First power-up, two-puck layout, networking, fallbacks | `hardware/BRINGUP.md`, `hardware/LAYOUT.md` |
-| What a puck needs (power, mounting) | `hardware/PUCK.md` |
-| The UNO Q as puck host or as the whole command post | `hardware/UNO_Q.md` |
-| Build the iPhone app in Xcode | `docs/IOS_BUILD.md` |
-| What works, what does not, and why (with sources) | `docs/PHONE_FEASIBILITY.md` |
+| The app | An occupant opens Beacon and presses Trapped, Injured, Sheltering or I am out. No account, no name: a random id that rotates. The screen shows exactly what is sent |
+| The pucks | Each puck ranges every phone that opted in. One iPhone ranges both pucks at once; one board serves one phone at a time, so two phones take turns or each puck position carries two boards |
+| The locator | One puck: a ring, clipped where the twin says nobody can be. Two pucks: two mirror spots. With both pucks just inside the wall the door is in, the mirror spot falls outside the room: the twin rules it out, or it is dismissed on the occupant's stated suite and shown as dismissed. With pucks mid-room, the board says "cannot choose" |
+| The record | Tenants by suite from the building record, expected head counts with their basis, phones inside, people reported, people who pressed "I am out": an accountability table, search priorities, where to throw the next puck |
+| The agent | A tool-using command agent reads the phones and the record and issues radio orders, the next-puck plan and record checks; a printable incident report closes the loop |
+| The feed | Everything is published for the Sandtable command board: JSON, WebSocket, GeoJSON and Cursor-on-Target (`docs/BEACON_FEED.md`) |
 
-## Run it without hardware
+## One puck, two pucks: what the geometry supports
 
-Python 3.10 or newer; wheels-only dependencies.
+<!-- TWO_PUCK_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_two_puck.json`; 800 phone positions per layout over the fire room; what a real iPhone would deliver: UWB distances only, no line-of-sight flag; noise model with sources in `beacon/models.py`):
+
+| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position, share of all trials | Position error, median / 90th percentile |
+|---|---|---|---|---|---|---|---|
+| Both pucks just inside the wall the door is in (recommended) | 77% | 48% | 29% | 0% | 23% | 1.1% | 0.26 m / 0.76 m |
+| Both pucks along the outside wall | 83% | 78% | 5% | 0% | 17% | 1.8% | 0.26 m / 0.76 m |
+| Both pucks mid-room (careless) | 18% | 17% | 0% | 57% | 25% | 0.0% | 0.50 m / 0.96 m |
+| Three pucks: the door-wall pair plus one in the far corner | 88% | 84% | 5% | 3% | 9% | 1.0% | 0.20 m / 0.61 m |
+
+"Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
+
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): the statement produces a wrong position in 4.3% of trials with the door-wall layout, and in 13.8% for the suite that shares that wall. That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+<!-- TWO_PUCK_NUMBERS:END -->
+
+![Where in the room two pucks give one answer, per layout](figures/eval_two_puck_map.png)
+
+The owner asked whether both boards could ride on one thrown device instead:
+
+<!-- LAYOUT_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_layouts.json`; 50 trials per row, phone 2 to 8 m away in the fire room, pucks thrown not placed; noise model with sources in `beacon/models.py`). Bearing error is measured after choosing the nearer of the two mirror solutions, so the mirror ambiguity is on top of it:
+
+| Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
+|---|---|---|---|---|---|---|
+| Two boards on one device, 0.1 m apart | 22 degrees | 1.71 m | 100% | 0% | n/a | 5.8 m2 |
+| Two boards on one device, 0.3 m apart | 17 degrees | 1.34 m | 100% | 0% | n/a | 4.8 m2 |
+| Two boards on one device, 0.5 m apart | 14 degrees | 1.29 m | 98% | 0% | n/a | 4.2 m2 |
+| Two separate pucks 2 m apart | 8 degrees | 0.64 m | 72% | 28% | 0.77 m | 2.0 m2 |
+| Two separate pucks 3 m apart | 5 degrees | 0.38 m | 60% | 40% | 0.36 m | 1.4 m2 |
+| Two separate pucks 4 m apart | 5 degrees | 0.36 m | 42% | 58% | 0.43 m | 1.2 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 80% | 0.22 m | 0.8 m2 |
+
+Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
+<!-- LAYOUT_NUMBERS:END -->
+
+And by number of pucks and by radio:
+
+<!-- MAIN_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_beacon.json`; 90 trials per cell; pucks thrown from the door, not placed; the phone is in the fire room in 60% of trials and in a neighbouring suite in 40%; noise model: UWB 0.10 m white noise plus a static 0.10 m bias per link, +0.30 m per wall, a body in the way on 25% of links; Bluetooth 6 dB shadowing; sources in `beacon/models.py`):
+
+| Method | Pucks | A position is published | Position error, median | Area the phone is confined to, median | Wrong position, share of trials |
+|---|---|---|---|---|---|
+| Bluetooth signal strength | 1 | 0% | n/a | 277.6 m2 | 0.0% |
+| Bluetooth signal strength | 2 | 0% | n/a | 164.2 m2 | 0.0% |
+| Bluetooth signal strength | 3 | 13% | 1.45 m | 176.8 m2 | 0.0% |
+| Bluetooth signal strength | 4 | 16% | 1.15 m | 142.8 m2 | 0.0% |
+| Bluetooth signal strength | 5 | 19% | 1.27 m | 154.5 m2 | 0.0% |
+| UWB ranging | 1 | 0% | n/a | 15.9 m2 | 0.0% |
+| UWB ranging | 2 | 28% | 0.49 m | 2.4 m2 | 0.0% |
+| UWB ranging | 3 | 53% | 0.28 m | 1.4 m2 | 2.2% |
+| UWB ranging | 4 | 69% | 0.25 m | 0.7 m2 | 0.0% |
+| UWB ranging | 5 | 61% | 0.19 m | 0.7 m2 | 0.0% |
+
+When the simulated world is 1.5 times noisier than the locator assumes, wrong positions rise to at most 6.0% of trials (UWB, any puck count).
+
+Cold Bluetooth count (no app): over 600 windows the count runs 2.1 devices low on average, the published band contains the true number of advertising devices in 60% of windows, and 37% of windows read zero while devices are in the room. It is a weak signal and the board treats it as one.
+<!-- MAIN_NUMBERS:END -->
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Room
+    P1[Puck A<br/>DWM3001CDK, stock firmware] -. UWB .- I1[iPhone, Beacon app]
+    P2[Puck B] -. UWB .- I1
+  end
+  I1 -- "POST /api/ingest<br/>distance per puck + status" --> S[Session<br/>one track per phone]
+  SIM[Simulator<br/>stated noise model] --> S
+  T[Twin<br/>rooms, walls, georeference] --> L
+  S --> L[Locator<br/>grid Bayes, honest geometry]
+  L --> PR[Stated evidence<br/>dismisses a mirror spot, visibly]
+  R[Building record<br/>tenants by suite] --> A[Accountability<br/>priorities, next puck]
+  PR --> A
+  A --> AG[Command agent<br/>tools, radio orders, record checks]
+  A --> F[Feeds: JSON, WebSocket,<br/>GeoJSON, Cursor-on-Target]
+  AG --> F
+  F --> B[Beacon board : 1885]
+  F --> SB[Sandtable command board]
+```
+
+- **Locator** (`beacon/locate.py`): a grid posterior over the twin's floor. Cells outside the building or inside a wall are impossible; walls between a puck and a cell add the bias and spread a wall adds to a range. The published geometry is what the posterior supports: `fix`, `candidates`, `ring`, `zone` or `none`. `x` and `y` exist only for a fix.
+- **Stated evidence** (`beacon/prune.py`): a spot that the twin allows but that contradicts what the occupant said (their suite) or what command decided (the search room) is dismissed with its reason attached, never silently.
+- **Layout** (`beacon/layout.py`): where two pucks go so that two rings give one answer.
+- **Roster** (`beacon/roster.py`): the join of record, twin and phones. Expected people are estimates with a stated basis (a record head count when there is one; otherwise floor area and building-code load factors).
+- **Agent** (`beacon/agent.py`): a plan-and-act loop over seven tools, built from discrete facts so that a recorded real model run replays exactly; a labelled deterministic fallback when no recording matches.
+- **Live path**: with Qorvo's stock firmware the phone app reads each distance and posts it; the puck needs only power. `beacon/host` is a small puck host for the UNO Q (heartbeat, an experimental reader of the board's debug channel, an optional Bluetooth device count).
+
+## How each judging criterion is met
+
+**CoStar: Inside and Out**
+
+| Criterion | Where to look |
+|---|---|
+| Use of the data (30%) | The record and the twin each do a job the other cannot, and the join is by suite and by geometry. Record: tenants by suite, kind of business, leased area, vacancy, life hazards. Twin: which room is which suite, walls that turn two rings into one position, the door to throw the next puck through, the route for the rescue order. Together: expected people per suite against phones inside it; a suite that is vacant on record but has phones in it becomes a record check. Details: `docs/COSTAR_TIE_IN.md` |
+| Agentic depth (30%) | The command agent plans and acts with tools (phones, accountability, next-puck plan, routes, radio, assignments, record checks) and its orders change when a phone resolves or a suite is still unscanned. Every step is on the board |
+| Usefulness (25%) | Monday users: a training officer running an evacuation or search drill on a real building with two pucks and the occupants' own phones; a building manager who wants a roll call that does not depend on a clipboard; and the record's owner, who gets disagreements between record and reality as evidence |
+| Demo and polish (15%) | One screen, two pucks a judge can move, a phone a judge can hold. `PITCH.md` is the script |
+
+**Main rubric.** Creativity: the pucks a crew already carries for Sandtable find the phones people already carry; two rings and a floor plan make one position. Utility: runs end to end in simulation; the hardware path is stock firmware plus one app. Charity: finding people in smoke, and knowing who is unaccounted for. Avidity: the board, the guides, the evaluation.
+
+**Best Hardware Hack / Best Physical AI.** UWB ranging between a thrown board and a victim's own phone is the product; the AI acts on that physical state and directs physical movement (which suite, which door, where the next puck goes). Honest status: simulated so far.
+
+**Amazon Practical AI.** Reasons, plans, acts and adapts as phones appear and resolve; a clear user; documented; a working prototype in simulation.
+
+## Run it
+
+Python 3.10 or newer; wheels-only dependencies; the same on Linux, macOS, Windows and Debian aarch64.
 
 ```bash
-bash run_demo.sh --story             # Linux / macOS / UNO Q: simulated world, plays the walk-through
+bash run_demo.sh --story               # simulated world, plays the two-puck walk-through
 ```
 ```powershell
-py -m venv .venv                     # Windows
+py -m venv .venv                       # Windows
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python -m beacon.demo --story
 ```
 
-Open <http://localhost:1885/>. `/phone.html` is a simulated victim's phone you can move around the room.
+Open <http://localhost:1885/>. `/phone.html` is a simulated victim's phone you can drag around the room; `/report.html` is the incident report.
 
-## Run it with real iPhones
+| Setting | Values | Default |
+|---|---|---|
+| `--source` | `sim` (simulator and real locator), `live` (real iPhones post to `/api/ingest`), `fake` (a hand-made sample, marked SAMPLE) | `sim` |
+| `--lan` | bind 0.0.0.0 and print the address for the iPhone app | off |
+| `--port` / `PORT` | | 1885 |
+| `LLM_BACKEND` | `replay` (recorded real model output, offline), `claude-cli`, `anthropic` (needs `ANTHROPIC_API_KEY`) | `replay` |
+
+Tests (offline): `bash run_tests.sh`. Evaluation: `python scripts/eval_beacon.py` (about 70 s; writes `results/` and `figures/eval_*.png`), then `python scripts/fill_numbers.py` writes the numbers into the documents.
+
+## With the hardware
+
+| Step | Guide |
+|---|---|
+| Flash Qorvo's stock firmware onto a DWM3001CDK | `hardware/FLASH.md` |
+| First power-up, the two-puck layout, networking, two phones, fallbacks | `hardware/BRINGUP.md`, `hardware/LAYOUT.md` |
+| What a puck needs (power, mounting) | `hardware/PUCK.md` |
+| The UNO Q as puck host or as the whole command post | `hardware/UNO_Q.md` |
+| Build the iPhone app in Xcode | `docs/IOS_BUILD.md` |
+| What works, what does not, and why, with sources | `docs/PHONE_FEASIBILITY.md` |
 
 ```bash
-bash run_demo.sh --source live --lan     # binds 0.0.0.0 and prints the address to give the app
+bash run_demo.sh --source live --lan     # then scan the board's QR code with each iPhone's camera
 ```
 
-The iPhone app posts its ranges to `POST /api/ingest`; the board shows a QR code that fills in the server address in the app. Put the laptop and the iPhones on one phone hotspot (venue Wi-Fi usually blocks device-to-device traffic).
-
-## One puck, two pucks
-
-| Pucks ranging a phone | What the board shows |
-|---|---|
-| 1 | a ring around the puck, clipped by the twin's walls |
-| 2 | two possible spots, mirror images across the line between the pucks. With both pucks just inside the wall the door is in, one spot falls outside the room and is dismissed, visibly and with its reason; with pucks mid-room the board says it cannot choose |
-| 3, not in a line | a position, with its uncertainty |
-
-## What is real and what is not
+## What is real, what is simulated, what is a stand-in
 
 | Thing | Status |
 |---|---|
-| Ranges and positions | Simulated (noise model in `beacon/models.py`, with sources) until real iPhones report |
-| Puck firmware | Qorvo's stock Nearby Interaction image; not in this repository (download from Qorvo) |
-| iOS app (`apps/ios`) | Uncompiled Swift source, modelled on Apple's accessory sample |
-| Building record | Fixture: public open data for a real Los Angeles address, tenant names withheld. Not CoStar data |
-| Twin | Fixture: synthetic interior fitted to the real footprint. Not a Matterport scan |
-| Expected head counts | Estimates from floor area and building-code load factors, with the basis stated |
+| Ranges and positions | **Simulated** (`beacon/sim.py`; noise model with sources in `beacon/models.py`) until real iPhones report. The board shows SIM, or LIVE in live mode |
+| Puck firmware | Qorvo's stock Nearby Interaction image. Not in this repository; the owner downloads it from Qorvo. Never flashed by us |
+| iOS app (`apps/ios`) | **Uncompiled Swift source**, modelled on Apple's accessory sample; syntax-parsed, never compiled, never run |
+| Puck host (`beacon/host`) | Tested against stubs; never run on a UNO Q; the debug-channel reader's input format is unconfirmed |
+| Building record | **Fixture: real public data, not CoStar**: a Los Angeles professional building from the county assessor and the city's business registrations; tenant names withheld. Head counts are estimates from floor area |
+| Twin | **Fixture: synthetic interior, not a Matterport scan**, fitted to the real footprint and numbered with the real suite numbers |
+| Agent decisions | Recorded real model output replayed, or a labelled deterministic fallback |
 
-## Layout
+## Limitations
+
+- Nothing has run on hardware; the real range error of an iPhone against this board, in a real room, is unknown. The simulated numbers are a guide.
+- With the stock firmware the phone app is the reporter: the phone needs a network path to the server, and the app must stay open with the screen on.
+- An iPhone 14 or 15 reports distance but no direction to an accessory, so position needs two well-placed pucks or three.
+- One board serves one phone at a time.
+- Dismissing a mirror spot on the occupant's stated suite can be wrong when the statement is wrong (rate in the table above); the board shows the dismissal for that reason.
+- A phone whose owner installed nothing cannot be ranged or identified. The cold Bluetooth count is weak (numbers above) and off by default on real hardware.
+- The pucks cannot find their own positions tonight (the stock firmware does not range board to board): they are placed and clicked onto the plan.
+- One floor; no smoke or heat model; the twin and the record are fixtures.
+- Not a life-safety product.
+
+## What's next
+
+Real iPhones against real boards; puck firmware that reports ranges and link quality itself, so a phone can go dark; pucks that survey their own positions; a dual-antenna radio for bearing from one puck; background ranging through a Live Activity; live CoStar and Matterport data; Android through Jetpack UWB.
+
+## Repository
 
 ```
-beacon/        locator, tracker, simulator, session, feeds, server, roster, layout, puck host
-web/           the board, the simulated phone
-apps/ios/      the occupant app (Swift / SwiftUI)
-hardware/      flashing, bring-up, puck and UNO Q guides
-docs/          feed contract (BEACON_FEED.md), feasibility, privacy, research notes
-fixtures/      building record and twin (labelled fixtures), scenarios
-tests/ results/ figures/ scripts/
+beacon/        models, locate, track, prune, layout, sim, session, feeds, server, story, roster, tools, agent, report, host/
+web/           the board, the simulated phone, the app page
+apps/ios/      the occupant app (Swift / SwiftUI) and its Xcode project
+hardware/      FLASH, BRINGUP, LAYOUT, PUCK, UNO_Q
+docs/          BEACON_FEED (the contract with the command board), PHONE_FEASIBILITY, PRIVACY, COSTAR_TIE_IN, IOS_BUILD, research/
+fixtures/      building record and twin (labelled fixtures), scenarios, recorded model runs
+scripts/       eval_beacon.py, fill_numbers.py, shots.cjs
+tests/ results/ figures/
 ```
 
-Privacy: opt-in by design, no identities from cold scanning, what is stored and for how long: `docs/PRIVACY.md`.
+Privacy (opt-in by design, no identities from cold scanning, what is kept and for how long): `docs/PRIVACY.md`.
 
-Not a life-safety product.
+Credits: the twin fixture, the spatial engine (`beacon/twin.py`) and the visual language come from Sandtable (same repository). Apple's sample "Implementing spatial interactions with third-party accessories" is the model for the app's Bluetooth and Nearby Interaction sequence.

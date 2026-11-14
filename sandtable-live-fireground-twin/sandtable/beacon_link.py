@@ -328,27 +328,62 @@ def accountability(beacons: dict | None, incident, twin, provider) -> dict:
     rows_in = acc.get("suites") or []
     floor = acc.get("floor") or twin.exercise_floor
     if not rows_in:                                              # no Beacon data at all: the record alone
-        floor_no = int(twin.floor()["label"])
+        from .scout.session import floor_number
+        try:
+            listed = provider.costar.list_tenants(floor_number(twin))
+        except Exception:
+            listed = []
         tenants: dict = {}
-        for t in provider.costar.list_tenants(floor_no):
-            tenants.setdefault(t["suite"], []).append(t)
-        for r in sorted(twin.rooms("suite"), key=lambda q: q.get("suite") or ""):
-            ts = tenants.get(r.get("suite"), [])
-            rows_in.append({"suite": r.get("suite"), "room": r["id"], "room_label": r["label"], "tenant": " / ".join(t["name"] for t in ts) or None,
-                            "life_hazard": "; ".join(sorted({t["life_hazard"] for t in ts if t.get("life_hazard")})) or None,
-                            "expected": None, "phones_opt_in": 0, "people_reported": 0, "located": 0, "cold_devices": 0,
-                            "unaccounted": None, "state": "unscanned", "priority": None, "why": "no Beacon data"})
+        for t in listed:
+            tenants.setdefault(t.get("suite"), []).append(t)
+        suite_rooms = [r for r in twin.rooms() if r.get("suite") and r["kind"] not in ("corridor", "stair")]
+        base = {"expected": None, "phones_opt_in": 0, "people_reported": 0, "located": 0, "cold_devices": 0, "unaccounted": None,
+                "state": "unscanned", "priority": None, "why": "no Beacon data"}
+
+        def name(ts):
+            return " / ".join(str(t.get("name")) for t in ts if t.get("name")) or None
+
+        def hz(ts):
+            return "; ".join(sorted({t["life_hazard"] for t in ts if t.get("life_hazard")})) or None
+        def expected(ts):
+            emp = sum(int(t.get("employees") or 0) for t in ts)
+            if emp:
+                return {"people": emp, "low": max(0, round(emp * 0.5)), "high": round(emp * 1.2), "basis": "employees in the building record: an estimate of who is in"}
+            return None
+        if suite_rooms:
+            by_suite: dict = {}
+            for r in suite_rooms:
+                by_suite.setdefault(r["suite"], []).append(r)
+            for suite, rs in sorted(by_suite.items(), key=lambda kv: str(kv[0])):
+                ts = tenants.get(suite, [])
+                rs = sorted(rs, key=lambda q: q["id"])
+                rows_in.append({**base, "suite": suite, "room": rs[0]["id"], "rooms": [q["id"] for q in rs],
+                                "room_label": rs[0]["label"] if len(rs) == 1 else f"Suite {suite} ({len(rs)} rooms)", "tenant": name(ts), "life_hazard": hz(ts),
+                                "expected": expected(ts)})
+            for suite, ts in sorted(tenants.items(), key=lambda kv: str(kv[0])):    # the storey's other tenancies: context, not in the twin
+                if suite not in by_suite:
+                    rows_in.append({**base, "suite": suite, "room": None, "room_label": f"Suite {suite}" if suite else None, "tenant": name(ts),
+                                    "life_hazard": hz(ts), "expected": expected(ts), "why": "elsewhere on this storey: not in the twin"})
+        else:                                                    # a scanned suite whose rooms carry no suite numbers: rooms, then the floor's tenants
+            for r in twin.rooms():
+                if r["kind"] not in ("corridor", "stair", "elevator", "restroom", "mechanical"):
+                    rows_in.append({**base, "suite": None, "room": r["id"], "room_label": r["label"], "tenant": None, "life_hazard": None})
+            for suite, ts in sorted(tenants.items(), key=lambda kv: str(kv[0])):
+                rows_in.append({**base, "suite": suite, "room": None, "room_label": f"Suite {suite}" if suite else None, "tenant": name(ts), "life_hazard": hz(ts),
+                                "why": "tenant on this floor in the record; its rooms are not in the twin"})
     people = list(incident.phones.values()) + list(incident.victims.values())
     rows = []
     for r in rows_in:
         room = r.get("room")
-        here = [p for p in people if p.get("room") == room]
+        rooms_of = set(r.get("rooms") or ([room] if room else []))
+        here = [p for p in people if p.get("room") in rooms_of]
         assigned = sorted({p["rescuer"] for p in here if p.get("rescuer")})
         rows.append({**{k: r.get(k) for k in ("suite", "room", "room_label", "tenant", "life_hazard", "expected", "phones_opt_in", "people_reported",
                                               "located", "cold_devices", "unaccounted", "state", "priority", "why")},
-                     "crews": sorted(u["id"] for u in incident.units.values() if u.get("room") == room),
-                     "hazards": [h["id"] for h in incident.hazards if h["ref"] == room],
-                     "radar_victims": [v["id"] for v in incident.victims.values() if v.get("room") == room],
+                     "rooms": sorted(rooms_of),
+                     "crews": sorted(u["id"] for u in incident.units.values() if u.get("room") in rooms_of),
+                     "hazards": [h["id"] for h in incident.hazards if h["ref"] in rooms_of],
+                     "radar_victims": [v["id"] for v in incident.victims.values() if v.get("room") in rooms_of],
                      "targets": sorted(p["id"] for p in here),
                      "assigned": assigned[0] if assigned else None,
                      "reached": any(p["status"] in ("reached", "evacuating", "out") for p in here),

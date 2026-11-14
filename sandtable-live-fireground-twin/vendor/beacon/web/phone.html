@@ -59,8 +59,8 @@
         <div class="stepper small"><button id="fl-minus" aria-label="Floor down">−</button><output id="fl">?</output><button id="fl-plus" aria-label="Floor up">+</button></div>
       </div>
       <div>
-        <h2>Your suite</h2>
-        <select id="suite" aria-label="Your suite, from the building's tenant list"><option value="">Not set</option></select>
+        <h2>Which suite are you in?</h2>
+        <select id="suite" aria-label="Which suite are you in? From the building's tenant list"><option value="">Not set</option></select>
         <div class="fine" id="suite-note"></div>
       </div>
     </section>
@@ -70,15 +70,14 @@
 
   <aside class="sim" aria-label="Simulation controls">
     <div class="sim-head"><h2>Simulation controls</h2><p>Not part of the app. The presenter moves this simulated phone and decides what it can do.</p></div>
-    <div class="mini-plan"><svg id="mplan" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan of the fire room and its neighbours: drag the phone"></svg><div class="mp-hint" id="mp-hint">Drag the phone (or tap the plan) to move it.</div></div>
+    <div class="mini-plan"><svg id="mplan" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan of the fire room and its neighbours: drag the phone"></svg><div class="mp-hint" id="mp-hint">Tap the plan to place this phone; drag it to move it.</div></div>
     <label class="tick"><input type="checkbox" id="opt-in" checked><span><b>App installed (opt-in)</b><small>Unticked: a cold phone. Pucks can only count it as a device.</small></span></label>
     <label class="tick"><input type="checkbox" id="uwb" checked><span><b>Phone has UWB</b><small>Unticked: Bluetooth only.</small></span></label>
     <div class="models" id="models" role="radiogroup" aria-label="Phone model">
-      <label><input type="radio" name="model" value="U1" checked><span><b>iPhone 14</b><small>U1: distance and direction</small></span></label>
+      <label><input type="radio" name="model" value="U1" checked><span><b>iPhone 14</b><small>U1: distance; direction only with the camera</small></span></label>
       <label><input type="radio" name="model" value="U2"><span><b>iPhone 15</b><small>U2: distance; direction only with the camera</small></span></label>
     </div>
-    <label class="tick"><input type="checkbox" id="pointing"><span><b>Holding the phone up, pointing at the door</b><small>Gives the pucks the phone's direction, when the chip can.</small></span></label>
-    <label class="tick sub" id="cam-row"><input type="checkbox" id="camera"><span><b>Camera assistance on</b><small>U2 phones give a direction only with it.</small></span></label>
+    <label class="tick" id="dir-row"><input type="checkbox" id="pointing"><span><b>Holding the phone up and moving it, camera assistance on</b><small>An iPhone 14 or later reports a direction only this way, and it needs light: not in smoke.</small></span></label>
     <label class="slider"><span><b>Battery</b> <output id="bat-v">80%</output></span><input type="range" id="bat" min="1" max="100" value="80"></label>
     <div class="sim-actions"><button id="btn-remove">Remove this phone</button><a href="index.html" target="_blank" rel="noopener">Open the board</a></div>
     <div class="sim-state" id="sim-state"></div>

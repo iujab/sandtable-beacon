@@ -314,14 +314,14 @@ the reason). With the pucks mid-room, nothing can decide between the two points.
 
 | Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position: share of the positions shown (share of all trials) | Position error, median / 90th percentile |
 |---|---|---|---|---|---|---|---|
-| Both pucks just inside the wall the door is in (recommended) | 77% | 48% | 29% | 0% | 23% | 1.5% (1.1%) | 0.26 m / 0.76 m |
-| Both pucks along the outside wall | 83% | 78% | 5% | 0% | 17% | 2.1% (1.8%) | 0.26 m / 0.76 m |
-| Both pucks mid-room (careless) | 18% | 17% | 0% | 57% | 25% | 0.0% (0.0%) | 0.50 m / 0.96 m |
-| Three pucks: the door-wall pair plus one in the far corner | 88% | 84% | 5% | 3% | 9% | 1.1% (1.0%) | 0.20 m / 0.61 m |
+| Both pucks just inside the wall the door is in (recommended) | 76% | 35% | 42% | 3% | 21% | 1.5% (1.1%) | 0.26 m / 0.77 m |
+| Both pucks along the outside wall | 70% | 70% | 0% | 11% | 18% | 2.3% (1.6%) | 0.25 m / 0.78 m |
+| Both pucks mid-room (careless) | 4% | 4% | 0% | 86% | 10% | 3.0% (0.1%) | 0.30 m / 0.73 m |
+| Three pucks: the door-wall pair plus one in the far corner | 84% | 78% | 6% | 8% | 8% | 1.2% (1.0%) | 0.20 m / 0.59 m |
 
 "Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
 
-When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 5.7% of trials and 82% of those positions are wrong (4.3% of trials are wrong positions produced by the statement; 13.8% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 6.3% of trials and 100% of those positions are wrong (6.0% of trials are wrong positions produced by the statement; 22.5% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
 <!-- LAYOUT_NUMBERS:END -->
 
 Each puck:

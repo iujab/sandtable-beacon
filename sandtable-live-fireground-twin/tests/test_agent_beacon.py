@@ -340,3 +340,119 @@ def test_calls_next_to_a_null_final_are_run_not_dropped(tmp_path):
     agent = CommandAgent(b.rig.provider, b.rig.twin, b.rig.inc, b.rig.msgs.append, Scripted())
     out = run(agent.handle(b.situation("phone_reached", "B1", {"rescuer": "RIT", "room": "r310"})))
     assert out["backend"] == "replay" and [a["tool"] for a in out["actions"]] == ["assign"] and b.rig.inc.units["RIT"]["assignment"]["task"] == "exit"
+
+
+# ---------------------------------------------------------------- the record against the phones (contract section 4), invented record
+
+class _InventedCostar:
+    mode = "live"
+
+    def __init__(self, tenants, spaces):
+        self.tenants, self.spaces = tenants, spaces
+
+    def list_tenants(self, floor=None):
+        return [t for t in self.tenants if floor is None or t.get("floor") == floor]
+
+    def list_available_space(self, floor=None):
+        return [a for a in self.spaces if floor is None or a.get("floor") == floor]
+
+
+class _InventedProvider:
+    """A live-mode record made up for the test: no real names, nothing read from a sponsor."""
+    modes = {"costar": "live", "matterport": "fixture", "vexcel": "fixture"}
+
+    def __init__(self):
+        self.costar = _InventedCostar(
+            tenants=[{"suite": "301", "floor": 3, "name": "Invented Clinic A", "employees": 10, "sf": 900, "life_hazard": "patients with limited mobility"},
+                     {"suite": "999", "floor": 3, "name": "Invented Firm B", "employees": 20, "sf": 4000}],
+            spaces=[{"suite": "310", "floor": 3, "sf": 880, "status": "for lease"}])
+
+    def labels(self):
+        return {"costar": {"mode": "live", "real_sponsor_data": True, "text": "Building record: CoStar (live)."}}
+
+
+def test_live_record_against_phones_gives_against_record_headline_and_first_priority():
+    from sandtable.beacon_link import accountability, record_vs_phones
+    b = BeaconRig()
+    acc = accountability(b.beacons, b.rig.inc, b.rig.twin, _InventedProvider())
+    rows = {r["suite"]: r for r in acc["rows"] if r["suite"]}
+    r310 = rows["310"]
+    assert r310["scope"] == "scan" and r310["record"]["status"] == "available" and r310["state"] == "against-record" and r310["covered"]
+    assert r310["phones_opt_in"] == 4 and r310["people_reported"] == 5 and r310["located"] == 1          # the ring counts in its puck's room; safe-outside does not
+    assert "available space with no tenant" in r310["why"] and "5 people" in r310["why"] and r310["expected"]["basis"] == "no current tenant on the record"
+    assert acc["priorities"][0]["suite"] == "310" and r310["priority"] == 1
+    assert "Suite 310" in acc["headline"] and "5 people are in it" in acc["headline"]
+    far = rows["999"]
+    assert far["scope"] == "storey" and far["state"] == "not-covered" and far["room"] is None and far["covered"] is False
+    assert far["unaccounted"] == {"low": 10, "high": 24} and far["expected"]["basis"] == "employees in the building record"
+    assert rows["301"]["state"] == "not-covered" and rows["301"]["record"]["status"] == "tenant" and rows["301"]["record"]["employees"] == 10
+    assert rows["303"]["record"]["status"] == "vacant"
+    assert acc["storey"] == {"label": "3", "tenancies": 2, "in_scan": 1, "not_covered": 1, "expected_low": 10, "expected_high": 24}     # the "same storey, no pucks" group
+    assert "2 tenancies on storey 3 have no puck: about 15 to 36 people" in acc["headline"]                                       # every uncovered tenancy
+    assert acc["totals"]["against_record_people"] == 5 and acc["totals"]["not_covered_suites"] == 2
+    assert acc["source"]["real_sponsor_data"] is True and acc["source"]["text"] == "Building record: CoStar (live)."
+    d = record_vs_phones(acc)
+    assert d == {"id": "record_vs_phones", "kind": "record_vs_phones", "source": ["costar", "beacon"], "text": acc["headline"]}
+
+
+def test_live_accountability_tool_gives_headline_storey_and_counts_only():
+    b = BeaconRig()
+    box = ToolBox(b.rig.provider, b.rig.twin, b.rig.inc, LLM(backend="replay"))
+    box.provider = _InventedProvider()
+    box.snapshot, box.beacon_brief = b.snapshot(), b.brief
+    a = run(box.call("get_accountability", {}))
+    assert a["headline"].startswith("The record lists Suite 310") and a["storey"]["not_covered"] == 1
+    text = json.dumps(a)
+    assert "Invented Clinic A" not in text and "Invented Firm B" not in text                          # counts only, no tenant names
+    assert {r["suite"]: r["state"] for r in a["suites"] if r["suite"]}["310"] == "against-record"
+
+
+def test_fixture_accountability_has_no_live_keys_and_is_never_below_the_incident():
+    from sandtable.beacon_link import accountability, closing_line, record_vs_phones
+    b = BeaconRig()
+    lagging = copy.deepcopy(b.beacons)
+    row = next(r for r in lagging["accountability"]["suites"] if r["suite"] == "310")
+    row.update({"phones_opt_in": 1, "people_reported": 1, "located": 0})                              # a story's frozen table, behind the phones
+    inc = b.rig.inc
+    inc.activate_beacon(True)
+    inc.on_beacons(lagging)
+    acc = accountability(lagging, inc, b.rig.twin, b.rig.provider)
+    assert "headline" not in acc and "storey" not in acc and all("scope" not in r for r in acc["rows"]) and record_vs_phones(acc) is None
+    r310 = next(r for r in acc["rows"] if r["suite"] == "310")
+    held = [q for q in inc.phones.values() if q.get("room") == "r310"]
+    assert r310["phones_opt_in"] >= len(held) and r310["people_reported"] >= sum(int(q.get("people") or 1) for q in held) == 5 and r310["located"] >= 1
+    assert acc["totals"]["people_reported"] >= 5
+    line = closing_line(inc)
+    assert line.startswith("All crews out. Reported people out: 0 of 5. Not searched: ") and "Unaccounted on the record:" in line and "complete" not in line.lower()
+
+
+def test_tools_ignore_unknown_arguments_with_one_fixed_phrase():
+    b = BeaconRig()
+    box = box_for(b)
+    r = run(box.call("radio", {"to": "ALL", "text": "All units from Command: test.", "priority": "routine", "priority_note": "secret-value"}))
+    assert r["ok"] and r["note"] == "unrecognised arguments were ignored" and "secret-value" not in json.dumps(r) and "priority_note" not in json.dumps(r)
+    assert "error" in run(box.call("radio", {"to": "ALL"}))                                            # a missing argument is still an error
+
+
+def test_cold_band_text_says_the_band_only():
+    from sandtable.scout.feeds import band_text
+    assert band_text({"count": 0, "count_range": [1, 1], "room_label": "Suite 310"}) == "1 device heard in Suite 310, not a person."
+    assert "about 0" not in band_text({"count": 0, "count_range": [0, 2]}).lower()
+
+
+def test_live_record_with_an_unnamed_occupancy_says_it_does_not_know_who_and_is_not_against_record():
+    from sandtable.beacon_link import accountability, record_vs_phones
+    prov = _InventedProvider()
+    prov.costar.spaces = []
+    prov.costar.tenants.append({"suite": "310", "floor": 3, "sf": 880})                     # an occupancy entry: no name, no head count
+    b = BeaconRig()
+    acc = accountability(b.beacons, b.rig.inc, b.rig.twin, prov)
+    r310 = next(r for r in acc["rows"] if r["suite"] == "310")
+    assert r310["record"]["status"] == "unnamed" and r310["record"]["tenants"] == 0
+    assert r310["record"]["text"] == "1 occupancy entry on record, no tenant named, no head count"
+    assert r310["expected"] == {"people": None, "low": None, "high": None, "basis": "an occupancy entry on record with no tenant named and no head count"}
+    assert r310["state"] == "people-reported" and r310["priority"] == 1 and acc["priorities"][0]["suite"] == "310"
+    assert r310["why"] == "the record has an occupancy entry for this suite but names no tenant and gives no head count; 4 phones report 5 people in it"
+    assert acc["headline"].startswith("The record does not say who is in Suite 310 (an occupancy entry with no tenant named and no head count); the phones say 5 people are in it.")
+    assert acc["totals"]["against_record_people"] == 0 and not any(r["state"] == "against-record" for r in acc["rows"])
+    assert record_vs_phones(acc)["text"] == acc["headline"]

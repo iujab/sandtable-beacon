@@ -81,6 +81,39 @@ def _unscanned(obj: dict) -> dict:
     return o
 
 
+def twin_hash(twin_raw: dict) -> str:
+    import hashlib
+    return hashlib.sha256(json.dumps(twin_raw, sort_keys=True, default=str).encode()).hexdigest()[:12]
+
+
+def live_story_path(twin_raw: dict) -> Path:
+    """Where a recorded Beacon run on a LIVE twin is kept: private, under data/live/, keyed by the twin it was made on."""
+    live = getattr(config, "LIVE_DIR", config.DATA_DIR / "live")
+    return Path(live) / "beacon" / f"story_{twin_hash(twin_raw)}.json"
+
+
+def scene_for(twin, room: str) -> dict:
+    """Two pucks and two simulated phones inside any room of any twin (a live twin has no fixture scene): pucks one metre in from the
+    door and at the room's centre; phones in the two corners farthest from the door, one metre in. Which geometry each phone gets
+    (a fix, two candidates) is whatever the Beacon module computes in that room."""
+    from .scout.session import room_door
+    poly = twin.room(room)["polygon"]
+    c = twin.room_centre(room)
+    d = (room_door(twin, room) or {}).get("at") or poly[0]
+
+    def toward(p, q, m):
+        L = math.dist(p, q) or 1.0
+        return [round(p[0] + (q[0] - p[0]) * min(1.0, m / L), 2), round(p[1] + (q[1] - p[1]) * min(1.0, m / L), 2)]
+    corners = sorted(poly, key=lambda v: -math.dist(v, d))
+    p1, p2 = toward(d, c, 1.0), [round(c[0], 2), round(c[1], 2)]
+    ph = [toward(corners[0], c, 1.0), toward(corners[1] if len(corners) > 1 else c, c, 1.0)]
+    reports = [{"status": "trapped", "text": "Two of us here, smoke under the door", "people": 2, "can_move": False, "battery_pct": 38},
+               {"status": "injured", "text": "Leg hurt", "people": 1, "can_move": False, "battery_pct": 71}]
+    return {"room": room, "floor": twin.room(room).get("floor") or twin.exercise_floor, "derived": True,
+            "pucks": [{"id": "P1", "x": p1[0], "y": p1[1]}, {"id": "P2", "x": p2[0], "y": p2[1]}],
+            "phones": [{"key": f"victim-phone-{i + 1}", "x": q[0], "y": q[1], "report": reports[i]} for i, q in enumerate(ph)]}
+
+
 def apply_searches(obj: dict, searches: dict) -> dict:
     """A crew searched a phone's candidate point and found nobody: that candidate is pruned ("searched by <crew>: nobody there");
     with one candidate left the phone is a fix there. This is Sandtable's annotation on the Beacon module's object (the module has no
@@ -102,7 +135,7 @@ def apply_searches(obj: dict, searches: dict) -> dict:
         changed = True
         by = done[-1]["by"]
         q = dict(p)
-        q["pruned"] = list(p.get("pruned") or []) + [{"x": c["x"], "y": c["y"], "reason": f"searched by {by}: nobody there"} for c in gone]
+        q["pruned"] = list(p.get("pruned") or []) + [{"x": c["x"], "y": c["y"], "reason": f"searched by {by}: nobody there", "by": "crew-search"} for c in gone]
         rep = p.get("report") or {}
         n = rep.get("people")
         who = (f"{n} {'person' if n == 1 else 'people'}" if n else "occupant") + (f", {rep['status']}" if rep.get("status") else "") + \
@@ -270,7 +303,9 @@ class BeaconLink:
         if not frames:
             return False
         self.story = {"frames": frames, "order": [f["step"] for f in data["frames"]], "first": data["frames"][0]["beacons"], "step": None,
-                      "meta": {"name": Path(path or STORY).stem, "recorded": data.get("recorded"), "vendored_commit": data.get("vendored_commit"), "note": data.get("note")}}
+                      "scene": data.get("scene_data"), "live_twin": bool(data.get("live_twin")),
+                      "meta": {"name": "live building (private)" if data.get("live_twin") else Path(path or STORY).stem,
+                               "recorded": data.get("recorded"), "vendored_commit": data.get("vendored_commit"), "note": data.get("note")}}
         self.refresh()
         return True
 
@@ -325,6 +360,29 @@ def _outcome(row: dict, here: list[dict]) -> str:
             "not-covered": "no puck here: nobody accounted for"}.get(row.get("state"), str(row.get("state")))
 
 
+def _floor_rows(rows_in: list[dict], incident) -> list[dict]:
+    """Per row: phones, people reported and located are never below what the incident holds for the row's rooms
+    (each phone once, people from its report). The Beacon object's own table can lag behind (a story's frozen table)."""
+    out = []
+    for r in rows_in:
+        r = dict(r)
+        rooms_of = set(r.get("rooms") or ([r["room"]] if r.get("room") else []))
+        mine = [q for q in incident.phones.values() if q.get("room") in rooms_of]
+        if mine:
+            people = sum(int(q.get("people") or 1) for q in mine)
+            delta = max(0, people - int(r.get("people_reported") or 0))
+            r["phones_opt_in"] = max(int(r.get("phones_opt_in") or 0), len(mine))
+            r["people_reported"] = max(int(r.get("people_reported") or 0), people)
+            r["located"] = max(int(r.get("located") or 0), sum(1 for q in mine if q.get("geometry") == "fix"))
+            if delta and isinstance(r.get("unaccounted"), dict):
+                r["unaccounted"] = {**r["unaccounted"], "low": max(0, int(r["unaccounted"].get("low") or 0) - delta),
+                                    "high": max(0, int(r["unaccounted"].get("high") or 0) - delta)}
+            if r.get("state") in ("unscanned", "silent", "devices-heard", "vacant-on-record"):
+                r["state"] = "people-reported"
+        out.append(r)
+    return out
+
+
 def _record_live(provider) -> bool:
     return (getattr(provider, "modes", None) or {}).get("costar") == "live"
 
@@ -340,14 +398,20 @@ def _people_word(n: int) -> str:
     return f"{n} {'person' if n == 1 else 'people'}"
 
 
-def _phone_room(p: dict) -> str | None:
-    """The room a phone is in as far as its geometry says: a fix or a zone, or candidates that all agree."""
+def _phone_room(p: dict, twin=None) -> str | None:
+    """The room a phone is counted in: a fix or a zone, candidates that all agree, or for a ring the room of the puck
+    it is ranged from (the ring's centre: a count, never a position)."""
     if p.get("room"):
         return p["room"]
     if (p.get("zone") or {}).get("room"):
         return p["zone"]["room"]
     rooms = {c.get("room") for c in p.get("candidates") or []}
-    return rooms.pop() if len(rooms) == 1 else None
+    if len(rooms) == 1:
+        return rooms.pop()
+    ring = p.get("ring") or {}
+    if twin is not None and ring.get("cx") is not None:
+        return twin.locate(ring["cx"], ring["cy"])["room"]
+    return None
 
 
 def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict:
@@ -387,25 +451,35 @@ def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict
         key = ("suite", _suite_key(r.get("suite"))) if r.get("suite") else ("room", r["id"])
         groups.setdefault(key, []).append(r)
 
+    def named(ts):                                   # an occupancy with no company, name or head count is not a known tenant
+        return [t for t in ts if t.get("name") or t.get("industry") or t.get("employees") is not None]
+
     def record_of(suite):
-        ts = by_tenant.get(suite, []) if suite is not None else []
+        allts = by_tenant.get(suite, []) if suite is not None else []
+        ts = named(allts)
+        unnamed = len(allts) - len(ts)
         sp = space_of.get(suite, []) if suite is not None else []
         emp = [int(t["employees"]) for t in ts if t.get("employees") is not None]
-        area_t = sum(int(t.get("sf") or 0) for t in ts)
+        area_t = sum(int(t.get("sf") or 0) for t in allts)
         area_s = max((int(a.get("sf") or 0) for a in sp), default=0)
+        also = f"; {unnamed} occupancy {'entry' if unnamed == 1 else 'entries'} with no tenant named" if unnamed else ""
         if ts:
             status = "tenant"
-            text = f"{len(ts)} {'tenancy' if len(ts) == 1 else 'tenancies'} on record" + (f", {sum(emp)} employees" if emp else ", head count not in the record")
+            text = f"{len(ts)} {'tenancy' if len(ts) == 1 else 'tenancies'} on record" + (f", {sum(emp)} employees" if emp else ", head count not in the record") + also
+        elif unnamed:                                # somebody holds the suite; the record does not say who or how many
+            status, text = "unnamed", f"{unnamed} occupancy {'entry' if unnamed == 1 else 'entries'} on record, no tenant named, no head count"
         elif sp:
-            status, text = "available", "listed as available space with no current tenant" + (f" ({area_s} sf)" if area_s else "")
+            status, text = "available", "listed as available space with no current tenant" + (f" ({area_s} sf)" if area_s else "") + also
         else:
-            status, text = "vacant", "no current tenant on the record and not listed as available"
+            status, text = "vacant", "no current tenant on the record and not listed as available" + also
         rec = {"status": status, "tenants": len(ts), "employees": sum(emp) if emp else None, "area_sf": (area_t or area_s or None), "text": text}
         if emp:
             n = sum(emp)
             expd = {"people": n, "low": max(0, round(n * 0.5)), "high": round(n * 1.2), "basis": "employees in the building record"}
         elif ts:
             expd = {"people": None, "low": None, "high": None, "basis": "tenant on record, head count not in the record"}
+        elif unnamed:
+            expd = {"people": None, "low": None, "high": None, "basis": "an occupancy entry on record with no tenant named and no head count"}
         else:
             expd = {"people": 0, "low": 0, "high": 0, "basis": "no current tenant on the record"}
         name = " / ".join(str(t.get("name")) for t in ts if t.get("name")) or None
@@ -418,25 +492,29 @@ def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict
         ids = [q["id"] for q in rs]
         suite = key if kind == "suite" else None
         rec, expd, name, hz = record_of(suite)
-        here = [q for q in phones if _phone_room(q) in ids and not (q.get("report") or {}).get("safe_outside")]
+        here = [q for q in phones if _phone_room(q, twin) in ids and not (q.get("report") or {}).get("safe_outside")]
         n_people = sum(int((q.get("report") or {}).get("people") or 1) for q in here)
         cold = [c for c in presence if c.get("room") in ids]
         cold_n = max((int(c.get("count") or 0) for c in cold), default=0)
         cold_rng = [max((int((c.get("count_range") or [0, 0])[0]) for c in cold), default=0), max((int((c.get("count_range") or [0, 0])[1]) for c in cold), default=0)]
         safe = sum(1 for q in phones if (q.get("report") or {}).get("safe_outside") and suite is not None and _suite_key((q.get("report") or {}).get("home_suite")) == suite)
         covered = any(i in puck_rooms for i in ids)
-        if rec["status"] != "tenant" and (n_people or cold_n):
+        if rec["status"] in ("available", "vacant") and (n_people or cold_n):
             state = "against-record"
             what = (f"{len(here)} phone{'s' if len(here) != 1 else ''} report {_people_word(n_people)} in it" if n_people else f"{cold_n} devices are heard in it (devices, not people)")
             why = ("the record lists this suite as available space with no tenant; " if rec["status"] == "available" else "the record has no current tenant for this suite; ") + what
+        elif n_people and rec["status"] == "unnamed":
+            state = "people-reported"
+            why = (f"the record has an occupancy entry for this suite but names no tenant and gives no head count; "
+                   f"{len(here)} phone{'s' if len(here) != 1 else ''} report {_people_word(n_people)} in it")
         elif n_people:
             state, why = "people-reported", f"{len(here)} phone{'s' if len(here) != 1 else ''} report {_people_word(n_people)}; {sum(1 for q in here if q.get('geometry') == 'fix')} located to a point"
         elif cold_n:
             state, why = "devices-heard", f"{cold_n} devices heard and no opt-in phone: devices are not people"
         elif covered:
             state, why = "silent", "a puck is here and heard nothing: weak evidence of empty, never proof"
-        elif rec["status"] == "tenant":
-            state, why = "not-covered", "a tenancy on record with no puck in it: nobody there is accounted for"
+        elif rec["status"] in ("tenant", "unnamed"):
+            state, why = "not-covered", ("a tenancy on record" if rec["status"] == "tenant" else "an occupancy entry on record") + " with no puck in it: nobody there is accounted for"
         else:
             state, why = "vacant-on-record", "no tenant on the record and no puck here"
         accounted = n_people + safe
@@ -450,7 +528,7 @@ def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict
                         "cold_devices": cold_n, "cold_range": cold_rng, "safe_outside": safe, "unaccounted": un, "state": state, "priority": None, "why": why,
                         "scope": "scan", "record": rec, "covered": covered, "_targets": sorted(q["id"] for q in here)})
     in_twin = {r["suite"] for r in rows_in if r["suite"] is not None}
-    for suite in sorted((k for k in by_tenant if k is not None and k not in in_twin), key=str):
+    for suite in sorted((k for k in by_tenant if k is not None and k not in in_twin and named(by_tenant[k])), key=str):
         rec, expd, name, hz = record_of(suite)
         rng = f"about {expd['low']} to {expd['high']} people on record" if expd["low"] is not None else "head count not in the record"
         rows_in.append({"suite": suite, "room": None, "rooms": [], "room_label": f"Suite {suite}", "tenant": name, "life_hazard": hz, "expected": expd,
@@ -476,11 +554,14 @@ def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict
     st_high = sum(int((r["expected"] or {}).get("high") or 0) for r in nc)
     storey_label = str(twin.floor().get("label") or storey)
     against = [r for r in rows_in if r["state"] == "against-record" and r["people_reported"]]
+    unnamed_rows = [r for r in rows_in if r["record"]["status"] == "unnamed" and r["people_reported"]]
     parts = []
-    for r in against:
-        word = "available space with no tenant" if r["record"]["status"] == "available" else "without a current tenant"
-        parts.append(f"The record lists {r['room_label']} as {word}; the phones say {_people_word(r['people_reported'])} {'is' if r['people_reported'] == 1 else 'are'} in it.")
-    if not against:
+    for r in against + unnamed_rows:
+        said = (f"The record lists {r['room_label']} as available space with no tenant" if r["record"]["status"] == "available"
+                else f"The record does not say who is in {r['room_label']} (an occupancy entry with no tenant named and no head count)" if r["record"]["status"] == "unnamed"
+                else f"The record has no current tenant for {r['room_label']}")
+        parts.append(f"{said}; the phones say {_people_word(r['people_reported'])} {'is' if r['people_reported'] == 1 else 'are'} in it.")
+    if not (against or unnamed_rows):
         rep = sum(r["people_reported"] for r in rows_in)
         parts.append(f"Phones report {_people_word(rep)} on this storey." if rep else "No phone reports anyone on this storey yet.")
     if nc:
@@ -525,17 +606,38 @@ def _accountability_live(beacons: dict | None, incident, twin, provider) -> dict
            "beacon": "sample (hand-made, not a result)" if b.get("sample") else ("simulated" if b.get("simulated", True) else "measured") if beacons else "none"}
     return {"type": "accountability", "schema": "sandtable.accountability/1", "floor": twin.exercise_floor, "rows": rows, "totals": totals, "source": src,
             "priorities": priorities, "headline": headline,
-            "storey": {"label": storey_label, "tenancies": len(tenants), "in_scan": sum(len(by_tenant.get(sx, [])) for sx in in_twin),
-                       "not_covered": len(nc_storey), "expected_low": st_low, "expected_high": st_high},
+            "storey": {"label": storey_label, "tenancies": len(named(tenants)), "in_scan": sum(len(named(by_tenant.get(sx, []))) for sx in in_twin),
+                       "not_covered": len(nc_storey), "expected_low": sum(int((r["expected"] or {}).get("low") or 0) for r in nc_storey),
+                       "expected_high": sum(int((r["expected"] or {}).get("high") or 0) for r in nc_storey)},
             "limits": ["Expected head counts are employees in the building record, never a census of who is in now",
                        "Devices are not people: cold counts are device bands",
                        "A silent suite is weak evidence of empty, never proof",
                        "Unaccounted is a range: expected minus everybody reported inside or outside"]}
 
 
+def closing_line(incident, names: str | None = None) -> str:
+    """What is true when the crews are out of an incident with phones or radar victims (never "accountability complete"):
+    crews out, reported people out of reported, suites never searched, and the unaccounted range from the same table."""
+    people = list(incident.phones.values()) + list(incident.victims.values())
+    total = sum(int(q.get("people") or 1) for q in people)
+    out = sum(int(q.get("people") or 1) for q in people if q.get("status") == "out")
+    try:
+        acc = accountability(getattr(incident, "beacons", None), incident, incident.twin, incident.provider)
+    except Exception:
+        acc = {}
+    t, rows = acc.get("totals") or {}, acc.get("rows") or []
+    k = t.get("suites_unscanned")
+    if k is None:
+        k = sum(1 for r in rows if r.get("state") in ("unscanned", "not-covered"))
+    known = any(isinstance(r.get("unaccounted"), dict) and r["unaccounted"].get("high") is not None for r in rows)
+    un = (f"{t.get('unaccounted_low', 0)} to {t.get('unaccounted_high', 0)} (an estimate)" if known else "not known (the record gives no head counts)")
+    return f"All crews out{' with ' + names if names else ''}. Reported people out: {out} of {total}. Not searched: {k} suite{'s' if k != 1 else ''}. Unaccounted on the record: {un}."
+
+
 def record_vs_phones(acc: dict | None) -> dict | None:
     """The report's difference between the record and the phones (section 4), or None."""
-    if acc and acc.get("headline") and any(r.get("state") == "against-record" and r.get("people_reported") for r in acc.get("rows") or []):
+    if acc and acc.get("headline") and any(r.get("people_reported") and (r.get("state") == "against-record" or (r.get("record") or {}).get("status") == "unnamed")
+                                           for r in acc.get("rows") or []):
         return {"id": "record_vs_phones", "kind": "record_vs_phones", "source": ["costar", "beacon"], "text": acc["headline"]}
     return None
 
@@ -592,6 +694,7 @@ def accountability(beacons: dict | None, incident, twin, provider) -> dict:
             for suite, ts in sorted(tenants.items(), key=lambda kv: str(kv[0])):
                 rows_in.append({**base, "suite": suite, "room": None, "room_label": f"Suite {suite}" if suite else None, "tenant": name(ts), "life_hazard": hz(ts),
                                 "why": "tenant on this floor in the record; its rooms are not in the twin"})
+    rows_in = _floor_rows(rows_in, incident)
     people = list(incident.phones.values()) + list(incident.victims.values())
     rows = []
     for r in rows_in:
@@ -617,6 +720,9 @@ def accountability(beacons: dict | None, incident, twin, provider) -> dict:
                    "expected_high": sum(int(e.get("high") or 0) for e in exp), "unaccounted_low": sum(int(u.get("low") or 0) for u in un if isinstance(u, dict)),
                    "unaccounted_high": sum(int(u.get("high") or 0) for u in un if isinstance(u, dict)),
                    "safe_outside": sum(int(r.get("safe_outside") or 0) for r in rows_in)})
+    for k in ("phones_opt_in", "people_reported", "located"):                  # never below the rows (which are never below the incident)
+        if k in totals or any(r.get(k) for r in rows_in):
+            totals[k] = max(int(totals.get(k) or 0), sum(int(r.get(k) or 0) for r in rows_in))
     totals.update({"targets": len(people), "assigned": sum(1 for p in people if p.get("rescuer")),
                    "reached": sum(1 for p in people if p["status"] in ("reached", "evacuating", "out")),
                    "out": sum(1 for p in people if p["status"] == "out")})

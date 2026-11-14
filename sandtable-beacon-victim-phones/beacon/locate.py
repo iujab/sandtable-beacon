@@ -45,6 +45,20 @@ geometry_rules: dict = {
     "prune_margin_m": 3.0,
     "prune_keep_m": 1.0,
     "impossible_log_penalty": 20.0,
+    "mirror_weight_floor": 0.2,
+    "mirror_min_share": 0.03,
+    "mirror_guarantee": (
+        "With UWB from exactly two pucks, or from pucks in a line, and no bearing, the ranges cannot tell a point from its "
+        "mirror image across the line through the pucks. A fix is then published only if the mirror image of that fix is "
+        "explained: it lies inside the fix's own 2-sigma ellipse (the two spots merge into one region, published with the "
+        "sigma of the whole region), or it is outside the building, inside a wall, farther than max_range_m or behind more "
+        "than max_walls walls from a ranging puck, or (only when the ranges carry a line-of-sight score) behind a wall "
+        "from a line-of-sight puck; every explained mirror is listed in `pruned` with that reason. Otherwise the result "
+        "is `candidates` with both spots, never a fix: the posterior is split by side of the line and each side's MASS "
+        "(not its density, so a spot widened by a wall's bias is not lost) gives the weights, floored so that neither is "
+        "below 0.2 unless the two spots have different wall counts to a puck (the twin's wall model then separates them "
+        "and the posterior weights stand). A side with a spread over 1 m makes the result a ring. The rule is structural: "
+        "it does not depend on the HPD threshold, and no line-of-sight score is needed."),
     "text": [
         "Posterior: a grid Bayes posterior over cells of the floor (0.25 m). Twin on: only cells inside the floor outline and "
         "not inside a wall (0.075 m half thickness) are possible; walls between each puck and each cell are counted (door "
@@ -66,7 +80,8 @@ geometry_rules: dict = {
         "candidates: 2 to 4 components that each pass the fix test; weights = their probability mass.",
         "Structure caps what the shape may claim: one UWB puck without a bearing is ALWAYS a ring (the twin may clip it to "
         "arcs but never makes it a point); Bluetooth only with fewer than 3 non-collinear pucks is a ring or a zone; "
-        "otherwise the posterior decides (two pucks, or pucks in a line, give mirror candidates unless the twin removes one).",
+        "two UWB pucks or pucks in a line, without a bearing, follow mirror_guarantee (mass per side of the line, not "
+        "connected HPD components); otherwise the posterior decides.",
         "ring: everything else with ranges: centre = the ranged puck with the smallest robust radial spread of the posterior; "
         "r_m = weighted median distance, sigma_m = 1.4826 x weighted MAD (never below the link's model sigma); arcs = the "
         "angular intervals (2-degree bins, CCW from +x, split at 0/360) covered by the HPD.",
@@ -79,7 +94,11 @@ geometry_rules: dict = {
         "locate.inside(result, x, y) applies the same test to a point.",
         "hpd_area_m2 = area of the 90% HPD, always.",
         "pruned: a range-only estimate without the twin and without the bearing on the same cells; its compact components "
-        "that no published point explains (within max(1 m, 2.5 sigma)) are listed with the reason the twin or bearing gives.",
+        "that no published point explains (within max(1 m, 2.5 sigma)) are listed with the reason the twin or bearing gives "
+        "(in the mirror case: the explained mirror image). Reasons are deterministic: pucks are taken in id order and the "
+        "categories in a fixed priority (outside the building, inside a wall, beyond UWB range, too many walls, "
+        "line-of-sight, bearing, the occupant's room, wall fit); `reason` is the first that applies and `reasons` lists all, "
+        "so the tracker can keep a published text while it still applies.",
         "debug.pair_bearing_deg: when exactly two pucks range the phone, the bearing (CCW from +x) of the phone from the "
         "midpoint of the two pucks on the side holding more mass; pair_bearing_alt_deg is its mirror across the baseline.",
     ],
@@ -802,7 +821,18 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
         debug["room_mass"] = {ctx.rooms[i]["id"]: round(float(room_mass[i]), 3) for i in top if room_mass[i] > 0.005}
 
     geometry = None
-    if point_ok and compact and len(sig) == 1:
+    # two UWB pucks or pucks in a line, no bearing: the mirror guarantee decides, by mass per side of the line
+    mirror_case = point_ok and not has_bearing and n_uwb >= 2 and _collinear(uwb_pts)
+    mirror = None
+    if mirror_case:
+        mirror = _mirror_decision(ctx, X, Y, P, valid, pk, uwb, ranges, noise, cell)
+        debug["mirror"] = mirror["debug"]
+        if mirror["kind"] in ("merged", "fix"):
+            if mirror["spot"]["sigma"] <= fix_max:
+                geometry = "fix"
+        elif all(sp["sigma"] <= fix_max for sp, _w in mirror["spots"]):
+            geometry = "candidates"
+    elif point_ok and compact and len(sig) == 1:
         geometry = "fix"
         if n_uwb == 1 and has_bearing and n_uwb < 2:
             up = pk[uwb[0]["puck"]]
@@ -830,8 +860,26 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
         return rid, ctx.rooms[k]["label"], round(float(rid_mass[k]), 3)
 
     published_pts = []
+    if geometry == "fix" and mirror is not None:
+        # structural guard (geometry_rules "mirror_guarantee"): the published fix's own mirror image must be explained
+        sp = mirror["spot"]
+        c_, u_ = _line_through(_distinct([(pk[i]["x"], pk[i]["y"]) for i in sorted({r["puck"] for r in uwb}, key=str)]))
+        fx_, fy_ = _reflect(sp["x"], sp["y"], c_, u_)
+        merged_ok = mirror["kind"] == "merged" and (_mahal2(sp, fx_, fy_) <= _R["region_k_sigma"] ** 2
+                                                    or math.hypot(fx_ - sp["x"], fy_ - sp["y"]) <= _R["merge_components_m"])
+        pruned_ok = mirror["kind"] == "fix" and bool(_reasons(ctx, pk, ranges, None, None, fx_, fy_, noise, hard_only=True))
+        if not (merged_ok or pruned_ok):
+            R_ = np.eye(2) - 2.0 * np.outer([-u_[1], u_[0]], [-u_[1], u_[0]])
+            other = {"x": fx_, "y": fy_, "cov": R_ @ sp["cov"] @ R_.T, "sigma": sp["sigma"]}
+            mirror = {"kind": "candidates", "spots": [(sp, 1.0 - _R["mirror_weight_floor"]), (other, _R["mirror_weight_floor"])],
+                      "debug": dict(mirror["debug"], guard="fix demoted: its mirror image is not explained")}
+            debug["mirror"] = mirror["debug"]
+            geometry = "candidates"
     if geometry == "fix":
-        x, y, C = _refine(sig[0], P, X, Y, H, labels, cell)
+        if mirror is not None:
+            x, y, C = mirror["spot"]["x"], mirror["spot"]["y"], mirror["spot"]["cov"]
+        else:
+            x, y, C = _refine(sig[0], P, X, Y, H, labels, cell)
         ev = np.linalg.eigvalsh(C)
         out.update({"geometry": "fix", "x": round(x, 2), "y": round(y, 2), "sigma_m": round(math.sqrt(max(ev[-1], 0.0)), 2),
                     "cov": [round(float(C[0, 0]), 4), round(float(C[0, 1]), 4), round(float(C[1, 1]), 4)]})
@@ -840,6 +888,29 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             out["node"] = ctx.twin.locate(x, y, ctx.floor)["node"]
             out["geo"] = _geo(ctx, x, y)
         published_pts.append((x, y, out["sigma_m"]))
+        if mirror is not None and mirror["kind"] == "fix":
+            mxx, myy = mirror["mirror"]
+            out["pruned"].append({"x": round(mxx, 2), "y": round(myy, 2), "reason": mirror["reasons"][0],
+                                  "reasons": mirror["reasons"], "by": "twin"})
+    elif geometry == "candidates" and mirror is not None:
+        cands = []
+        for sp, wgt in mirror["spots"]:
+            x, y = sp["x"], sp["y"]
+            ev = np.linalg.eigvalsh(sp["cov"])
+            s = math.sqrt(max(ev[-1], 0.0))
+            rid = rl = None
+            if ctx.use_twin and _pip((x, y), ctx.outline):
+                loc = ctx.twin.locate(x, y, ctx.floor)
+                rid, rl = loc["room"], loc["room_label"]
+            cands.append({"x": round(x, 2), "y": round(y, 2), "sigma_m": round(s, 2), "weight": round(wgt, 3),
+                          "room": rid, "room_label": rl, "geo": _geo(ctx, x, y)})
+            published_pts.append((x, y, s))
+        out.update({"geometry": "candidates", "candidates": cands})
+        rooms_c = {c["room"] for c in cands}
+        if len(rooms_c) == 1 and None not in rooms_c and room_mass is not None:
+            rid = rooms_c.pop()
+            out["room"], out["room_label"] = rid, ctx.room_label(rid)
+            out["room_prob"] = round(float(room_mass[ctx._room_k[rid]]), 3)
     elif geometry == "candidates":
         cands = []
         tot = sum(c["mass"] for c in sig)
@@ -912,7 +983,7 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
         out["confidence"] = round(min(1.0, _supersample_mass(P, X, Y, cell, pred)), 3) if pred else 0.0
 
     # ---- pruned: range-only, twin-free, bearing-free solution; its points that nothing published explains
-    if out["geometry"] in ("fix", "candidates") and (n_uwb >= 2 or n_ble >= 3 or has_bearing):
+    if out["geometry"] in ("fix", "candidates") and mirror is None and (n_uwb >= 2 or n_ble >= 3 or has_bearing):
         Lf = _loglik(ctx, X, Y, pk, ranges, noise, None, False)
         Pf = np.exp(Lf - Lf.max())
         Pf /= Pf.sum()
@@ -926,8 +997,9 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             explained = any(math.hypot(c["x"] - x, c["y"] - y) <= max(_R["prune_keep_m"], 2.5 * c["sigma_long"], 2.5 * s)
                             for x, y, s in published_pts)
             if not explained:
-                out["pruned"].append({"x": round(c["x"], 2), "y": round(c["y"], 2),
-                                      "reason": _prune_reason(ctx, pk, ranges, bearing, prior, c["x"], c["y"], noise)})
+                reason, reasons = _prune_reason(ctx, pk, ranges, bearing, prior, c["x"], c["y"], noise)
+                out["pruned"].append({"x": round(c["x"], 2), "y": round(c["y"], 2), "reason": reason, "reasons": reasons})
+        out["pruned"].sort(key=lambda q: (q["x"], q["y"]))
 
     # ---- two pucks: bearing of the phone from their midpoint (evaluation of short baselines)
     rp_ids = list(dict.fromkeys(r["puck"] for r in ranges))
@@ -1001,47 +1073,171 @@ def _wall_between(ctx, x, y):
     return labels[0], labels[1], d
 
 
-def _prune_reason(ctx, pk, ranges, bearing, prior, x, y, noise) -> str:
+def _in_wall(ctx, x: float, y: float) -> bool:
+    """Inside the thickness of a wall of the twin (and not in a door opening)."""
+    for dx, dy, hw in ctx.doors:
+        if math.hypot(x - dx, y - dy) <= hw:
+            return False
+    for ax, ay, bx, by in ctx.wall_segs:
+        if float(_seg_dist_vec(np.array(x), np.array(y), ax, ay, bx, by)) < _R["wall_half_thickness_m"]:
+            return True
+    return False
+
+
+def _reasons(ctx, pk, ranges, bearing, prior, x, y, noise, hard_only: bool = False) -> list[str]:
+    """Every reason that rules the point (x, y) out, in a FIXED priority order, pucks in id order (deterministic).
+
+    hard_only: only what makes the point impossible or contradicts a stated line-of-sight score (outside the building,
+    inside a wall, beyond UWB range, more walls than UWB ranges through, behind a wall from a line-of-sight puck)."""
     u = noise["uwb"]
-    if ctx.use_twin:
-        if not _pip((x, y), ctx.outline):
-            return "outside the building"
-        a, b, dw = _wall_between(ctx, x, y)
-        if dw < 0.2:
-            if a and b and a != b:
-                return f"inside the wall between {a} and {b}"
-            if a or b:
-                return f"inside the outer wall of {a or b}"
-            return "inside a wall"
-        label = ctx.twin.locate(x, y, ctx.floor)["room_label"]
-        for r in ranges:
-            if r["kind"] != "uwb":
-                continue
+    out: list[str] = []
+    uwb_sorted = sorted((r for r in ranges if r["kind"] == "uwb"), key=lambda r: str(r["puck"]))
+    all_sorted = sorted(ranges, key=lambda r: (str(r["puck"]), r["kind"]))
+    if ctx.use_twin and not _pip((x, y), ctx.outline):
+        out.append("outside the building")
+    elif ctx.use_twin and _in_wall(ctx, x, y):
+        a, b, _ = _wall_between(ctx, x, y)
+        if a and b and a != b:
+            out.append(f"inside the wall between {a} and {b}")
+        elif a or b:
+            out.append(f"inside the outer wall of {a or b}")
+        else:
+            out.append("inside a wall")
+    for r in uwb_sorted:
+        p = pk[r["puck"]]
+        if math.hypot(x - p["x"], y - p["y"]) > u["max_range_m"]:
+            out.append(f"beyond UWB range of {p['id']}")
+            break
+    walls = {}
+    if ctx.use_twin and _pip((x, y), ctx.outline):
+        for r in all_sorted:
             p = pk[r["puck"]]
-            if math.hypot(x - p["x"], y - p["y"]) > u["max_range_m"]:
-                return f"beyond UWB range of {p['id']}"
-            nw = ctx.twin.walls_crossed((p["x"], p["y"]), (x, y), ctx.floor)
-            if nw > u["max_walls"]:
-                return f"behind {nw} walls from {p['id']}: the range model allows ranging through {u['max_walls']} wall at most"
-        for r in ranges:
-            if r["kind"] == "uwb" and r.get("los") is not None and float(r["los"]) >= _R["los_threshold"]:
-                p = pk[r["puck"]]
-                if ctx.twin.walls_crossed((p["x"], p["y"]), (x, y), ctx.floor) >= 1:
-                    return f"behind the wall to {label}: the link to {p['id']} is line-of-sight"
+            walls[r["puck"]] = ctx.twin.walls_crossed((p["x"], p["y"]), (x, y), ctx.floor)
+        for r in uwb_sorted:
+            if walls[r["puck"]] > u["max_walls"]:
+                out.append(f"behind more walls from {r['puck']} than UWB ranges through ({u['max_walls']} at most)")
+                break
+        label = ctx.twin.locate(x, y, ctx.floor)["room_label"]
+        for r in uwb_sorted:
+            if r.get("los") is not None and float(r["los"]) >= _R["los_threshold"] and walls[r["puck"]] >= 1:
+                out.append(f"behind the wall to {label}: the link to {r['puck']} is line-of-sight")
+                break
+    if hard_only:
+        return out
     if bearing is not None:
         p = pk[bearing["puck"]]
         th = math.degrees(math.atan2(y - p["y"], x - p["x"]))
         dd = abs((th - float(bearing["from_puck_deg"]) + 180.0) % 360.0 - 180.0)
         sg = float(bearing.get("sigma_deg") or noise["bearing"]["sigma_deg"])
         if dd > 2.0 * sg:
-            return f"against the phone's bearing from {p['id']} ({round(dd)} degrees off)"
+            out.append(f"against the phone's bearing from {p['id']}")
     if prior is not None and ctx.use_twin:
         here = ctx.twin.locate(x, y, ctx.floor)["room"]
         if here != prior.get("room"):
-            return f"outside {ctx.room_label(prior['room'])}, where the occupant says they are"
+            out.append(f"outside {ctx.room_label(prior['room'])}, where the occupant says they are")
+    for pid in sorted(walls):
+        if walls[pid] >= 1:
+            out.append(f"behind a wall from {pid}: the ranges fit worse once the wall is counted")
+            break
+    return out
+
+
+def _prune_reason(ctx, pk, ranges, bearing, prior, x, y, noise) -> tuple[str, list[str]]:
+    rs = _reasons(ctx, pk, ranges, bearing, prior, x, y, noise)
+    return (rs[0] if rs else "less likely once the twin is applied"), rs
+
+
+# --- the mirror guarantee (two pucks, or pucks in a line, without a bearing) -----------------------------------
+
+def _line_through(pts: list[tuple[float, float]]):
+    a = np.array(pts, dtype=float)
+    c = a.mean(axis=0)
+    if len(pts) == 2:
+        d = a[1] - a[0]
+    else:
+        d = np.linalg.svd(a - c)[2][0]
+    d = d / np.linalg.norm(d)
+    if d[0] < -1e-12 or (abs(d[0]) <= 1e-12 and d[1] < 0):      # a canonical direction: deterministic sides
+        d = -d
+    return (float(c[0]), float(c[1])), (float(d[0]), float(d[1]))
+
+
+def _reflect(x: float, y: float, c, u) -> tuple[float, float]:
+    t = (x - c[0]) * u[0] + (y - c[1]) * u[1]
+    fx, fy = c[0] + t * u[0], c[1] + t * u[1]
+    return 2 * fx - x, 2 * fy - y
+
+
+def _spot(P, X, Y, S, cell):
+    """Mass, mean and covariance of the posterior restricted to the cells S (its own 90% HPD, then every cell of S
+    within Mahalanobis 3.5, as in _refine)."""
+    PS = np.where(S, P, 0.0)
+    m = float(PS.sum())
+    if m <= 0:
+        return None
+    Hs = _hpd(PS, 0.9)
+    w = PS[Hs]
+    x, y = X[Hs], Y[Hs]
+    mx, my = (w * x).sum() / w.sum(), (w * y).sum() / w.sum()
+    q = cell * cell / 12.0
+    C0 = np.array([[(w * (x - mx) ** 2).sum(), (w * (x - mx) * (y - my)).sum()],
+                   [(w * (x - mx) * (y - my)).sum(), (w * (y - my) ** 2).sum()]]) / w.sum() * _HPD_VAR_CORR + np.eye(2) * q
+    Ci = np.linalg.inv(C0 + np.eye(2) * 1e-9)
+    dx, dy = X - mx, Y - my
+    sel = S & (PS > 0) & (Ci[0, 0] * dx * dx + 2 * Ci[0, 1] * dx * dy + Ci[1, 1] * dy * dy <= 3.5 ** 2)
+    w = PS[sel]
+    if w.sum() > 0:
+        x, y = X[sel], Y[sel]
+        mx, my = (w * x).sum() / w.sum(), (w * y).sum() / w.sum()
+        C0 = np.array([[(w * (x - mx) ** 2).sum() / w.sum() + q, (w * (x - mx) * (y - my)).sum() / w.sum()],
+                       [(w * (x - mx) * (y - my)).sum() / w.sum(), (w * (y - my) ** 2).sum() / w.sum() + q]])
+    ev = np.linalg.eigvalsh(C0)
+    return {"mass": m, "x": float(mx), "y": float(my), "cov": C0, "sigma": float(math.sqrt(max(ev[-1], 0.0)))}
+
+
+def _mahal2(spot, x, y) -> float:
+    Ci = np.linalg.inv(spot["cov"] + np.eye(2) * 1e-12)
+    dx, dy = x - spot["x"], y - spot["y"]
+    return float(Ci[0, 0] * dx * dx + 2 * Ci[0, 1] * dx * dy + Ci[1, 1] * dy * dy)
+
+
+def _mirror_decision(ctx, X, Y, P, valid, pk, uwb, ranges, noise, cell) -> dict:
+    """Side-by-side decision for UWB from two pucks or pucks in a line, without a bearing (geometry_rules
+    "mirror_guarantee"). Returns {"kind": "merged" | "fix" | "candidates", ...}."""
+    ids = sorted({r["puck"] for r in uwb}, key=str)
+    pts = _distinct([(pk[i]["x"], pk[i]["y"]) for i in ids])
+    c, u = _line_through(pts)
+    nx_, ny_ = -u[1], u[0]
+    h = (X - c[0]) * nx_ + (Y - c[1]) * ny_
+    pos, neg = valid & (h > 0), valid & (h <= 0)
+    m_pos, m_neg = float(P[pos].sum()), float(P[neg].sum())
+    S, O = (pos, neg) if m_pos >= m_neg else (neg, pos)
+    s = _spot(P, X, Y, S, cell)
+    o = _spot(P, X, Y, O, cell)
+    tot = m_pos + m_neg
+    share_o = (o["mass"] if o else 0.0) / tot if tot > 0 else 0.0
+    mx, my = _reflect(s["x"], s["y"], c, u)
+    dbg = {"line": [round(c[0], 2), round(c[1], 2), round(math.degrees(math.atan2(u[1], u[0])), 1)],
+           "share_other_side": round(share_o, 3)}
+    if _mahal2(s, mx, my) <= _R["region_k_sigma"] ** 2 or math.hypot(mx - s["x"], my - s["y"]) <= _R["merge_components_m"]:
+        return {"kind": "merged", "spot": _spot(P, X, Y, valid, cell), "debug": dict(dbg, kind="merged")}
+    hard = _reasons(ctx, pk, ranges, None, None, mx, my, noise, hard_only=True)
+    if share_o < _R["mirror_min_share"] and hard:
+        return {"kind": "fix", "spot": s, "mirror": (mx, my), "reasons": hard + [x for x in _reasons(ctx, pk, ranges, None, None, mx, my, noise) if x not in hard],
+                "debug": dict(dbg, kind="fix", mirror_explained=hard[0])}
+    if o is not None and share_o >= _R["mirror_min_share"]:
+        other = o
+    else:                                   # the twin leaves the mirror possible but the posterior put (almost) nothing there
+        R = np.eye(2) - 2.0 * np.outer([nx_, ny_], [nx_, ny_])
+        other = {"mass": share_o * tot, "x": mx, "y": my, "cov": R @ s["cov"] @ R.T, "sigma": s["sigma"]}
+    wall_sep = False
     if ctx.use_twin:
-        for r in ranges:
-            p = pk[r["puck"]]
-            if ctx.twin.walls_crossed((p["x"], p["y"]), (x, y), ctx.floor) >= 1:
-                return f"behind a wall from {p['id']}: the ranges fit worse once the wall is counted"
-    return "less likely once the twin is applied"
+        for i in ids:
+            p = (pk[i]["x"], pk[i]["y"])
+            if ctx.twin.walls_crossed(p, (s["x"], s["y"]), ctx.floor) != ctx.twin.walls_crossed(p, (other["x"], other["y"]), ctx.floor):
+                wall_sep = True
+                break
+    w_o = share_o if wall_sep else max(share_o, _R["mirror_weight_floor"])
+    w_o = min(w_o, 0.5) if not wall_sep else w_o          # the main side is the heavier one by construction
+    return {"kind": "candidates", "spots": [(s, 1.0 - w_o), (other, w_o)],
+            "debug": dict(dbg, kind="candidates", wall_separated=wall_sep, mirror_unexplained=not hard)}

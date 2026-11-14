@@ -8,7 +8,7 @@ Commands are Windows PowerShell. On Linux or the UNO Q, use `.venv/bin/python` i
 
 ## A. What runs on real hardware: Beacon
 
-> **POINTER (to be filled at packaging):** L16's hardware documents (bring-up, wiring, bill of materials, build logs) will be vendored into this repository under **`vendor/beacon/`**. Until then they live in the sibling project `../sandtable-beacon-victim-phones/` (`hardware/`, `docs/`). Follow them for the boards and the phones. This file does not repeat them and has not checked them.
+> **Beacon hardware:** lane L16's hardware documents are vendored in this repository under **`vendor/beacon/`**: `vendor/beacon/hardware/BRINGUP.md` (bring-up of the pucks, the iPhones and the server), `FLASH.md` (flashing the DWM3001CDK pucks), `PUCK.md`, `LAYOUT.md` (where to put two pucks), `UNO_Q.md` (the puck host), and `vendor/beacon/docs/IOS_BUILD.md` (building the iOS app). `vendor/beacon/VENDORED.md` names the commit they come from. Follow them for the boards and the phones; this file does not repeat them.
 
 ## B. This command board next to a Beacon server (5 min)
 

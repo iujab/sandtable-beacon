@@ -16,13 +16,19 @@ from collections import deque
 
 from . import locate, models
 
-__all__ = ["PhoneTrack", "LINK_STALE_S", "BEARING_FRESH_S", "UWB_WINDOW", "BLE_WINDOW", "HOLD_N"]
+__all__ = ["PhoneTrack", "LINK_STALE_S", "BEARING_FRESH_S", "UWB_WINDOW", "BLE_WINDOW", "HOLD_N", "HOLD_DOWN_N"]
 
 LINK_STALE_S = 5.0
 BEARING_FRESH_S = 3.0
 UWB_WINDOW = 7
 BLE_WINDOW = 10
 HOLD_N = 2
+MIN_LINK_SAMPLES = 3     # a UWB link joins a multi-puck solution once it has this many fresh readings
+# Demotion is slower than promotion: with an unchanged set of pucks and links, a published geometry is replaced by a
+# weaker one (fix -> candidates -> ring -> zone) only after HOLD_DOWN_N consecutive estimates, so that a borderline
+# posterior does not flicker on the board. When the pucks or the links change, HOLD_N applies (the evidence changed).
+HOLD_DOWN_N = 6
+_RANK = {"none": 0, "zone": 1, "ring": 2, "candidates": 3, "fix": 4}
 REPORT_FRESH_S = 10.0
 MOVE_WINDOW_S = 3.0          # range history looked at for `moving`
 MOVE_RANGE_M = 0.6           # a smoothed range changing by more than this within MOVE_WINDOW_S means the phone moves
@@ -40,6 +46,10 @@ class PhoneTrack:
     def __init__(self, eid: str, georef_bearing_deg: float | None = None):
         self.eid = eid
         self.eids = [eid]
+        # Seconds a link's samples stay usable. The session raises it (to 25 s) for live phones that take turns on a
+        # board, because the stock puck firmware serves one phone at a time and a still phone's range does not age fast.
+        self.link_stale_s = LINK_STALE_S
+        self._ignore_before: dict[str, float] = {}      # per puck: samples timestamped up to this are from before the puck moved
         self.georef_bearing_deg = georef_bearing_deg
         self._uwb: dict[str, deque] = {}
         self._ble: dict[str, deque] = {}
@@ -71,6 +81,10 @@ class PhoneTrack:
         self.first_seen = t if self.first_seen is None else min(self.first_seen, t)
         self.last_seen = t if self.last_seen is None else max(self.last_seen, t)
         self.updates += 1
+        if kind in ("uwb", "sos", "bearing") and t <= self._ignore_before.get(obs.get("puck"), float("-inf")):
+            if kind == "sos" and obs.get("report"):
+                self._merge_report(obs["report"], t)     # the status is still good; the range is not
+            return                                       # measured before that puck moved: it no longer fits the map
         if kind == "uwb":
             d = obs.get("d_m")
             if d is None or not math.isfinite(float(d)):
@@ -88,6 +102,21 @@ class PhoneTrack:
             if obs.get("report"):
                 self._merge_report(obs["report"], t)
 
+    def forget_puck(self, puck_id: str, now: float, guard_s: float = 0.3) -> None:
+        """The puck moved, was removed, or its ranges changed meaning (exercise scale): what is buffered for it no longer
+        describes the geometry. Drop it, ignore anything timestamped up to `now + guard_s` for that puck, and publish
+        afresh: a geometry computed with the old position is never held over (no dot from stale ranges)."""
+        self._uwb.pop(puck_id, None)
+        self._ble.pop(puck_id, None)
+        self._hist.pop(puck_id, None)
+        if self._bearing is not None and self._bearing.get("puck") == puck_id:
+            self._bearing = None
+        self._ignore_before[puck_id] = float(now) + float(guard_s)
+        self.published = None
+        self._published_sig = None
+        self._pending_geom, self._pending_n = None, 0
+        self._last_fix = None
+
     def _merge_report(self, rep: dict, t: float) -> None:
         if self.report_t is None or t >= self.report_t:
             self.report.update({k: v for k, v in rep.items() if k != "age_s"})
@@ -98,7 +127,7 @@ class PhoneTrack:
         ranges: list[dict] = []
         uwb_pucks = set()
         for puck, dq in self._uwb.items():
-            fresh = [s for s in dq if now - s[0] <= LINK_STALE_S]
+            fresh = [s for s in dq if now - s[0] <= self.link_stale_s]
             if not fresh:
                 continue
             d = _median([s[1] for s in fresh])
@@ -114,7 +143,7 @@ class PhoneTrack:
         for puck, dq in self._ble.items():
             if puck in uwb_pucks:
                 continue
-            fresh = [s for s in dq if now - s[0] <= LINK_STALE_S]
+            fresh = [s for s in dq if now - s[0] <= self.link_stale_s]
             if not fresh:
                 continue
             r = {"puck": puck, "kind": "ble", "rssi": round(sum(s[1] for s in fresh) / len(fresh), 1), "n": len(fresh),
@@ -186,10 +215,20 @@ class PhoneTrack:
                 est = dict(self.published)
                 est["debug"] = dict(est.get("debug") or {}, held=True, reason="no fresh link: last geometry kept")
             return self._finish(est, ranges, bearing, now, noise)
-        est = locate.estimate(ctx, pucks, ranges, bearing, prior, noise, want_heat=want_heat)
+        # A UWB link joins the solution once it has MIN_LINK_SAMPLES readings (the median then survives one outlier): a
+        # second puck's first reading must not turn a ring into a position. A lone thin link may still draw its ring.
+        solid = [r for r in ranges if r["kind"] != "uwb" or int(r.get("n") or 0) >= MIN_LINK_SAMPLES]
+        use = solid if any(r["kind"] == "uwb" for r in solid) else ranges
+        use_bearing = bearing if (bearing is not None and any(r["puck"] == bearing["puck"] for r in use)) else None
+        est = locate.estimate(ctx, pucks, use, use_bearing, prior, noise, want_heat=want_heat)
         g = est["geometry"]
+        by_id = {p["id"]: p for p in pucks or []}
+        sig = (frozenset((r["puck"], r["kind"], round(float(by_id[r["puck"]]["x"]), 1), round(float(by_id[r["puck"]]["y"]), 1)) for r in ranges),
+               bearing["puck"] if bearing else None)
+        same_evidence = sig == getattr(self, "_published_sig", None)     # same pucks and links as when the geometry was published
         if self.published is None or g == self.published["geometry"]:
             self.published = est
+            self._published_sig = sig
             self._pending_geom, self._pending_n = None, 0
             held = False
         else:
@@ -197,8 +236,11 @@ class PhoneTrack:
                 self._pending_n += 1
             else:
                 self._pending_geom, self._pending_n = g, 1
-            if self._pending_n >= HOLD_N:
+            weaker = _RANK.get(g, 0) < _RANK.get(self.published["geometry"], 0)
+            need = HOLD_DOWN_N if (weaker and same_evidence) else HOLD_N
+            if self._pending_n >= need:
                 self.published = est
+                self._published_sig = sig
                 self._pending_geom, self._pending_n = None, 0
                 held = False
             else:

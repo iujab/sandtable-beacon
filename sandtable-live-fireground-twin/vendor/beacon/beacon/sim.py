@@ -19,10 +19,21 @@ own: `models.uwb_expected`, `models.ble_expected_rssi`, `models.cold_band`. Wall
 `Twin.walls_crossed` on the straight segment between the TRUE puck and the TRUE device position (door openings do
 not count).
 
-* Pucks. True position = where the puck landed. `w.pucks` is what the pucks BELIEVE (what Scout's self-location
-  would report): truth + N(0, puck.position_sigma_m) per axis, drawn once per throw.
+* Pucks. Thrown (any n, "scatter"): true position = where the puck landed, and `w.pucks` is what the pucks BELIEVE
+  (what Scout's self-location would report): truth + N(0, puck.position_sigma_m) per axis, drawn once per throw.
+  Two pucks placed by hand (n == 2, default "door-wall", `beacon.layout.recommend`): believed = the recommended
+  spots, truth = those + N(0, 0.03 m) per axis.
 * Links exist only between a puck and a device on the same floor; a device outside the floor outline has no link
   (slabs and the exterior wall are not modelled: treated as out of reach).
+* Live-like by default: a UWB observation carries `d_m` only, because an iPhone's Nearby Interaction session reports
+  a distance and nothing else (`SIM_MODEL["uwb_link"]["reports_los"] = False`). `World(..., reports_los=True)` adds
+  the simulated `los` / `rssi` / `fp` below, for studies only (NOT available from an iPhone). The random draws are the
+  same either way, so the two settings are paired.
+* Board sharing (`World(..., board_sharing=...)`, exposed as `sim_model["board_sharing"]`): "pairs" (default) = each
+  puck position carries one board per phone, so every phone in range is ranged by every puck continuously (an
+  idealisation); "turns" = each puck is ONE board (Qorvo stock firmware) serving one phone at a time: 4 s of ranges
+  to one phone, then the next phone in range after a 1 to 2 s connection set-up gap, round robin (a puck with only
+  one phone in range keeps serving it). A phone then hears each puck in bursts, and its bearing only while served.
 * UWB two-way ranging (opt-in phone with a UWB chip): no link beyond `uwb.max_range_m` or through more than
   `uwb.max_walls` walls, and none unless the pair's Bluetooth link is up (the UWB session is set up over Bluetooth).
   Per link (puck-phone pair), drawn ONCE per phone position and orientation (redrawn when the phone moves more than
@@ -34,7 +45,7 @@ not count).
   s_white = sqrt(sigma(n=1)^2 - s_static^2) (= uwb.sigma_los_m), mean = truth + wall bias per wall (+ body bias
   when blocked). With probability
   `uwb.outlier_prob` a positive outlier of `uwb.outlier_m` * U(0.25, 1.0) is added (up to outlier_m).
-  `los` is high on a wall-free link (N(0.88, 0.06)) and low through walls (N(0.32, 0.12) through one wall,
+  `los` (only with reports_los=True) is high on a wall-free link (N(0.88, 0.06)) and low through walls (N(0.32, 0.12) through one wall,
   N(0.18, 0.12) through two), 0.30 lower when a body blocks, clipped to 0..1: a noisy hint, not a truth.
   `rssi`/`fp` follow a plausible DW3000-like shape (rssi = -62 dBm - 20 log10 d - 5 dB per wall + N(0, 1.5);
   fp = rssi - 2 dB on a clear link, - 9 dB per wall otherwise, - 6 dB more when a body blocks, + N(0, 1)).
@@ -92,7 +103,8 @@ Scenario schema (`fixtures/beacon/scenarios/*.json`, loaded with `w.load_scenari
      "floor": "f3",                 # optional, default the twin's exercise floor
      "room": "r310",                # the fire room (where the pucks go); must be a room of the twin
      "seed": 310,                   # optional: the world is reseeded with it on load (same scene every time)
-     "pucks": {"throw": {"room": "r310", "n": 3, "seed": 310}}      # thrown like Scout's pucks, or explicitly:
+     "pucks": {"throw": {"room": "r310", "n": 2, "seed": 310, "strategy"?: "door-wall" | "exterior-wall" | "careless" | "scatter"}}
+                                    # n == 2 defaults to the door-wall layout (beacon.layout), other n are thrown; or explicitly:
               | [{"id": "P1", "x": 7.9, "y": 6.7, "sigma_m"?: 0.08}],   # true positions; believed = truth + noise
      "phones": [{"key": "trapped-310", "x": 2.1, "y": 1.8, "floor"?: "f3",
                  "room"?: "r310" | null,     # declared room, CHECKED against the twin on load (ValueError if wrong)
@@ -135,7 +147,11 @@ SIM_MODEL: dict[str, Any] = {
     "eid_rotate_s": EID_ROTATE_S,
     "ble_shadow_redraw_m": 0.5,
     "links": "same floor only; a device outside the floor outline has no link",
-    "uwb_link": {"needs_ble_link": True, "outlier_scale": [0.25, 1.0], "los_body_drop": 0.30, "fp_gap_body_db": 6.0,
+    "uwb_link": {"reports_los": False,
+                 "reports_los_text": "an iPhone's Nearby Interaction session reports a distance only: no los, rssi or fp. "
+                                     "reports_los=True adds the simulated line-of-sight score and DW3000-style rssi/fp, for "
+                                     "studies only (not available from an iPhone)",
+                 "needs_ble_link": True, "outlier_scale": [0.25, 1.0], "los_body_drop": 0.30, "fp_gap_body_db": 6.0,
                  "los_clear_mean": 0.88, "los_clear_sd": 0.06, "los_wall_mean": [0.32, 0.18], "los_wall_sd": 0.12,
                  "rssi_1m_dbm": -62.0, "rssi_wall_db": 5.0, "rssi_sd_db": 1.5,
                  "fp_gap_clear_db": 2.0, "fp_gap_wall_db": 9.0, "fp_sd_db": 1.0},
@@ -154,15 +170,22 @@ SIM_MODEL: dict[str, Any] = {
     "throw": {"stages": [[1.5, 5.5, 1.2, 0.5, 75], [1.0, 5.5, 1.0, 0.4, 90], [0.8, 6.5, 0.8, 0.3, 120],
                          [0.5, 8.0, 0.6, 0.25, 180]],
               "stage_fields": ["r_min_m", "r_max_m", "min_separation_m", "wall_clearance_m", "half_angle_deg"],
-              "collinear_ratio": 0.18, "credit": "throw model copied from Sandtable's Scout (scout/scene.py)"},
+              "collinear_ratio": 0.18, "credit": "throw model copied from Sandtable's Scout (scout/scene.py)",
+              "layout_truth_sd_m": 0.03,
+              "two_puck_default": "n == 2: beacon.layout.recommend(strategy='door-wall'); truth = recommended spot + N(0, 0.03 m)"},
 }
 
 # Phones with UWB (the owner's hardware: iPhones ranging Qorvo DWM3001CDK pucks through Nearby Interaction).
 CHIPS: dict[str, dict] = {
-    "U1": {"model": "iPhone 14", "bearing": "pointing", "source": "ni-direction+compass", "sigma_factor": 1.0},
+    "U1": {"model": "iPhone 13", "bearing": "pointing", "source": "ni-direction+compass", "sigma_factor": 1.0},
     "U2": {"model": "iPhone 15", "bearing": "pointing+camera_assist", "source": "camera-assist+compass", "sigma_factor": 1.3},
 }
 NO_UWB_MODEL = "iPhone SE (no UWB)"
+# Developers report that the iPhone 14 family and later give NO direction to a third-party accessory without camera
+# assistance, although the iPhone 14 still has the first-generation chip (docs/research/ios_ni.md, section 4). So a phone
+# whose model is one of these needs `camera_assist` for a bearing, whatever its chip. The default U1 model is an
+# iPhone 13, which does report direction.
+DIRECTION_NEEDS_CAMERA_MODELS = ("iPhone 14", "iPhone 15", "iPhone 16", "iPhone 17", "iPhone Air")
 SIM_MODEL["chips"] = copy.deepcopy(CHIPS)
 
 # Noise keys the lead announced that may not be in models.DEFAULT_NOISE yet: fallback values used ONLY when the key is
@@ -171,7 +194,17 @@ _NOISE_FALLBACKS = {("uwb", "link_bias_sigma_m"): 0.05, ("uwb", "body_block_prob
 
 _KIND_ORDER = {"report": 0, "bearing": 1, "uwb": 2, "sos": 3, "cold": 4}
 _STREAM = {"puck": 1, "device": 2, "measure": 3, "shadow": 4, "cold_place": 5, "eid": 6, "puck_belief": 7, "aim": 8,
-           "link": 9}
+           "link": 9, "turns": 10}
+
+BOARD_SHARING = {
+    "pairs": "each puck position carries one board per phone: every phone in range is ranged by every puck continuously "
+             "(an idealisation of the hardware)",
+    "turns": "each puck is ONE board (Qorvo stock firmware) that serves one phone at a time: 4 s of ranges to one phone, then "
+             "the next phone in range after a 1 to 2 s connection set-up gap, round robin; a phone hears each puck in bursts",
+}
+SIM_MODEL["board_sharing"] = "pairs"
+SIM_MODEL["board_sharing_modes"] = dict(BOARD_SHARING)
+SIM_MODEL["turns"] = {"serve_s": 4.0, "gap_s": [1.0, 2.0], "single_phone": "a puck with one phone in range keeps serving it, no gap"}
 
 
 def _h(s: str) -> int:
@@ -304,15 +337,25 @@ class _Device:
 class World:
     """The simulated world. See the module docstring for the stated noise model and the scenario schema."""
 
-    def __init__(self, twin, seed: int = 310, noise: dict | None = None, eid_rotate_s: float | None = None):
+    def __init__(self, twin, seed: int = 310, noise: dict | None = None, eid_rotate_s: float | None = None,
+                 reports_los: bool | None = None, board_sharing: str | None = None):
+        """reports_los: None/False (default) = live-like, UWB observations carry d_m only, as from an iPhone; True = add the
+        simulated los/rssi/fp (studies only). board_sharing: "pairs" (default) or "turns" (see BOARD_SHARING)."""
         self.twin = twin if isinstance(twin, Twin) else Twin(twin)
         self.seed = int(seed)
         self.noise = copy.deepcopy(noise if noise is not None else models.DEFAULT_NOISE)
         self.sim_model = copy.deepcopy(SIM_MODEL)
+        if reports_los is not None:
+            self.sim_model["uwb_link"]["reports_los"] = bool(reports_los)
+        mode = board_sharing or self.sim_model["board_sharing"]
+        if mode not in BOARD_SHARING:
+            raise ValueError(f"board_sharing must be one of {sorted(BOARD_SHARING)}, not {mode!r}")
+        self.sim_model["board_sharing"] = mode
         self.eid_rotate_s = float(eid_rotate_s if eid_rotate_s is not None else EID_ROTATE_S)
         self.floor = self.twin.exercise_floor
         self.georef_bearing_deg = georef_bearing_deg(self.twin)
         self.room_id: str | None = None
+        self.layout: dict | None = None
         self.noise_fallbacks: dict[str, float] = {}
         for (grp, k), v in _NOISE_FALLBACKS.items():
             if k not in self.noise.get(grp, {}):
@@ -335,6 +378,7 @@ class World:
         self._links: dict[tuple, tuple[float, int]] = {}
         self._shadow: dict[tuple, float] = {}
         self._linkstate: dict[tuple, tuple[float, bool]] = {}
+        self._turns: dict[str, dict] = {}
         self._cold_counter = 0
         self._throws = 0
 
@@ -353,7 +397,8 @@ class World:
         """What the pucks believe about their own positions (truth + position noise)."""
         return [dict(p) for p in self._pucks_believed]
 
-    def _install_pucks(self, true_pts: list[dict], believe_seed: int, exact: bool = False) -> list[dict]:
+    def _install_pucks(self, true_pts: list[dict], believe_seed: int, exact: bool = False,
+                       believed: list[dict] | None = None) -> list[dict]:
         sig_default = float(self.noise.get("puck", {}).get("position_sigma_m", 0.08))
         self._pucks_true, self._pucks_believed = [], []
         for k, p in enumerate(true_pts):
@@ -363,7 +408,9 @@ class World:
             x, y = float(p["x"]), float(p["y"])
             loc = self.twin.locate(x, y, floor)
             self._pucks_true.append({"id": pid, "x": x, "y": y, "floor": floor, "room": loc["room"]})
-            if exact:
+            if believed is not None:
+                bx, by = float(believed[k]["x"]), float(believed[k]["y"])
+            elif exact:
                 bx, by = x, y
             else:
                 rng = np.random.default_rng([self.seed, _STREAM["puck_belief"], believe_seed, k])
@@ -378,15 +425,35 @@ class World:
                 del self._due[key]
         return self.pucks
 
-    def throw_pucks(self, room_id: str, n: int = 3, seed: int | None = None) -> list[dict]:
-        """Throw n pucks into the room from its door (Scout's model: 1.5-5.5 m in, within +-75 degrees of straight in,
-        >= 1.2 m apart, >= 0.5 m from walls, not in a line; relaxed in steps for small rooms). Replaces the pucks.
-        Prefix-stable: with the same seed, throwing n+1 pucks keeps the first n where they landed."""
+    def throw_pucks(self, room_id: str, n: int = 3, seed: int | None = None, strategy: str | None = None) -> list[dict]:
+        """Put n pucks into the room. Replaces the pucks.
+
+        strategy (default "door-wall" when n == 2, else "scatter"):
+        * "door-wall" | "exterior-wall" | "careless" (n == 2 only): the positions of `beacon.layout.recommend` (the
+          owner's two-puck layouts). The pucks BELIEVE they are exactly there; the truth is within a few centimetres
+          (N(0, 0.03 m) per axis: placed by hand).
+        * "scatter": thrown from the door (Scout's model: 1.5-5.5 m in, within +-75 degrees of straight in, >= 1.2 m
+          apart, >= 0.5 m from walls, not in a line; relaxed in steps for small rooms). Prefix-stable: with the same
+          seed, throwing n+1 pucks keeps the first n where they landed."""
         room = self.twin.room(room_id)
         n = int(n)
         if not 1 <= n <= 5:
             raise ValueError("n must be between 1 and 5 pucks")
         seed = self.seed if seed is None else int(seed)
+        strategy = strategy or ("door-wall" if n == 2 else "scatter")
+        if strategy != "scatter":
+            if n != 2:
+                raise ValueError(f"strategy {strategy!r} places exactly 2 pucks")
+            from . import layout                     # lead-owned: where two pucks give one answer
+            rec = layout.recommend(self.twin, room_id, n=2, strategy=strategy)
+            rng = np.random.default_rng([seed, _STREAM["puck"], 99])
+            sd = self.sim_model["throw"]["layout_truth_sd_m"]
+            true = [{"id": p["id"], "x": float(p["x"]) + float(rng.normal(0, sd)), "y": float(p["y"]) + float(rng.normal(0, sd)),
+                     "floor": room["floor"]} for p in rec["pucks"]]
+            self.room_id = room_id
+            self._throws += 1
+            self.layout = rec
+            return self._install_pucks(true, believe_seed=seed, believed=rec["pucks"])
         poly = room["polygon"]
         door = _door_of(self.twin, room)
         inward = _inward(door, poly)
@@ -417,6 +484,7 @@ class World:
             pts.append(got)
         self.room_id = room_id
         self._throws += 1
+        self.layout = None
         return self._install_pucks([{"id": f"P{k + 1}", "x": p[0], "y": p[1], "floor": room["floor"]}
                                     for k, p in enumerate(pts)], believe_seed=seed)
 
@@ -610,7 +678,8 @@ class World:
         pk = sc.get("pucks")
         if isinstance(pk, dict) and pk.get("throw"):
             th = pk["throw"]
-            self.throw_pucks(th.get("room") or sc["room"], n=int(th.get("n", 3)), seed=th.get("seed"))
+            self.throw_pucks(th.get("room") or sc["room"], n=int(th.get("n", 3)), seed=th.get("seed"),
+                             strategy=th.get("strategy"))
         elif isinstance(pk, list) and pk:
             self.set_pucks(pk)
         if sc.get("room"):
@@ -758,6 +827,8 @@ class World:
             if d.battery_t0 is None:
                 d.battery_t0 = now
 
+        if self.sim_model["board_sharing"] == "turns":
+            self._advance_turns(pucks, devices, now)
         for d in devices:
             if not d.opt_in:
                 continue
@@ -810,8 +881,9 @@ class World:
                 ok = dist <= uwbn["max_range_m"] and nw <= uwbn["max_walls"]
                 if self.sim_model["uwb_link"]["needs_ble_link"]:
                     ok = ok and ble_mean >= blen["sensitivity_dbm"]
+                turns = self.sim_model["board_sharing"] == "turns"
                 for t in self._ticks(("uwb", p["id"], d.key), self._period(sch["uwb_hz"]), now, t_prev):
-                    if not ok:
+                    if not ok or (turns and not self._served(p["id"], d.key, t)):
                         continue
                     o = self._uwb_sample(p, d, dist, nw, t)
                     if o is not None:
@@ -859,8 +931,59 @@ class World:
         rssi = ul["rssi_1m_dbm"] - 20.0 * math.log10(max(dist, 0.3)) - ul["rssi_wall_db"] * nw + m.normal(0, ul["rssi_sd_db"])
         gap = (ul["fp_gap_clear_db"] if nw == 0 else ul["fp_gap_wall_db"] * nw) + (ul["fp_gap_body_db"] if body else 0.0)
         fp = rssi - gap + m.normal(0, ul["fp_sd_db"])
-        return {"kind": "uwb", "t": _r(t, 3), "puck": p["id"], "eid": self._eid_at(d, t)[0], "d_m": _r(r, 3), "rssi": _r(rssi, 1),
-                "fp": _r(fp, 1), "los": _r(float(np.clip(los, 0.0, 1.0)), 2)}
+        o = {"kind": "uwb", "t": _r(t, 3), "puck": p["id"], "eid": self._eid_at(d, t)[0], "d_m": _r(r, 3)}
+        if ul["reports_los"]:                      # studies only: an iPhone gives a distance and nothing else
+            o.update({"rssi": _r(rssi, 1), "fp": _r(fp, 1), "los": _r(float(np.clip(los, 0.0, 1.0)), 2)})
+        return o
+
+    # ---- one board, one phone at a time ("turns")
+    def _uwb_link_ok(self, p: dict, d: _Device) -> bool:
+        if not (d.opt_in and d.uwb):
+            return False
+        link = self._link(p, d)
+        if link is None:
+            return False
+        uwbn = self.noise["uwb"]
+        ok = link[0] <= uwbn["max_range_m"] and link[1] <= uwbn["max_walls"]
+        if ok and self.sim_model["uwb_link"]["needs_ble_link"]:
+            ok = self._ble_mean(p, d, link) >= self.noise["ble"]["sensitivity_dbm"]
+        return bool(ok)
+
+    def _advance_turns(self, pucks: list[dict], devices: list[_Device], now: float) -> None:
+        """Extend each puck's service schedule up to `now`: [(phone key, start, end)], round robin over the phones in range."""
+        ts = self.sim_model["turns"]
+        for p in pucks:
+            st = self._turns.get(p["id"])
+            if st is None or st["version"] != self._puck_version:
+                st = {"cur": None, "end": now, "iv": [], "n": 0, "version": self._puck_version}
+                self._turns[p["id"]] = st
+            for _ in range(1000):
+                if st["end"] > now:
+                    break
+                elig = [d.key for d in devices if self._uwb_link_ok(p, d)]
+                if not elig:
+                    st["cur"], st["end"] = None, now + 1e-6          # idle; looked at again at the next step
+                    break
+                if st["cur"] in elig and len(elig) == 1:
+                    nxt, gap = st["cur"], 0.0
+                else:
+                    if st["cur"] in elig:
+                        nxt = elig[(elig.index(st["cur"]) + 1) % len(elig)]
+                    else:
+                        later = [k for k in elig if st["cur"] is not None and k > st["cur"]]
+                        nxt = later[0] if later else elig[0]
+                    rng = np.random.default_rng([self.seed, _STREAM["turns"], _h(p["id"]), st["n"]])
+                    gap = float(rng.uniform(*ts["gap_s"]))
+                st["n"] += 1
+                start = st["end"] + gap
+                st["iv"].append((nxt, start, start + ts["serve_s"]))
+                st["cur"], st["end"] = nxt, start + ts["serve_s"]
+            keep_from = now - self.sim_model["schedule"]["max_catchup_s"] - 1.0
+            st["iv"] = [iv for iv in st["iv"] if iv[2] >= keep_from]
+
+    def _served(self, pid: str, key: str, t: float) -> bool:
+        st = self._turns.get(pid)
+        return bool(st) and any(k == key and a <= t < b for k, a, b in st["iv"])
 
     def _visible_for_bearing(self, d: _Device, pucks: list[dict]) -> list[tuple[dict, float, float]]:
         """Pucks with a wall-free UWB link to the phone: (puck, true direction phone->puck in deg, distance)."""
@@ -886,7 +1009,8 @@ class World:
         """U1: while pointing. U2: while pointing AND camera assistance is on."""
         if not (d.uwb and d.pointing and d.chip in CHIPS):
             return False
-        return d.camera_assist if CHIPS[d.chip]["bearing"] == "pointing+camera_assist" else True
+        needs_camera = CHIPS[d.chip]["bearing"] == "pointing+camera_assist" or str(d.model or "").startswith(DIRECTION_NEEDS_CAMERA_MODELS)
+        return d.camera_assist if needs_camera else True
 
     def _bearing_sample(self, d: _Device, pucks: list[dict], t: float) -> dict | None:
         bn = self.noise["bearing"]
@@ -910,6 +1034,8 @@ class World:
         best = min(vis, key=lambda v: off(v[1]))
         if off(best[1]) > bn["fov_deg"] / 2.0:
             return None
+        if self.sim_model["board_sharing"] == "turns" and not self._served(best[0]["id"], d.key, t):
+            return None                            # the direction comes from the UWB session with that board
         meas = (best[1] + float(self._mrng.normal(0.0, sigma))) % 360.0
         return {"kind": "bearing", "t": _r(t, 3), "eid": self._eid_at(d, t)[0], "puck": best[0]["id"],
                 "to_puck_compass_deg": _r(to_puck_compass_deg(meas, self.georef_bearing_deg), 1),

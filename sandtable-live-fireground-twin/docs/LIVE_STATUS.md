@@ -11,7 +11,18 @@ This page holds no sponsor data. It says which layers have been read live, on wh
 | Vexcel | **read live** (API v2) | 7 images of the demo building (2 ortho, 1 detail, 4 obliques), cached under `data/live/vexcel/` so the demo also runs offline. |
 | Public context | **real open data** for the demo building | Footprint, the four sides, hydrants, fire stations and street geometry, from Los Angeles open data (`scripts/build_site.py --from-demo`). |
 
-**The building.** A Class A multi-storey office building in Los Angeles that is on CoStar's Matterport list. The Matterport scan covers one space on one storey, not the whole building.
+**The building.** A Class A, 12-storey, sprinklered office building in Los Angeles that is on CoStar's Matterport list. The Matterport scan covers one suite on one storey, not the whole building.
+
+## What ran end to end (Saturday 14 November 2026, about 1:05 to 1:35 pm CST)
+
+- **CoStar** (the data kit): 26 property fields, 72 current tenant rows, 18 available spaces. Elevators, height, parking and percent leased are empty in that record.
+- **Matterport** (Model API): the scanned suite as 8 rooms with real boundaries, 48 walls, 14 doorways, 30 scan positions and a 199-edge walking graph. The Showcase SDK view was embedded and steered on `localhost`.
+- **Vexcel** (API v2): 7 images (orthos, a roof detail, four obliques). The agent's vision tool read the roof and the parking on them.
+- **The exercise:** the board ran a phone-rescue exercise end to end on that building with a live model: a pre-plan citing each layer, both simulated phones located and brought out, and a report with its provenance. Phones, pucks and crews were simulated.
+- **Known limits:** the scan covers one suite, not the storey; the scan's georeference lands about 90 m from the record's map point (the pre-plan flagged it; not corrected); the first live run needed one order given by hand (fixed since).
+- Hands-free live replay: see the matching line in the README's "Sponsor data" section.
+
+None of this data is in the public repository: it runs on stand-ins (real open data for a different building and a synthetic twin), labelled as not the sponsor's.
 
 ## Still a stand-in, or not in any layer
 

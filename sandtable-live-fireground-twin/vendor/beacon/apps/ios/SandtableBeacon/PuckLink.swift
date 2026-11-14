@@ -109,6 +109,8 @@ final class PuckLink: NSObject {
     private(set) var direction: simd_float3?
     private(set) var horizontalAngle: Float?
     private(set) var angleTime: TimeInterval = 0
+    /// When the first distance of this connection arrived (0 = none yet). Used by "take turns".
+    private(set) var firstDistanceAt: TimeInterval = 0
 
     /// Last two bytes of the accessory configuration data, as 4 hex digits. The research
     /// note says they follow the board's UWB short address, so they should be the same
@@ -123,6 +125,7 @@ final class PuckLink: NSObject {
     private var niSession: NISession?
     private var configuration: NINearbyAccessoryConfiguration?
     private var initAttempts = 0
+    private var pendingSubscriptions = 0
     private var lastInitSent: TimeInterval = 0
     private var stopRequested = false
     private var invalidationRetries = 0
@@ -280,6 +283,11 @@ final class PuckLink: NSObject {
         send(Data([MessageId.initialize.rawValue]))
     }
 
+    private func canWrite(_ characteristic: CBCharacteristic) -> Bool {
+        let props = characteristic.properties
+        return props.contains(.write) || props.contains(.writeWithoutResponse)
+    }
+
     /// Writes one message to the board's rx characteristic.
     /// Like the sample: truncate to maximumWriteValueLength and write in one go.
     /// Differs from the sample: the sample always writes `.withResponse`; we use
@@ -398,6 +406,9 @@ extension PuckLink: CBPeripheralDelegate {
                 log("service invalidated; discovering again")
                 rxCharacteristic = nil
                 txCharacteristic = nil
+                pendingSubscriptions = 0
+                initAttempts = 0
+                connectedAt = nowSeconds()      // restarts the 12 s watchdog in tick()
                 peripheral.discoverServices(PuckUUIDs.services)
             }
         }
@@ -444,6 +455,14 @@ extension PuckLink: CBPeripheralDelegate {
                 txCharacteristic = characteristic
             }
         }
+        // Differs from the sample: the sample always writes to "rx". If "rx" cannot be
+        // written but "tx" can (UUIDs named from the other side's point of view), write
+        // to "tx" instead, so the board still receives initialize (0x0A).
+        if let rx = rxCharacteristic, let tx = txCharacteristic, !canWrite(rx), canWrite(tx) {
+            rxCharacteristic = tx
+            txCharacteristic = rx
+            log("rx is not writable but tx is: writing to tx")
+        }
         // Differs from the sample: the sample calls setNotifyValue(true) on both rx and tx.
         // We call it on whichever of the two can notify or indicate (normally tx only).
         var toSubscribe: [CBCharacteristic] = []
@@ -456,6 +475,7 @@ extension PuckLink: CBPeripheralDelegate {
         for characteristic in toSubscribe {
             let props = characteristic.properties
             if props.contains(.notify) || props.contains(.indicate) {
+                pendingSubscriptions += 1
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
@@ -465,14 +485,23 @@ extension PuckLink: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if pendingSubscriptions > 0 {
+            pendingSubscriptions -= 1
+        }
         if let error = error {
             log("could not subscribe: \(error.localizedDescription)")
+            // Another subscription may carry the board's answer: ask once all have answered
+            // (tick() also asks after 3 s, and gives up after 3 unanswered attempts).
+            if pendingSubscriptions == 0 && initAttempts == 0 && rxCharacteristic != nil {
+                sendInitialize(nowSeconds())
+            }
             return
         }
         if characteristic.isNotifying {
             // Differs from the sample: the sample waits for a button press before sending
-            // initialize. We send it as soon as the board can answer.
-            if initAttempts == 0 {
+            // initialize. We send it as soon as every subscription we asked for is
+            // confirmed, so the board's answer (0x01) cannot arrive before we listen.
+            if pendingSubscriptions == 0 && initAttempts == 0 {
                 sendInitialize(nowSeconds())
             }
         } else {
@@ -543,6 +572,9 @@ extension PuckLink: NISessionDelegate {
             if let d = object.distance {
                 distance = d
                 distanceTime = now
+                if firstDistanceAt == 0 {
+                    firstDistanceAt = now
+                }
                 if phase != .ranging {
                     setPhase(.ranging, "")
                     invalidationRetries = 0

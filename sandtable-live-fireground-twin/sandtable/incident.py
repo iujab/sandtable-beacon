@@ -301,7 +301,8 @@ class Incident:
                 left = [v for v in self._people() if v["status"] not in ("out",)]
                 rest = (f" Handed over, still inside and not reached: {', '.join(v['id'] for v in left)}" +
                         (lambda n: f" ({n} {'person' if n == 1 else 'people'} reported)")(sum(int(v.get('people') or 1) for v in left)) + ".") if left else ""
-                self._log("par", f"All crews are out of the floor with {names}." + (rest or " Accountability complete."))
+                from .beacon_link import closing_line            # what is true, never "accountability complete" (people may be unaccounted)
+                self._log("par", closing_line(self, names) + rest)
                 self._situation("all_out", None, {})
 
     # ------------------------------------------------------------------ scout mode: located people

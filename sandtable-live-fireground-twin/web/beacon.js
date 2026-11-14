@@ -17,6 +17,23 @@ export function chipSpot(room, b) {
   if (!pts.length) return spots[0];
   return spots.map((s) => [s, Math.min(...pts.map((p) => Math.hypot(p[0] - s[0], p[1] - s[1])))]).sort((a, c) => c[1] - a[1])[0][0];
 }
+// the two-puck case in words, only from what the phone object says (shown on the phone's card)
+export function mirrorCaption(p) {
+  const uwb = (p.ranges || []).filter((r) => r.kind === "uwb");
+  if (p.geometry === "fix" && (p.pruned || []).length && uwb.length === 2)
+    return `2 pucks give 2 possible places. One is ${p.pruned[0].reason}: the twin rules it out.`;
+  if (p.geometry === "candidates" && (p.candidates || []).length === 2) {
+    const rs = [...new Set(p.candidates.map((c) => c.room_label || "an unknown room"))];
+    return rs.length === 1 ? `2 possible places, both inside ${rs[0]}: cannot choose until a crew looks.` : `2 possible places, in ${rs.join(" and in ")}: cannot choose until a crew looks.`;
+  }
+  return "";
+}
+// the line through the two pucks a phone is ranged from: its two places are mirror images across it
+export function mirrorPair(p, pucks) {
+  const uwb = (p.ranges || []).filter((r) => r.kind === "uwb" && pucks[r.puck]);
+  if (uwb.length !== 2 || !(p.geometry === "candidates" || (p.geometry === "fix" && (p.pruned || []).length))) return null;
+  return [pucks[uwb[0].puck], pucks[uwb[1].puck]];
+}
 export const tagText = (p) => `${p.id} ${p.report?.status && p.report.status !== "unknown" ? p.report.status : "?"}`;
 export const STATUS_WORD = { trapped: "trapped", injured: "injured", sheltering: "sheltering", ok: "ok", unknown: "no status" };
 export const STATE_WORD = { "against-record": "record disagrees", "not-covered": "no puck there", "people-reported": "people reported", "devices-heard": "devices heard", silent: "silent", "vacant-on-record": "vacant on record", unscanned: "not scanned" };

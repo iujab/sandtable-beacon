@@ -52,6 +52,8 @@
    "ble_shadow_redraw_m": 0.5,
    "links": "same floor only; a device outside the floor outline has no link",
    "uwb_link": {
+    "reports_los": false,
+    "reports_los_text": "an iPhone's Nearby Interaction session reports a distance only: no los, rssi or fp. reports_los=True adds the simulated line-of-sight score and DW3000-style rssi/fp, for studies only (not available from an iPhone)",
     "needs_ble_link": true,
     "outlier_scale": [
      0.25,
@@ -166,7 +168,7 @@
    },
    "chips": {
     "U1": {
-     "model": "iPhone 14",
+     "model": "iPhone 13",
      "bearing": "pointing",
      "source": "ni-direction+compass",
      "sigma_factor": 1.0
@@ -177,10 +179,24 @@
      "source": "camera-assist+compass",
      "sigma_factor": 1.3
     }
+   },
+   "board_sharing": "pairs",
+   "board_sharing_modes": {
+    "pairs": "each puck position carries one board per phone: every phone in range is ranged by every puck continuously (an idealisation of the hardware)",
+    "turns": "each puck is ONE board (Qorvo stock firmware) that serves one phone at a time: 4 s of ranges to one phone, then the next phone in range after a 1 to 2 s connection set-up gap, round robin; a phone hears each puck in bursts"
+   },
+   "turns": {
+    "serve_s": 4.0,
+    "gap_s": [
+     1.0,
+     2.0
+    ],
+    "single_phone": "a puck with one phone in range keeps serving it, no gap"
    }
   },
   "text": "see the beacon/sim.py module docstring (stated model); radio constants: models.DEFAULT_NOISE"
  },
+ "observations": "live-like: every UWB observation carries a distance only (no los, rssi or fp), as an iPhone's Nearby Interaction session gives; board_sharing 'pairs' (each puck position carries one board per phone) unless an arm says otherwise",
  "pipeline": "beacon.track.PhoneTrack (median of the last UWB ranges, mean RSSI, hysteresis) -> beacon.locate.estimate",
  "obs_s": 3.0,
  "sim_hz": 10.0,
@@ -203,7 +219,10 @@
   "tp_draws": 2,
   "tp_false_positions": 150,
   "tp_ref_draws": 1,
-  "tp_cadence_check": 40
+  "tp_cadence_check": 40,
+  "los_flag_trials": 90,
+  "two_phone_turns_trials": 50,
+  "two_phone_pairs_trials": 25
  },
  "quick": false,
  "locator_rules": {
@@ -230,7 +249,10 @@
   "arc_bin_deg": 2.0,
   "prune_margin_m": 3.0,
   "prune_keep_m": 1.0,
-  "impossible_log_penalty": 20.0
+  "impossible_log_penalty": 20.0,
+  "mirror_weight_floor": 0.2,
+  "mirror_min_share": 0.03,
+  "mirror_guarantee": "With UWB from exactly two pucks, or from pucks in a line, and no bearing, the ranges cannot tell a point from its mirror image across the line through the pucks. A fix is then published only if the mirror image of that fix is explained: it lies inside the fix's own 2-sigma ellipse (the two spots merge into one region, published with the sigma of the whole region), or it is outside the building, inside a wall, farther than max_range_m or behind more than max_walls walls from a ranging puck, or (only when the ranges carry a line-of-sight score) behind a wall from a line-of-sight puck; every explained mirror is listed in `pruned` with that reason. Otherwise the result is `candidates` with both spots, never a fix: the posterior is split by side of the line and each side's MASS (not its density, so a spot widened by a wall's bias is not lost) gives the weights, floored so that neither is below 0.2 unless the two spots have different wall counts to a puck (the twin's wall model then separates them and the posterior weights stand). A side with a spread over 1 m makes the result a ring. The rule is structural: it does not depend on the HPD threshold, and no line-of-sight score is needed."
  },
  "title": "SIMULATED: the owner's two-puck demo: how often two pucks give one answer, and how often it is wrong",
  "live_like": "UWB ranges only (no los, rssi or fp fields: the iPhone gives a distance), no Bluetooth, no bearing, a still U1 phone, 3 s of ranges per puck at about 5 Hz; default noise model (body blocks, static link bias); twin on",
@@ -248,38 +270,38 @@
   "door-wall": {
    "n": 800,
    "outcome_share": {
-    "twin_fix": 0.481,
-    "statement_fix": 0.292,
-    "cannot_choose": 0.0,
-    "ring_or_other": 0.226
+    "twin_fix": 0.347,
+    "statement_fix": 0.416,
+    "cannot_choose": 0.026,
+    "ring_or_other": 0.21
    },
    "twin_fix": {
-    "n": 385,
-    "wrong_fix_rate_of_these": 0.013,
-    "fix_err_median_m": 0.264,
-    "fix_err_p90_m": 0.768,
-    "sigma_median_m": 0.48
+    "n": 278,
+    "wrong_fix_rate_of_these": 0.018,
+    "fix_err_median_m": 0.249,
+    "fix_err_p90_m": 0.798,
+    "sigma_median_m": 0.5
    },
    "statement_fix": {
-    "n": 234,
-    "wrong_fix_rate_of_these": 0.017,
-    "fix_err_median_m": 0.249,
-    "fix_err_p90_m": 0.575,
-    "sigma_median_m": 0.49
+    "n": 333,
+    "wrong_fix_rate_of_these": 0.012,
+    "fix_err_median_m": 0.258,
+    "fix_err_p90_m": 0.731,
+    "sigma_median_m": 0.48
    },
    "all_fixes": {
-    "n": 619,
-    "share_of_trials": 0.774,
+    "n": 611,
+    "share_of_trials": 0.764,
     "wrong_fix_rate_of_fixes": 0.015,
     "wrong_fix_rate_of_trials": 0.011,
-    "fix_err_median_m": 0.259,
-    "fix_err_p90_m": 0.756
+    "fix_err_median_m": 0.258,
+    "fix_err_p90_m": 0.765
    },
    "hpd_area_median_m2": 1.94,
    "geometry_after_statement_share": {
-    "fix": 0.774,
-    "candidates": 0.0,
-    "ring": 0.2,
+    "fix": 0.764,
+    "candidates": 0.026,
+    "ring": 0.184,
     "zone": 0.0,
     "none": 0.026
    },
@@ -290,13 +312,14 @@
     "3": 0.0
    },
    "dismissed_mirror_rooms": {
-    "r311": 183,
-    "r309": 47,
-    "rcW": 3,
-    "rcS": 7
+    "r311": 316,
+    "rcW": 16,
+    "rcS": 1
    },
    "conflict_share": 0.0,
-   "twin_pruned_share": 0.476,
+   "twin_pruned_share": 0.329,
+   "wrong_fix_rate_of_trials": 0.011,
+   "wrong_fix_rate_of_fixes": 0.015,
    "pucks": {
     "pucks": [
      {
@@ -312,46 +335,49 @@
     ],
     "wall": "east wall (the wall the door is in)",
     "spacing_m": 4.0,
-    "mirror_falls": "the west corridor",
+    "mirror_falls": "beyond the door wall: the west corridor or the next suite",
     "certain": false,
-    "why": "Both pucks 0.35 m inside the wall the door is in, 4.0 m apart: one beside the door, one slid along the wall. The mirror image of anyone in the room falls in the west corridor, where the crew is; it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed."
-   }
+    "why": "Both pucks 0.35 m inside the wall the door is in, 4.0 m apart: one beside the door, one slid along the wall. The mirror image of anyone in the room falls beyond that wall, outside the room (in the west corridor or the suite next door); the twin removes it when the ranges do not fit a spot behind a wall, otherwise it is dismissed on the occupant's stated suite or command's search room, and shown as dismissed."
+   },
+   "observations": "live-like: UWB distance only",
+   "reports_los": false,
+   "board_sharing": "pairs"
   },
   "exterior-wall": {
    "n": 800,
    "outcome_share": {
-    "twin_fix": 0.776,
-    "statement_fix": 0.052,
-    "cannot_choose": 0.0,
-    "ring_or_other": 0.171
+    "twin_fix": 0.705,
+    "statement_fix": 0.0,
+    "cannot_choose": 0.114,
+    "ring_or_other": 0.181
    },
    "twin_fix": {
-    "n": 621,
+    "n": 564,
     "wrong_fix_rate_of_these": 0.023,
-    "fix_err_median_m": 0.257,
-    "fix_err_p90_m": 0.767,
-    "sigma_median_m": 0.46
+    "fix_err_median_m": 0.251,
+    "fix_err_p90_m": 0.782,
+    "sigma_median_m": 0.47
    },
    "statement_fix": {
-    "n": 42,
-    "wrong_fix_rate_of_these": 0.0,
-    "fix_err_median_m": 0.256,
-    "fix_err_p90_m": 0.596,
-    "sigma_median_m": 0.505
+    "n": 0,
+    "wrong_fix_rate_of_these": null,
+    "fix_err_median_m": null,
+    "fix_err_p90_m": null,
+    "sigma_median_m": null
    },
    "all_fixes": {
-    "n": 663,
-    "share_of_trials": 0.829,
-    "wrong_fix_rate_of_fixes": 0.021,
-    "wrong_fix_rate_of_trials": 0.018,
-    "fix_err_median_m": 0.257,
-    "fix_err_p90_m": 0.763
+    "n": 564,
+    "share_of_trials": 0.705,
+    "wrong_fix_rate_of_fixes": 0.023,
+    "wrong_fix_rate_of_trials": 0.016,
+    "fix_err_median_m": 0.251,
+    "fix_err_p90_m": 0.782
    },
    "hpd_area_median_m2": 1.44,
    "geometry_after_statement_share": {
-    "fix": 0.829,
-    "candidates": 0.0,
-    "ring": 0.146,
+    "fix": 0.705,
+    "candidates": 0.114,
+    "ring": 0.156,
     "zone": 0.0,
     "none": 0.025
    },
@@ -361,11 +387,11 @@
     "2": 0.833,
     "3": 0.0
    },
-   "dismissed_mirror_rooms": {
-    "r309": 42
-   },
+   "dismissed_mirror_rooms": {},
    "conflict_share": 0.0,
-   "twin_pruned_share": 0.26,
+   "twin_pruned_share": 0.671,
+   "wrong_fix_rate_of_trials": 0.016,
+   "wrong_fix_rate_of_fixes": 0.023,
    "pucks": {
     "pucks": [
      {
@@ -384,43 +410,46 @@
     "mirror_falls": "outside the building",
     "certain": true,
     "why": "Both pucks 0.35 m inside the west wall, 4.0 m apart. The mirror image of anyone in the room is outside the building, so the twin removes it."
-   }
+   },
+   "observations": "live-like: UWB distance only",
+   "reports_los": false,
+   "board_sharing": "pairs"
   },
   "careless": {
    "n": 800,
    "outcome_share": {
-    "twin_fix": 0.17,
-    "statement_fix": 0.005,
-    "cannot_choose": 0.575,
-    "ring_or_other": 0.25
+    "twin_fix": 0.037,
+    "statement_fix": 0.004,
+    "cannot_choose": 0.861,
+    "ring_or_other": 0.098
    },
    "twin_fix": {
-    "n": 136,
+    "n": 30,
     "wrong_fix_rate_of_these": 0.0,
-    "fix_err_median_m": 0.485,
-    "fix_err_p90_m": 0.962,
-    "sigma_median_m": 0.64
+    "fix_err_median_m": 0.263,
+    "fix_err_p90_m": 0.65,
+    "sigma_median_m": 0.35
    },
    "statement_fix": {
-    "n": 4,
-    "wrong_fix_rate_of_these": 0.0,
-    "fix_err_median_m": 0.569,
-    "fix_err_p90_m": 0.629,
-    "sigma_median_m": 0.895
+    "n": 3,
+    "wrong_fix_rate_of_these": 0.333,
+    "fix_err_median_m": 0.967,
+    "fix_err_p90_m": 8.405,
+    "sigma_median_m": 0.48
    },
    "all_fixes": {
-    "n": 140,
-    "share_of_trials": 0.175,
-    "wrong_fix_rate_of_fixes": 0.0,
-    "wrong_fix_rate_of_trials": 0.0,
-    "fix_err_median_m": 0.502,
-    "fix_err_p90_m": 0.962
+    "n": 33,
+    "share_of_trials": 0.041,
+    "wrong_fix_rate_of_fixes": 0.03,
+    "wrong_fix_rate_of_trials": 0.001,
+    "fix_err_median_m": 0.302,
+    "fix_err_p90_m": 0.727
    },
    "hpd_area_median_m2": 2.0,
    "geometry_after_statement_share": {
-    "fix": 0.175,
-    "candidates": 0.575,
-    "ring": 0.245,
+    "fix": 0.041,
+    "candidates": 0.861,
+    "ring": 0.092,
     "zone": 0.0,
     "none": 0.005
    },
@@ -431,10 +460,12 @@
     "3": 0.0
    },
    "dismissed_mirror_rooms": {
-    "r309": 4
+    "r309": 3
    },
-   "conflict_share": 0.0,
+   "conflict_share": 0.001,
    "twin_pruned_share": 0.0,
+   "wrong_fix_rate_of_trials": 0.001,
+   "wrong_fix_rate_of_fixes": 0.03,
    "pucks": {
     "pucks": [
      {
@@ -453,43 +484,46 @@
     "mirror_falls": "inside the room",
     "certain": false,
     "why": "Comparison layout: both pucks mid-room. The mirror image stays inside the room and nothing can dismiss it."
-   }
+   },
+   "observations": "live-like: UWB distance only",
+   "reports_los": false,
+   "board_sharing": "pairs"
   },
   "three-pucks (door-wall pair + far corner)": {
    "n": 400,
    "outcome_share": {
-    "twin_fix": 0.838,
-    "statement_fix": 0.048,
-    "cannot_choose": 0.028,
-    "ring_or_other": 0.087
+    "twin_fix": 0.775,
+    "statement_fix": 0.065,
+    "cannot_choose": 0.085,
+    "ring_or_other": 0.075
    },
    "twin_fix": {
-    "n": 335,
-    "wrong_fix_rate_of_these": 0.012,
-    "fix_err_median_m": 0.199,
-    "fix_err_p90_m": 0.614,
-    "sigma_median_m": 0.27
+    "n": 310,
+    "wrong_fix_rate_of_these": 0.013,
+    "fix_err_median_m": 0.188,
+    "fix_err_p90_m": 0.597,
+    "sigma_median_m": 0.26
    },
    "statement_fix": {
-    "n": 19,
+    "n": 26,
     "wrong_fix_rate_of_these": 0.0,
-    "fix_err_median_m": 0.244,
-    "fix_err_p90_m": 0.449,
-    "sigma_median_m": 0.36
+    "fix_err_median_m": 0.256,
+    "fix_err_p90_m": 0.53,
+    "sigma_median_m": 0.365
    },
    "all_fixes": {
-    "n": 354,
-    "share_of_trials": 0.885,
-    "wrong_fix_rate_of_fixes": 0.011,
+    "n": 336,
+    "share_of_trials": 0.84,
+    "wrong_fix_rate_of_fixes": 0.012,
     "wrong_fix_rate_of_trials": 0.01,
-    "fix_err_median_m": 0.202,
-    "fix_err_p90_m": 0.608
+    "fix_err_median_m": 0.196,
+    "fix_err_p90_m": 0.589
    },
    "hpd_area_median_m2": 0.62,
    "geometry_after_statement_share": {
-    "fix": 0.885,
-    "candidates": 0.028,
-    "ring": 0.083,
+    "fix": 0.84,
+    "candidates": 0.085,
+    "ring": 0.07,
     "zone": 0.0,
     "none": 0.005
    },
@@ -500,11 +534,14 @@
     "3": 0.698
    },
    "dismissed_mirror_rooms": {
-    "r311": 11,
-    "r309": 8
+    "r311": 23,
+    "r309": 2,
+    "rcW": 1
    },
    "conflict_share": 0.0,
-   "twin_pruned_share": 0.11,
+   "twin_pruned_share": 0.085,
+   "wrong_fix_rate_of_trials": 0.01,
+   "wrong_fix_rate_of_fixes": 0.012,
    "pucks": {
     "pucks": [
      {
@@ -524,45 +561,48 @@
      }
     ],
     "why": "the door-wall pair plus a third puck 0.35 m in from the corner farthest from the door"
-   }
+   },
+   "observations": "live-like: UWB distance only",
+   "reports_los": false,
+   "board_sharing": "pairs"
   }
  },
  "false_statement": {
   "door-wall": {
    "n": 300,
    "outcome_share": {
-    "twin_fix": 0.013,
-    "statement_fix": 0.043,
-    "cannot_choose": 0.0,
-    "ring_or_other": 0.943
+    "twin_fix": 0.003,
+    "statement_fix": 0.06,
+    "cannot_choose": 0.013,
+    "ring_or_other": 0.923
    },
    "twin_fix": {
-    "n": 4,
-    "wrong_fix_rate_of_these": 0.25,
-    "fix_err_median_m": 1.159,
-    "fix_err_p90_m": 8.759,
-    "sigma_median_m": 0.55
+    "n": 1,
+    "wrong_fix_rate_of_these": 1.0,
+    "fix_err_median_m": 11.887,
+    "fix_err_p90_m": 11.887,
+    "sigma_median_m": 0.48
    },
    "statement_fix": {
-    "n": 13,
+    "n": 18,
     "wrong_fix_rate_of_these": 1.0,
-    "fix_err_median_m": 3.026,
-    "fix_err_p90_m": 4.008,
-    "sigma_median_m": 0.27
+    "fix_err_median_m": 2.766,
+    "fix_err_p90_m": 3.967,
+    "sigma_median_m": 0.3
    },
    "all_fixes": {
-    "n": 17,
-    "share_of_trials": 0.057,
-    "wrong_fix_rate_of_fixes": 0.824,
-    "wrong_fix_rate_of_trials": 0.047,
-    "fix_err_median_m": 2.851,
-    "fix_err_p90_m": 4.416
+    "n": 19,
+    "share_of_trials": 0.063,
+    "wrong_fix_rate_of_fixes": 1.0,
+    "wrong_fix_rate_of_trials": 0.063,
+    "fix_err_median_m": 2.796,
+    "fix_err_p90_m": 4.22
    },
    "hpd_area_median_m2": 17.75,
    "geometry_after_statement_share": {
-    "fix": 0.057,
-    "candidates": 0.0,
-    "ring": 0.773,
+    "fix": 0.063,
+    "candidates": 0.013,
+    "ring": 0.753,
     "zone": 0.0,
     "none": 0.17
    },
@@ -573,63 +613,63 @@
     "3": 0.0
    },
    "dismissed_mirror_rooms": {
-    "r309": 2,
-    "rcS": 1,
-    "r311": 11
+    "r311": 18
    },
-   "conflict_share": 0.0,
+   "conflict_share": 0.013,
    "twin_pruned_share": 0.003,
-   "statement_produced_wrong_fix_rate_of_trials": 0.043,
+   "statement_produced_wrong_fix_rate_of_trials": 0.06,
    "by_true_room": {
     "r309": {
-     "twin_fix": 0.005,
-     "statement_fix": 0.009,
-     "cannot_choose": 0.0,
-     "ring_or_other": 0.986
+     "twin_fix": 0.0,
+     "statement_fix": 0.0,
+     "cannot_choose": 0.018,
+     "ring_or_other": 0.982
     },
     "r311": {
-     "twin_fix": 0.037,
-     "statement_fix": 0.138,
+     "twin_fix": 0.013,
+     "statement_fix": 0.225,
      "cannot_choose": 0.0,
-     "ring_or_other": 0.825
+     "ring_or_other": 0.762
     }
-   }
+   },
+   "published_fixes_wrong_share": 1.0,
+   "published_fixes_share_of_trials": 0.063
   },
   "exterior-wall": {
    "n": 300,
    "outcome_share": {
-    "twin_fix": 0.013,
-    "statement_fix": 0.01,
-    "cannot_choose": 0.003,
-    "ring_or_other": 0.973
+    "twin_fix": 0.007,
+    "statement_fix": 0.0,
+    "cannot_choose": 0.007,
+    "ring_or_other": 0.987
    },
    "twin_fix": {
-    "n": 4,
+    "n": 2,
     "wrong_fix_rate_of_these": 0.0,
-    "fix_err_median_m": 0.428,
-    "fix_err_p90_m": 0.704,
-    "sigma_median_m": 0.76
+    "fix_err_median_m": 0.265,
+    "fix_err_p90_m": 0.393,
+    "sigma_median_m": 0.775
    },
    "statement_fix": {
-    "n": 3,
-    "wrong_fix_rate_of_these": 0.333,
-    "fix_err_median_m": 1.294,
-    "fix_err_p90_m": 1.752,
-    "sigma_median_m": 0.5
+    "n": 0,
+    "wrong_fix_rate_of_these": null,
+    "fix_err_median_m": null,
+    "fix_err_p90_m": null,
+    "sigma_median_m": null
    },
    "all_fixes": {
-    "n": 7,
-    "share_of_trials": 0.023,
-    "wrong_fix_rate_of_fixes": 0.143,
-    "wrong_fix_rate_of_trials": 0.003,
-    "fix_err_median_m": 0.821,
-    "fix_err_p90_m": 1.523
+    "n": 2,
+    "share_of_trials": 0.007,
+    "wrong_fix_rate_of_fixes": 0.0,
+    "wrong_fix_rate_of_trials": 0.0,
+    "fix_err_median_m": 0.265,
+    "fix_err_p90_m": 0.393
    },
    "hpd_area_median_m2": 16.625,
    "geometry_after_statement_share": {
-    "fix": 0.023,
-    "candidates": 0.003,
-    "ring": 0.733,
+    "fix": 0.007,
+    "candidates": 0.007,
+    "ring": 0.747,
     "zone": 0.0,
     "none": 0.24
    },
@@ -639,34 +679,34 @@
     "2": 0.3,
     "3": 0.0
    },
-   "dismissed_mirror_rooms": {
-    "r309": 3
-   },
-   "conflict_share": 0.003,
-   "twin_pruned_share": 0.003,
-   "statement_produced_wrong_fix_rate_of_trials": 0.003,
+   "dismissed_mirror_rooms": {},
+   "conflict_share": 0.007,
+   "twin_pruned_share": 0.007,
+   "statement_produced_wrong_fix_rate_of_trials": 0.0,
    "by_true_room": {
     "r309": {
-     "twin_fix": 0.009,
-     "statement_fix": 0.014,
-     "cannot_choose": 0.0,
-     "ring_or_other": 0.977
+     "twin_fix": 0.0,
+     "statement_fix": 0.0,
+     "cannot_choose": 0.009,
+     "ring_or_other": 0.991
     },
     "r311": {
      "twin_fix": 0.025,
      "statement_fix": 0.0,
-     "cannot_choose": 0.013,
-     "ring_or_other": 0.963
+     "cannot_choose": 0.0,
+     "ring_or_other": 0.975
     }
-   }
+   },
+   "published_fixes_wrong_share": 0.0,
+   "published_fixes_share_of_trials": 0.007
   },
   "careless": {
    "n": 300,
    "outcome_share": {
     "twin_fix": 0.0,
-    "statement_fix": 0.003,
-    "cannot_choose": 0.087,
-    "ring_or_other": 0.91
+    "statement_fix": 0.0,
+    "cannot_choose": 0.113,
+    "ring_or_other": 0.887
    },
    "twin_fix": {
     "n": 0,
@@ -676,25 +716,25 @@
     "sigma_median_m": null
    },
    "statement_fix": {
-    "n": 1,
-    "wrong_fix_rate_of_these": 1.0,
-    "fix_err_median_m": 2.555,
-    "fix_err_p90_m": 2.555,
-    "sigma_median_m": 0.86
+    "n": 0,
+    "wrong_fix_rate_of_these": null,
+    "fix_err_median_m": null,
+    "fix_err_p90_m": null,
+    "sigma_median_m": null
    },
    "all_fixes": {
-    "n": 1,
-    "share_of_trials": 0.003,
-    "wrong_fix_rate_of_fixes": 1.0,
-    "wrong_fix_rate_of_trials": 0.003,
-    "fix_err_median_m": 2.555,
-    "fix_err_p90_m": 2.555
+    "n": 0,
+    "share_of_trials": 0.0,
+    "wrong_fix_rate_of_fixes": null,
+    "wrong_fix_rate_of_trials": 0.0,
+    "fix_err_median_m": null,
+    "fix_err_p90_m": null
    },
    "hpd_area_median_m2": 13.69,
    "geometry_after_statement_share": {
-    "fix": 0.003,
-    "candidates": 0.087,
-    "ring": 0.74,
+    "fix": 0.0,
+    "candidates": 0.113,
+    "ring": 0.717,
     "zone": 0.0,
     "none": 0.17
    },
@@ -704,41 +744,93 @@
     "2": 0.423,
     "3": 0.0
    },
-   "dismissed_mirror_rooms": {
-    "r309": 1
-   },
-   "conflict_share": 0.08,
-   "twin_pruned_share": 0.013,
-   "statement_produced_wrong_fix_rate_of_trials": 0.003,
+   "dismissed_mirror_rooms": {},
+   "conflict_share": 0.1,
+   "twin_pruned_share": 0.0,
+   "statement_produced_wrong_fix_rate_of_trials": 0.0,
    "by_true_room": {
     "r309": {
      "twin_fix": 0.0,
-     "statement_fix": 0.005,
-     "cannot_choose": 0.073,
-     "ring_or_other": 0.923
+     "statement_fix": 0.0,
+     "cannot_choose": 0.105,
+     "ring_or_other": 0.895
     },
     "r311": {
      "twin_fix": 0.0,
      "statement_fix": 0.0,
-     "cannot_choose": 0.125,
-     "ring_or_other": 0.875
+     "cannot_choose": 0.138,
+     "ring_or_other": 0.863
     }
-   }
+   },
+   "published_fixes_wrong_share": null,
+   "published_fixes_share_of_trials": 0.0
+  }
+ },
+ "two_phones": {
+  "setup": "door-wall pucks, two still U1 phones in the fire room (>= 1 m apart, the same scenes in both modes), live-like UWB only, trackers keep a range 25 s (link_stale_s), estimates at 2 Hz, 24 s per scene; occupant's statement = the fire room",
+  "modes": {
+   "turns": "each puck is ONE board (Qorvo stock firmware) that serves one phone at a time: 4 s of ranges to one phone, then the next phone in range after a 1 to 2 s connection set-up gap, round robin; a phone hears each puck in bursts",
+   "pairs": "each puck position carries one board per phone: every phone in range is ranged by every puck continuously (an idealisation of the hardware)"
+  },
+  "turns": {
+   "phone_scenes": 100,
+   "wait_first_two_puck_ranges": {
+    "median_s": 2.5,
+    "p90_s": 8.0,
+    "never_within_scene": 0.2
+   },
+   "wait_first_fix": {
+    "median_s": 3.5,
+    "p90_s": 9.0,
+    "never_within_scene": 0.23
+   },
+   "outcome_share_at_end": {
+    "twin_fix": 0.34,
+    "statement_fix": 0.41,
+    "cannot_choose": 0.04,
+    "ring_or_other": 0.21
+   },
+   "wrong_fix_rate_of_fixes": 0.027,
+   "wrong_fix_rate_of_trials": 0.02,
+   "fix_err_median_m": 0.284
+  },
+  "pairs": {
+   "phone_scenes": 50,
+   "wait_first_two_puck_ranges": {
+    "median_s": 0.5,
+    "p90_s": 0.5,
+    "never_within_scene": 0.18
+   },
+   "wait_first_fix": {
+    "median_s": 1.5,
+    "p90_s": 1.5,
+    "never_within_scene": 0.22
+   },
+   "outcome_share_at_end": {
+    "twin_fix": 0.38,
+    "statement_fix": 0.38,
+    "cannot_choose": 0.04,
+    "ring_or_other": 0.2
+   },
+   "wrong_fix_rate_of_fixes": 0.026,
+   "wrong_fix_rate_of_trials": 0.02,
+   "fix_err_median_m": 0.248
   }
  },
  "cadence_check": {
   "text": "estimates every 0.25 s over 3 s vs only in the last second (this run)",
   "records": 40,
-  "identical_outcome_and_fix": 40
+  "identical_outcome_and_fix": 39
  },
  "timings_s": {
-  "main_s": 29.1,
-  "cadence_check_s": 2.5,
-  "cold_s": 0.3,
-  "layouts_s": 23.8,
-  "two_puck_s": 10.8,
+  "main_s": 21.4,
+  "cadence_check_s": 1.8,
+  "cold_s": 0.2,
+  "layouts_s": 17.5,
+  "two_puck_s": 7.1,
+  "two_phone_s": 4.1,
   "two_puck_cadence_check_s": 0.2,
-  "layout_figures_s": 1.4,
-  "two_puck_figures_s": 0.9
+  "layout_figures_s": 0.9,
+  "two_puck_figures_s": 0.6
  }
 }

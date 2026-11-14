@@ -13,6 +13,7 @@
 // JSON names, so there is no key-mapping step that could go wrong.
 
 import Foundation
+import Combine
 
 // MARK: - Time and rounding helpers
 
@@ -219,6 +220,12 @@ struct IngestResponse: Codable {
     var ack: WireAck?
 }
 
+/// The body of an HTTP error from the server (FastAPI: {"detail": "..."}). A
+/// non-string detail (a list, from a validation error) just fails to decode.
+struct ServerErrorReply: Decodable {
+    var detail: String?
+}
+
 // MARK: - Suite directory: GET /api/directory
 
 /// One entry of the building's suite list. The server may send `floor` and `suite`
@@ -228,8 +235,9 @@ struct DirectoryEntry: Decodable, Identifiable {
     var floor: String?
     var label: String?
 
+    /// Unique per row: the same suite number may exist on two floors.
     var id: String {
-        return suite
+        return (floor ?? "") + "/" + suite
     }
 
     enum CodingKeys: String, CodingKey {
@@ -317,6 +325,9 @@ final class AppSettings: ObservableObject {
         static let cameraAssist = "beacon.cameraAssist"
         static let flipAngleSign = "beacon.flipAngleSign"
         static let nameOnlyKey = "beacon.nameOnlyKey"
+        static let takeTurns = "beacon.takeTurns"
+        static let holdSeconds = "beacon.holdSeconds"
+        static let disabledBoards = "beacon.disabledBoards"
     }
 
     /// The Beacon server, e.g. "http://192.168.1.20:1885".
@@ -334,9 +345,9 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(homeFloor, forKey: Keys.homeFloor) }
     }
 
-    /// How many boards to connect to at once (1 to 5). The stock firmware probably
-    /// serves one phone per board, so two phones must share five boards.
-    @Published var maxPucks: Int = 3 {
+    /// How many boards to connect to at once (1 to 5). Qorvo's stock firmware serves ONE
+    /// phone per board at a time and stops advertising while connected (Qorvo forum).
+    @Published var maxPucks: Int = 2 {
         didSet { UserDefaults.standard.set(maxPucks, forKey: Keys.maxPucks) }
     }
 
@@ -356,16 +367,85 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(nameOnlyKey, forKey: Keys.nameOnlyKey) }
     }
 
+    /// "Take turns": range ONE board at a time, hold it for `holdSeconds` once distances
+    /// arrive, then release it so another phone can use it. For two phones sharing boards.
+    @Published var takeTurns: Bool = false {
+        didSet { UserDefaults.standard.set(takeTurns, forKey: Keys.takeTurns) }
+    }
+
+    /// How long to keep a board in "take turns" mode once its distances arrive (2 to 20 s).
+    @Published var holdSeconds: Int = 4 {
+        didSet { UserDefaults.standard.set(holdSeconds, forKey: Keys.holdSeconds) }
+    }
+
+    /// Boards this phone must NOT use, by CBPeripheral.identifier (uuidString). Default:
+    /// every board is used. Lets the owner dedicate boards to a phone.
+    @Published var disabledBoards: [String] = [] {
+        didSet { UserDefaults.standard.set(disabledBoards, forKey: Keys.disabledBoards) }
+    }
+
+    /// Not stored: the confirmation line shown after a QR code set the server.
+    @Published var configNotice: String = ""
+
     init() {
         let d = UserDefaults.standard
         serverAddress = d.string(forKey: Keys.server) ?? ""
         homeSuite = d.string(forKey: Keys.homeSuite) ?? ""
         homeFloor = d.integer(forKey: Keys.homeFloor)
         let m = d.integer(forKey: Keys.maxPucks)
-        maxPucks = (m >= 1 && m <= 5) ? m : 3
+        maxPucks = (m >= 1 && m <= 5) ? m : 2
         cameraAssist = d.bool(forKey: Keys.cameraAssist)
         flipAngleSign = d.bool(forKey: Keys.flipAngleSign)
         nameOnlyKey = d.bool(forKey: Keys.nameOnlyKey)
+        takeTurns = d.bool(forKey: Keys.takeTurns)
+        let h = d.integer(forKey: Keys.holdSeconds)
+        holdSeconds = (h >= 2 && h <= 20) ? h : 4
+        disabledBoards = d.stringArray(forKey: Keys.disabledBoards) ?? []
+    }
+
+    func isBoardEnabled(_ id: UUID) -> Bool {
+        return !disabledBoards.contains(id.uuidString)
+    }
+
+    func setBoardEnabled(_ id: UUID, _ enabled: Bool) {
+        let key = id.uuidString
+        if enabled {
+            disabledBoards.removeAll { $0 == key }
+        } else if !disabledBoards.contains(key) {
+            disabledBoards.append(key)
+        }
+    }
+
+    /// Handles sandtablebeacon://server?url=http://192.168.1.20:1885 (the QR code on the
+    /// board page, opened by the Camera app). Returns true when the server was set.
+    @discardableResult
+    func applyConfigURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "sandtablebeacon" else {
+            return false
+        }
+        guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              (parts.host ?? "").lowercased() == "server" else {
+            configNotice = "This link is not a Beacon server link."
+            return false
+        }
+        var value: String? = nil
+        for item in parts.queryItems ?? [] {
+            if item.name == "url" {
+                value = item.value
+            }
+        }
+        let raw = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let inner = URLComponents(string: raw),
+              let scheme = inner.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let innerHost = inner.host, !innerHost.isEmpty else {
+            configNotice = "The QR code did not contain a valid http:// server address."
+            return false
+        }
+        serverAddress = raw
+        configNotice = "Server set from QR code: " + normalizedServer
+        BeaconLog.shared.add(configNotice)
+        return true
     }
 
     /// "192.168.1.20:1885/" -> "http://192.168.1.20:1885"; "" when nothing is set.

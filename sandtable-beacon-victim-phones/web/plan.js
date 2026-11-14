@@ -679,6 +679,8 @@ export class Plan {
     for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 14 * u, P[1] - 26 * u, P[0] + 14 * u, P[1] + 10 * u]); }
     for (const b of this.presEls || []) { const q = bbox(b.rect); if (q) placed.push(q); }
     if (this._focusTag) { const q = bbox(this._focusTag); if (q) placed.push(q); }
+    // the rooms' own labels (suite numbers, tenants) that are on show
+    for (const labs of Object.values(this.roomLabelEls || {})) for (const t of labs) { if (t.style.display === "none") continue; const q = bbox(t); if (q) placed.push(q); }
     if (this.nextEl) { const q = bbox(this.nextEl.t); if (q) placed.push(q); }
     // and the phones' own markers (fix cores, candidate markers with their weights)
     for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) {

@@ -1,7 +1,7 @@
 // 2D plan of the exercise floor (SVG). Also owns the small client-side graph search used by the "Here" card,
 // and draws the scout scan (scanPlan below) in the same building frame as the 3D twin.
 import { bistatic, sigmaEllipse, victimState, VICTIM_COLOR, PUCK_COLOR, FLAG_COLOR } from "./scout.js";
-import { reportWords, STATUS_WORD, STATUS_COLOR, tagText, chipSpot } from "./beacon.js";
+import { reportWords, STATUS_WORD, STATUS_COLOR, tagText, chipSpot, mirrorPair } from "./beacon.js";
 const NS = "http://www.w3.org/2000/svg";
 const el = (name, attrs = {}, text) => {
   const e = document.createElementNS(NS, name);
@@ -424,11 +424,21 @@ export class Plan {
       else g.append(el("circle", { cx: p[0], cy: p[1], r: 0.42, class: "halo" }), el("circle", { cx: p[0], cy: p[1], r: 0.22, class: "body" }), el("text", { x: p[0] + 0.55, y: p[1] + 0.2, style: `font-size:${fs * 0.8}px;text-anchor:start` }, pk.id));
       tip(g, `Puck ${pk.id} (${(pk.radios || []).join(" + ")})${hand ? ": position measured with tape and placed by hand, not located by the system" : ""}`); hi.appendChild(g);
     }
-    const labels = [];
+    const labels = [], mirrors = new Set();
     for (const ph of b.phones || []) {
       const g = el("g", { class: `bc-phone ${ph.geometry}${ph.stale ? " stale" : ""}${ph.id === selected ? " sel" : ""} st-${ph.report?.status || "unknown"}`, "data-pick": ph.id });
       g.addEventListener("click", () => this.opts.onPick?.(ph.id));
       const r0 = ph.report || {}, head = tagText(ph);
+      // the mirror line: through the two pucks; the phone's two places are mirror images across it
+      const pair = mirrorPair(ph, pucks), pk2 = pair && pair.map((q) => q.id).sort().join("-");
+      if (pair && !mirrors.has(pk2)) {
+        mirrors.add(pk2);
+        const [a, b] = pair, dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, ext = 30;
+        const p1 = P([a.x - dx / L * ext, a.y - dy / L * ext]), p2 = P([b.x + dx / L * ext, b.y + dy / L * ext]);
+        lo.appendChild(el("line", { x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1], class: "mirror-line" }));
+        const m = P([b.x + dx / L * 1.2, b.y + dy / L * 1.2]);
+        hi.appendChild(el("text", { x: m[0], y: m[1] - 0.25, class: "mirror-l", style: `font-size:${fs * 0.62}px` }, `mirror line ${a.id}–${b.id}`));
+      }
       if (ph.geometry === "candidates" || ph.geometry === "fix")
         for (const rg of ph.ranges || []) { const pk = pucks[rg.puck]; if (!pk || rg.kind !== "uwb" || !rg.d_m) continue; g.appendChild(el("path", { d: this._arcPath(pk.x, pk.y, rg.d_m, 0, 360), class: "ring-x" })); }
       let lab = null;
@@ -455,11 +465,11 @@ export class Plan {
         for (let i = 1; i < cs.length; i++) g.appendChild(el("line", { x1: cs[0][0], y1: cs[0][1], x2: cs[i][0], y2: cs[i][1], class: "pair" }));
         ph.candidates.forEach((c, i) => {
           const p = cs[i];
-          g.append(el("circle", { cx: p[0], cy: p[1], r: Math.max(0.3, c.sigma_m || 0.3), class: "cand", "fill-opacity": (0.1 + 0.5 * c.weight).toFixed(2) }), el("circle", { cx: p[0], cy: p[1], r: 0.13, class: "core" }),
+          g.append(el("circle", { cx: p[0], cy: p[1], r: Math.max(0.45, c.sigma_m || 0.3), class: "cand", "fill-opacity": (0.15 + 0.5 * c.weight).toFixed(2) }), el("circle", { cx: p[0], cy: p[1], r: 0.18, class: "core" }),
             el("text", { x: p[0] + 0.45, y: p[1] + 0.2, class: "w", style: `font-size:${fs * 0.7}px` }, `${Math.round(c.weight * 100)}%`));
         });
         for (const q of ph.pruned || []) this._ghost(g, q);
-        if (cs.length > 1) { const m = [(cs[0][0] + cs[1][0]) / 2, (cs[0][1] + cs[1][1]) / 2]; g.appendChild(el("text", { x: m[0], y: m[1] - 0.25, class: "undecided", style: `font-size:${fs * 0.72}px` }, `cannot choose: ${cs.length} places`)); }
+        if (cs.length > 1) { const m = [(cs[0][0] + cs[1][0]) / 2, (cs[0][1] + cs[1][1]) / 2]; g.appendChild(el("text", { x: m[0], y: m[1] - 0.25, class: "undecided", style: `font-size:${fs * 0.95}px` }, `cannot choose: ${cs.length} places`)); }
         const top = cs.reduce((a, q) => (q[1] < a[1] ? q : a), cs[0]);
         lab = [top[0], top[1] - 0.6];
       } else if (ph.geometry === "ring" && ph.ring) {
@@ -492,10 +502,10 @@ export class Plan {
     }
   }
   _ghost(g, q, strike) {
-    const p = this.P([q.x, q.y]), d = 0.34;
+    const p = this.P([q.x, q.y]), d = 0.6;
     const x = el("g", { class: `ghost${strike ? " strike" : ""}` });
-    x.append(el("circle", { cx: p[0], cy: p[1], r: 0.38 }), el("line", { x1: p[0] - d, y1: p[1] - d, x2: p[0] + d, y2: p[1] + d }), el("line", { x1: p[0] - d, y1: p[1] + d, x2: p[0] + d, y2: p[1] - d }),
-      el("text", { x: p[0], y: p[1] + 0.95, class: "why" }, `ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`), el("title", {}, `Ruled out: ${q.reason}`));
+    x.append(el("circle", { cx: p[0], cy: p[1], r: 0.7 }), el("line", { x1: p[0] - d, y1: p[1] - d, x2: p[0] + d, y2: p[1] + d }), el("line", { x1: p[0] - d, y1: p[1] + d, x2: p[0] + d, y2: p[1] - d }),
+      el("text", { x: p[0], y: p[1] + 1.45, class: "why" }, `ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`), el("title", {}, `Ruled out: ${q.reason}`));
     if (strike) {
       // the resolution moment: the twin deletes the mirror place
       const big = el("g", { class: "strike-x" });

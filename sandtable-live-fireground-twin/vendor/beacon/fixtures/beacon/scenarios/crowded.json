@@ -3,11 +3,11 @@
   "name": "crowded",
   "simulated": true,
   "title": "Crowded Suite 310: five opt-in phones, ten cold devices",
-  "description": "SIMULATED stress scene on the synthetic twin: a waiting room full of patients. Three pucks in Suite 310; five opt-in phones (three in the room, one in Suite 309, one in Suite 311; UWB and Bluetooth-only mixed) and ten devices with no app (phones, watches, earbuds, a laptop) over the room and its neighbours.",
+  "description": "SIMULATED stress scene on the synthetic twin: a waiting room full of patients. Two pucks in the door-wall layout of Suite 310; five opt-in phones (three in the room, one in Suite 309, one in Suite 311; UWB and Bluetooth-only mixed) and ten devices with no app (phones, watches, earbuds, a laptop) over the room and its neighbours.",
   "floor": "f3",
   "room": "r310",
   "seed": 312,
-  "pucks": {"throw": {"room": "r310", "n": 3, "seed": 310}},
+  "pucks": {"throw": {"room": "r310", "n": 2, "seed": 310, "strategy": "door-wall"}},
   "phones": [
     {"key": "crowd-uwb-1", "room": "r310", "x": 1.8, "y": 1.5, "opt_in": true, "uwb": true, "chip": "U1", "model": "iPhone 14", "pointing": false,
      "report": {"status": "trapped", "text": "Patient sedated in chair 2, cannot walk", "people": 2, "can_move": false,

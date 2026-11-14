@@ -2,11 +2,15 @@
 """Writes the "Results" section of README.md (and the Scout table inside its radar section) from the files in results/
 and vendor/beacon/results/, so that every number in the README is traceable to a file produced by code.
 
-    python scripts/make_results_md.py        (re-run after any evaluation, recording, screenshot walk or test run)
+    python scripts/make_results_md.py        writes results/RESULTS.md (re-run after any evaluation, recording, screenshot walk or test run)
+
+The README's own "Results" section is hand-written (pointers, no numbers) and is never touched; the only README text this
+script writes is between the markers <!-- scout-ablation:start ... --> and <!-- scout-ablation:end --> when they exist.
 
 It never fails on a missing or older file: that row says "not yet measured" and names the file it wanted.
 Files read (all optional):
   vendor/beacon/results/eval_beacon.json, eval_layouts.json   lane L16's Beacon locator evaluation (scripts/eval_beacon.py there)
+  vendor/beacon/results/eval_two_puck.json                    lane L16's two-puck demo layouts (same script)
   results/scout_ablation.json                                 scripts/eval_scout.py
   results/radar_arithmetic.json                               scripts/radar_arithmetic.py
   results/sim_eval.json                                       scripts/eval_sim.py (tagged crews on the uwb-kit simulator)
@@ -18,12 +22,14 @@ Files read (all optional):
 import glob
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 R = ROOT / "results"
 VB = ROOT / "vendor" / "beacon" / "results"
 README = ROOT / "README.md"
+RESULTS_MD = R / "RESULTS.md"
 NYM = "not yet measured"
 
 
@@ -98,7 +104,7 @@ def beacon_section() -> list[str]:
         tp = next((x for x in g(eb, "effects", "twin_pruning", default=[]) or [] if x.get("method") == "uwb-twr" and x.get("pucks") == 2), None)
         out.append("")
         if tp:
-            out.append(f"**What the twin does with two pucks** (the demo's set-up): with UWB ranges from two pucks, using the twin's walls and outline "
+            out.append(f"**Thrown pucks, two of them:** with UWB ranges from two pucks thrown from the door, using the twin's walls and outline "
                        f"raised the share of phones published as one point from {pct(tp.get('fix_share_off'))} to {pct(tp.get('fix_share_on'))} and cut the share left as two "
                        f"candidates from {pct(tp.get('candidates_share_off'))} to {pct(tp.get('candidates_share_on'))}; wrong fixes: {pct(tp.get('wrong_fix_rate_off'))} without the twin, "
                        f"{pct(tp.get('wrong_fix_rate_on'))} with it. A third puck without the twin published a point in "
@@ -123,6 +129,44 @@ def beacon_section() -> list[str]:
                 continue                      # the owner's iPhones give no bearing to an accessory; those rows stay in the file
             out.append(f"| {name} | {pct(r.get('fix_share'))} | {num(r.get('bearing_err_median_deg'), ' deg', 1)} | {pct(r.get('mirror_ambiguity_rate'))} | {pct(r.get('twin_single_rate'))} |")
         out.append("")
+    return out
+
+
+def two_puck_section() -> list[str]:
+    """lane L16's evaluation of the owner's two-puck demo: placed pucks, one phone, how often one answer, how often wrong."""
+    out = ["### Two-puck demo: what the twin does with two pucks (lane L16's evaluation, SIMULATED)", ""]
+    pt = VB / "eval_two_puck.json"
+    t = load(pt)
+    if not t:
+        return out + missing(pt, "Two placed pucks: one answer, two places, or wrong")
+    d = t.get("definitions") or {}
+    n = g(t, "noise_model", "noise", "uwb") or {}
+    out += [f"From `{rel(pt)}` (\"{t.get('title', '')}\"), made by lane L16's `{t.get('generated_by', 'scripts/eval_beacon.py')}` on its own simulator, "
+            "not on phones or boards. Everything here is simulated.", "",
+            "Assumptions, as the file states them:", "",
+            f"- What the phone gives: {t.get('live_like') or NYM}.",
+            f"- Pucks: {d.get('pucks') or NYM}.",
+            f"- Phone positions: {d.get('positions') or NYM}.",
+            f"- Radio noise: {num(n.get('sigma_los_m'), ' m')} per range in line of sight, a per-link bias of {num(n.get('link_bias_sigma_m'), ' m')}, "
+            f"+{num(n.get('wall_bias_m'), ' m')} through a wall, a body blocking the link {pct(n.get('body_block_prob'))} of the time; the locator assumes the same model.",
+            f"- One point \"by the twin\": {d.get('twin_fix') or NYM}. \"After the occupant's statement\": {d.get('statement_fix') or NYM}. "
+            f"\"Two places\": {d.get('cannot_choose') or NYM}. A wrong point: {d.get('wrong_fix') or NYM}.", "",
+            "| Layout | Trials | One point, by the twin alone | One point, after the occupant's stated suite | One point, total | Two places (cannot choose) | Ring or other | Wrong point (share of all trials) | Point error, median (p90) |",
+            "|---|---|---|---|---|---|---|---|---|"]
+    for name, lay in (t.get("layouts") or {}).items():
+        sh, allf = lay.get("outcome_share") or {}, lay.get("all_fixes") or {}
+        out.append(f"| {name} | {lay.get('n')} | {pct(sh.get('twin_fix'))} | {pct(sh.get('statement_fix'))} | {pct(allf.get('share_of_trials'))} | "
+                   f"{pct(sh.get('cannot_choose'))} | {pct(sh.get('ring_or_other'))} | {pct(allf.get('wrong_fix_rate_of_trials'), 1)} | "
+                   f"{num(allf.get('fix_err_median_m'), ' m')} ({num(allf.get('fix_err_p90_m'), ' m')}) |")
+    fs = t.get("false_statement") or {}
+    if fs:
+        out += ["", f"**When the occupant names the wrong suite** ({d.get('false_statement') or 'the phone is in a neighbouring room'}): "
+                "how often the statement produced a wrong point.", "",
+                "| Layout | Trials | Wrong point caused by the statement | Ring or other (no point) | Two places |", "|---|---|---|---|---|"]
+        for name, lay in fs.items():
+            sh = lay.get("outcome_share") or {}
+            out.append(f"| {name} | {lay.get('n')} | {pct(lay.get('statement_produced_wrong_fix_rate_of_trials'), 1)} | {pct(sh.get('ring_or_other'))} | {pct(sh.get('cannot_choose'))} |")
+    out.append("")
     return out
 
 
@@ -268,6 +312,7 @@ def main() -> None:
     lines = ["## Results (generated by `scripts/make_results_md.py` from the files named; everything is simulated or arithmetic unless a row says otherwise)", "",
              "No UWB board and no phone has been in the loop of any number below.", ""]
     lines += beacon_section()
+    lines += two_puck_section()
     radar_block = eval_scout_block()
     if radar_block:
         lines += ["### Scout: the pucks as a radar (SIMULATED)", "",
@@ -277,16 +322,17 @@ def main() -> None:
         lines += ["### Scout: the pucks as a radar (SIMULATED)", ""] + scout_table() + radar_numbers()
     lines += crews_section()
     lines += runs_section()
-    text = README.read_text() if README.exists() else ""
     block = "\n".join(lines)
-    if re.search(r"^## Results", text, flags=re.M):
-        text = re.sub(r"^## Results.*?(?=^## )", lambda _m: block + "\n", text, count=1, flags=re.S | re.M)
-    else:
-        text = text.rstrip() + "\n\n" + block + "\n"
-    scout = "\n".join(["<!-- scout-ablation:start (generated by scripts/make_results_md.py) -->"] + (radar_block or scout_table()) + ["<!-- scout-ablation:end -->"])
-    text = re.sub(r"<!-- scout-ablation:start.*?<!-- scout-ablation:end -->", lambda _m: scout, text, count=1, flags=re.S)
-    README.write_text(text)
-    print(block)
+    RESULTS_MD.write_text("# Results\n\nGenerated by `scripts/make_results_md.py` from the files named; everything is simulated or arithmetic unless a row says otherwise.\n\n"
+                          + block.split("\n", 1)[1].lstrip("\n") + "\n")
+    print(f"wrote {rel(RESULTS_MD)}")
+    text = README.read_text() if README.exists() else ""
+    if "<!-- scout-ablation:start" in text and "<!-- scout-ablation:end -->" in text:
+        scout = "\n".join(["<!-- scout-ablation:start (generated by scripts/make_results_md.py) -->"] + (radar_block or scout_table()) + ["<!-- scout-ablation:end -->"])
+        new = re.sub(r"<!-- scout-ablation:start.*?<!-- scout-ablation:end -->", lambda _m: scout, text, count=1, flags=re.S)
+        if new != text:
+            README.write_text(new)
+            print(f"updated the scout-ablation block of {rel(README)} (between its markers only)")
 
 
 if __name__ == "__main__":

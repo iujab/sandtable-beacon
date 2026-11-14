@@ -1,7 +1,7 @@
 // Sandtable command board. Static ES modules, no build step, no network beyond this origin.
 import { Plan, prettyIndustry } from "./plan2d.js";
 import { Aerial } from "./aerial.js";
-import { BeaconModel, PHONE_COLOR, STATUS_WORD, STATE_WORD, MODES, geomWords, reportWords, ago } from "./beacon.js";
+import { BeaconModel, PHONE_COLOR, STATUS_WORD, STATE_WORD, MODES, geomWords, reportWords, ago, mirrorCaption } from "./beacon.js";
 import { ScoutModel, PHASES, PHASE_WORD, RUNG_WORD, METHOD_WORD, VICTIM_COLOR, victimState, sigmaEllipse, wallDistances, regQuality, meshSvg } from "./scout.js";
 
 const $ = (id) => document.getElementById(id);
@@ -522,7 +522,7 @@ function phoneRows() {
     return `<div class="unit-row phone ${p.id === S.selected ? "sel" : ""}${p.stale ? " stale" : ""}" data-unit="${esc(p.id)}">` +
       `<div class="cs" style="color:${PHONE_COLOR}">${esc(p.id)}</div>` +
       `<div style="min-width:0"><div class="loc">${beacon.foreign ? "on another building's plan" : esc(out ? "outside the building" : p.room_label || p.zone?.room_label || (p.geometry === "ring" ? `near puck ${p.ring.puck}` : p.geometry === "candidates" ? [...new Set(p.candidates.map((c) => c.room_label || "?"))].join(" or ") : "where unknown"))}${beacon.foreign ? "" : ""}<span class="pill st-${esc(r.status || "unknown")}">${esc(STATUS_WORD[r.status] || "no status")}</span></div>` +
-      `<div class="asg">${esc(reportWords(r))}${asg ? ` · ${esc(asg.label)} ${withThem ? (inc.status === "out" ? "brought them out" : "is with them") : "sent"}` : ""}</div></div>` +
+      `<div class="asg" title="${esc(mirrorCaption(p))}">${esc(reportWords(r))}${asg ? ` · ${esc(asg.label)} ${withThem ? (inc.status === "out" ? "brought them out" : "is with them") : "sent"}` : ""}</div>${mirrorCaption(p) ? `<div class="asg cap">${esc(mirrorCaption(p))}</div>` : ""}</div>` +
       `<div class="nums">${esc(short)}<br>${r.battery_pct != null ? `${r.battery_pct}% · ` : ""}${esc(ago(p.track?.last_seen_s ?? r.age_s))}</div></div>`;
   }).join("");
 }
@@ -539,7 +539,7 @@ function renderHerePhone(p) {
   const where = p.geometry === "fix" && room ? wallDistances(twin, room, p.x, p.y) + ((p.pruned || []).length ? `; the mirror place is ruled out (${p.pruned[0].reason})` : "") : p.geometry === "ring" ? `search the arc ${p.ring.r_m.toFixed(1)} m from puck ${p.ring.puck}` : p.geometry === "candidates" ? `two mirror places; the twin cannot choose: check both, ${Math.round(p.candidates[0].weight * 100)}% first` : p.geometry === "zone" ? "search the room" : "";
   const rec = tenants.length ? tenants.map((t) => `<div>${esc(indOf(t))}</div>` + (t.life_hazard ? `<div class="hzline">${esc(t.life_hazard)}</div>` : "")).join("") : (room?.suite ? "no active tenant in the record for this suite" : "—");
   el.innerHTML = `<div><div class="who"><span class="dot" style="background:${PHONE_COLOR}"></span>${esc(p.id)}: phone${r.people != null ? `, ${r.people} ${r.people === 1 ? "person" : "people"}` : ""}</div><div class="where">${esc(r.safe_outside ? "Outside" : room?.label || "—")}</div><div class="sub st-${esc(r.status || "unknown")}">${esc(reportWords(r))}</div>${pt && !r.safe_outside ? lookBtn(pt[0], pt[1]) : ""}</div>` +
-    `<div><div class="k"><span class="dot matterport"></span>Twin: where</div><div>${esc(geomWords(p))}</div><div>${esc(where)}</div>${exits.map((e) => `<div>${esc(e.label)}: ${e.m == null ? "<b class='hzline'>cut off</b>" : e.m + " m"}</div>`).join("")}</div>` +
+    `<div><div class="k"><span class="dot matterport"></span>Twin: where</div><div>${esc(geomWords(p))}</div>${mirrorCaption(p) ? `<div class="caption">${esc(mirrorCaption(p))}</div>` : `<div>${esc(where)}</div>`}${exits.map((e) => `<div>${esc(e.label)}: ${e.m == null ? "<b class='hzline'>cut off</b>" : e.m + " m"}</div>`).join("")}</div>` +
     `<div><div class="k"><span class="dot costar"></span>Record: who is usually in there</div>${rec}</div>` +
     `<div><div class="k"><span class="dot vexcel"></span>Aerial: where outside</div><div>${side ? `behind side ${side}` : ""}</div><div>${geo ? `${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)}` : "no point: not a fix"}</div></div>` +
     `<div><div class="k"><span class="dot scan"></span>Phone: what it says${p.simulated ? " (simulated)" : ""}</div>${r.text ? `<div>“${esc(r.text)}”</div>` : ""}<div>${r.battery_pct != null ? `battery ${r.battery_pct}%, ` : ""}heard ${esc(ago(p.track?.last_seen_s ?? r.age_s))}</div><div class="faintline">${esc(p.method)}, confidence ${Math.round((p.confidence ?? 0) * 100)}%${p.stale ? ", not heard recently" : ""}</div></div>`;
@@ -566,7 +566,9 @@ function renderBeaconHead() {
   const nIn = ph.filter((p) => !p.report?.safe_outside).length, nFix = ph.filter((p) => p.geometry === "fix").length;
   const summary = `${nIn} phone${nIn === 1 ? "" : "s"} with the app inside, ${ppl} ${ppl === 1 ? "person" : "people"} reported, ${nFix} located to a point${dev ? `; ${dev} device${dev === 1 ? "" : "s"} heard (devices, not people)` : ""}`;
   const lim = b.limits || [];
-  el.innerHTML = `<div class="st1"><span class="sh-phase done">Phones</span><b>${b.room_label ? `Pucks in ${esc(b.room_label)}` : "No pucks thrown yet"}</b>${marks.join("")}<span class="sh-text" title="${esc(summary)}">${esc(summary)}</span></div>` +
+  const npk = (b.pucks || []).length, hand = beacon.view()?.hand?.size || 0;
+  const pucksWord = !npk ? "No pucks placed yet" : `${npk} puck${npk === 1 ? "" : "s"} ${hand === npk ? "placed by hand" : "thrown"}${b.room_label ? ` in ${b.room_label}` : ""}`;
+  el.innerHTML = `<div class="st1"><span class="sh-phase done">Phones</span><b>${esc(pucksWord)}</b>${marks.join("")}<span class="sh-text" title="${esc(summary)}">${esc(summary)}</span></div>` +
     (lim.length ? `<div class="st2" title="${esc(lim.join("; "))}"><b>Cannot tell:</b> ${lim.map(esc).join("; ")}</div>` : "");
 }
 function renderAcc() {
@@ -591,7 +593,7 @@ function renderAcc() {
     const crew = r.reached ? `${esc(r.assigned || (r.crews || [])[0] || "crew")} reached` : r.assigned ? `${esc(r.assigned)} sent` : (r.crews || []).length ? `${esc(r.crews.join(", "))} inside` : "";
     const vs = r.record ? `<div class="vs${r.state === "against-record" ? " against" : ""}"><div><span class="k">Record</span>${esc(recordWords(r.record))}</div><div><span class="k">Phones</span>${esc(phoneWords(r))}</div></div>` : "";
     return `<div class="acc-row st-${esc(r.state)}${r.out ? " out" : ""}${r.scope ? " sc-" + esc(r.scope) : ""}" data-suite="${esc(r.suite)}" title="${esc(r.expected?.basis ? `Expected: ${r.expected.basis}` : "")}${r.why ? `\n${esc(r.why)}` : ""}">` +
-      `<div class="su">${esc(r.suite)}${r.priority != null && r.priority <= 2 ? `<span class="prio">P${r.priority}</span>` : ""}</div>` +
+      `<div class="su">${esc(r.suite)}${r.priority != null && r.priority <= 2 ? `<span class="prio" title="Priority ${r.priority}">#${r.priority}</span>` : ""}</div>` +
       `<div class="mid"><div class="tn">${esc(r.tenant || r.industry || (r.vacant ? "vacant on record" : "no tenant on record"))}${r.rooms?.length > 1 ? ` <small>(${r.rooms.length} rooms)</small>` : ""}</div>${r.life_hazard ? `<div class="hz">${esc(r.life_hazard)}</div>` : ""}${vs}` +
       `<div class="nn">${r.expected ? `<span>expects ${r.expected.people == null ? "an unknown number" : range(r.expected)}</span>` : ""}${!r.record && r.phones_opt_in ? `<span class="ph">${r.phones_opt_in} phone${r.phones_opt_in > 1 ? "s" : ""}, ${r.people_reported} reported${r.located ? `, ${r.located} located` : ""}</span>` : ""}${!r.record && r.cold_devices ? `<span>${r.cold_devices} devices</span>` : ""}</div></div>` +
       `<div class="rt"><div class="un">${range(r.unaccounted)}</div><div class="ul">unaccounted</div><div class="stw">${esc(STATE_WORD[r.state] || r.state || "")}</div>${crew ? `<div class="crew">${crew}${r.out ? ", out" : ""}</div>` : ""}</div></div>`;

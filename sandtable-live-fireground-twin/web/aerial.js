@@ -17,8 +17,33 @@ export class Aerial {
     seg.innerHTML = this.images.map((i, k) => `<button data-i="${k}" class="${k === 0 ? "on" : ""}">${i.id === "ortho" ? "Site" : i.kind === "detail" ? "Roof" : "Approach"}</button>`).join("");
     for (const b of seg.querySelectorAll("button")) b.onclick = () => { for (const q of seg.querySelectorAll("button")) q.classList.toggle("on", q === b); this.show(Number(b.dataset.i)); };
     if (this.images.length < 2) seg.hidden = true;
+    this.offsite = this._checkGeoref();
+    if (this.offsite) {
+      const note = document.createElement("div");
+      note.className = "aerial-note";
+      note.textContent = `The scan's georeference places this suite ${this.offsite.dist_m} m outside the footprint: interior positions are shown on the plan and the twin only.`;
+      img.parentElement.appendChild(note);
+    }
     this.show(0);
     this._sides(opts.sidesEl);
+  }
+  // Is the twin where the record's footprint is? If its outline's centre falls outside the footprint, interior markers
+  // would be drawn at a wrong place on the photo: they are left off, and the board says by how much the scan is off.
+  _checkGeoref() {
+    const fp = this.bundle.site.footprint?.coordinates?.[0], twin = this.bundle.twin;
+    const fl = twin.floors.find((f) => f.id === twin.exercise_floor)?.outline;
+    if (!fp || fp.length < 3 || !fl) return null;
+    const lat0 = fp.reduce((a, p) => a + p[1], 0) / fp.length, lon0 = fp.reduce((a, p) => a + p[0], 0) / fp.length;
+    const m = (lat, lon) => [(lon - lon0) * 111320 * Math.cos(lat0 * Math.PI / 180), (lat - lat0) * 111320];
+    const poly = fp.map(([lon, lat]) => m(lat, lon));
+    const pts = fl.map((p) => m(...this.geo(p[0], p[1])));
+    const c = [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > c[1]) !== (yj > c[1]) && c[0] < ((xj - xi) * (c[1] - yi)) / (yj - yi) + xi) inside = !inside; }
+    if (inside) return null;
+    let d = 1e9;
+    for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy) / L)); d = Math.min(d, Math.hypot(c[0] - a[0] - t * dx, c[1] - a[1] - t * dy)); }
+    return d < 2 ? null : { dist_m: Math.round(d) };
   }
   // oblique views (live Vexcel): one per side of the building, matched to the fire-service letters by the face they show
   _sides(box) {
@@ -56,9 +81,11 @@ export class Aerial {
     svg.replaceChildren();
     const k1 = im.width / 420;                                  // overlay size relative to the picture
     const ring = site.footprint.coordinates[0].map(([lon, lat]) => this.px(lat, lon).join(",")).join(" ");
-    svg.appendChild(el("polygon", { points: ring, class: "a-foot" }));
-    const fl = twin.floors.find((f) => f.id === twin.exercise_floor).outline.map((p) => this.px(...this.geo(p[0], p[1])).join(",")).join(" ");
-    svg.appendChild(el("polygon", { points: fl, class: "a-floor" }));
+    svg.appendChild(el("polygon", { points: ring, class: `a-foot${this.offsite ? " alert" : ""}` }));
+    if (!this.offsite) {
+      const fl = twin.floors.find((f) => f.id === twin.exercise_floor).outline.map((p) => this.px(...this.geo(p[0], p[1])).join(",")).join(" ");
+      svg.appendChild(el("polygon", { points: fl, class: "a-floor" }));
+    }
     const c = this.px(site.property.lat, site.property.lon), fr = site.frame || {};
     const reach = (Math.max(fr.length_m || 40, fr.width_m || 40) / 2 + 9) / im.gsd_m;
     for (const [letter, s] of Object.entries(site.sides || {})) {
@@ -99,7 +126,7 @@ export class Aerial {
     if (key === this._bkey) return;
     this._bkey = key; this.bview = view;
     this.blayer.replaceChildren();
-    if (!view) return;
+    if (!view || this.offsite) return;
     const k1 = this.k1, P = (x, y) => this.px(...this.geo(x, y)), gsd = this.im.gsd_m;
     for (const ph of view.b.phones || []) {
       const t = el("title", {}, ph.text || ph.id);
@@ -132,7 +159,7 @@ export class Aerial {
   setVictim(v, scan) {
     this.victim = v; this.scan = scan;
     this.vlayer.replaceChildren();
-    if (!v || v.x == null) return;
+    if (!v || v.x == null || this.offsite) return;
     const g = v.geo ? [v.geo.lat, v.geo.lon] : this.geo(v.x, v.y), p = this.px(g[0], g[1]), k1 = this.k1;
     const r = Math.max(6 * k1, (v.sigma_m || 0.4) / this.im.gsd_m);
     this.vlayer.append(el("circle", { cx: p[0], cy: p[1], r: r * 2.2, class: "a-vic-ring" }), el("circle", { cx: p[0], cy: p[1], r: 4.5 * k1, class: "a-vic" }),
@@ -141,6 +168,7 @@ export class Aerial {
   }
   update(st) {
     this.last = st;
+    if (this.offsite) return;                      // no interior marker at a wrong place on the photo
     for (const u of st.units) {
       if (u.x == null || !u.geo) continue;
       let g = this.units[u.id];

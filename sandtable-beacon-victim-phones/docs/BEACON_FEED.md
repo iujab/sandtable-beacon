@@ -358,3 +358,22 @@ The twin and the building record default to this repository's labelled fixtures.
 With an external bundle nothing read from it is written into this tree: no fixture, no log line with room or tenant text, no recorded prompt under `fixtures/`. `tests/test_external_bundle.py` runs the walk-through on a synthetic external bundle and checks that `fixtures/` and `data/` are untouched.
 
 What changes on another twin: suites are grouped by suite number, so a scan of one suite (several rooms carrying the same suite number) is one accountability row with `rooms: [...]`; the record's tenants are joined by suite number, and the record's storey is used only when the same number exists on several floors; a record head count (`employees`) replaces the floor-area estimate; an occupant's stated suite covers all the rooms of that suite.
+
+## A11. After the independent review (13:50 CST; additive)
+
+- **A stale phone is never a dot.** When a phone has not been heard for `stale_s`: `stale: true`, `geometry: "none"`, `x`, `y`, `sigma_m`, `ring` and `candidates` cleared, and `last_known: {"geometry", "room", "room_label", "age_s", "puck"?}` (no coordinates). It still counts its reported people in its last room's accountability row (`stale_phones: [ids]`, and a note in `why`), but not as `located`. This replaces the growing-sigma rule of section 2.2.
+- **Ranges are forgotten when a puck moves** (more than 0.30 m), leaves, or the exercise scale changes: no phone is drawn from ranges measured against an old puck position. A second puck's link joins a phone's solution after three readings.
+- `Presence.opt_in_phones`: the opt-in phones known in that room (they are among the devices counted).
+- GeoJSON: a new feature kind `phone-last-known` (the room polygon of a stale phone).
+- Cursor-on-Target: only a fix is an `a-u-G` point. Everything else is a `b-m-p-s-m` marker whose callsign and remarks say what it is:
+
+| Item | Callsign | Remarks begin | Point |
+|---|---|---|---|
+| ring | `B2 RANGE ONLY` | `RANGE ONLY: within N m of puck P1, no position.` | the puck, `ce` = radius + 2 sigma |
+| candidates | `B2 CANDIDATE 1 OF 2` | `CANDIDATE 1 OF 2: one of 2 possible spots ..., not a position` | the candidate |
+| zone | `B4 ROOM ONLY` | `ROOM ONLY: in Suite 310 ..., no position` | room centroid |
+| stale | `B1 LAST KNOWN` | `LAST KNOWN: not heard for N s; last located in Suite 310.` | room centroid |
+
+- The Beacons object's `agent` summary gains `as_of_t` and `stale` (true once phones' geometry kinds, statuses or the puck set changed after the plan was made).
+- `hello` carries `sim_model` (including `board_sharing`: the simulation gives each puck position one board per phone unless it says `"turns"`) and `story.expected_s`.
+- In the simulator, a phone created through `POST /api/sim/phone` leaves when nothing polls it for 15 s, and leaves the board at once when its `opt_in` is switched off (it stays a cold device).

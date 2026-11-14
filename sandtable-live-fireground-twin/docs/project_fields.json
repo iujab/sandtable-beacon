@@ -1,8 +1,8 @@
 {
  "_note": "Text fields of project.json for the lead to merge (written by the write-ups builder). Numbers are left out on purpose: they live in README Results, generated from results/ and vendor/beacon/results/.",
  "tagline": "Pucks in a burning building hear the occupants' phones; each phone appears in the right room of a map built from the building's own data (record, aerial, 3D twin), drawn only as precisely as the measurement allows, and an AI command agent routes the rescue and writes the report.",
- "abstract": "When a commercial building is on fire, the incident commander's hardest question is who is still inside, and where. Sandtable Beacon is a command and reporting centre for that question. When the alarm comes in, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. A crew then places small pucks (Qorvo DWM3001CDK boards: Bluetooth and UWB) in the building. Occupants who opened the opt-in app are ranged through their phones, and each phone is drawn as what the measurement supports: a ring, two candidate points, or one point, in the right room and beside the tenant the building record expects there. Phones without the app are only a device count. The agent prioritises, routes a rescue crew through the twin, issues the radio order, re-plans and writes the report the command post keeps. Sponsor layers run as labelled fixtures; positions are simulated until the boards run.",
- "aha": "Two pucks give each phone two possible places, mirror images of each other; the twin's walls rule one out, so phone 1 lands as a point in the dentist's office the building record expects to be full, while phone 2 honestly stays 'two places: search both'. The building's own data does the job of a third puck.",
+ "abstract": "When a commercial building is on fire, the incident commander's hardest question is who is still inside, and where. Sandtable Beacon is a command and reporting centre for that question. When the alarm comes in, an AI command agent reads three layers for the address (the building record with its tenants, the aerial image, the 3D twin) and writes the pre-incident plan. A crew places small pucks (Qorvo DWM3001CDK boards: Bluetooth and UWB) in the building. Occupants who opened an opt-in app are ranged through their phones, and each phone is drawn as what the measurement supports: a ring, two candidate points, or one point, in the right room and beside who the building record expects there. The agent prioritises, routes a rescue crew through the twin, issues the radio order and writes the report the command post keeps. The same code has run privately on live CoStar, Matterport and Vexcel data for one real building; this repository runs on labelled stand-ins, and phones, pucks and crews are simulated.",
+ "aha": "Two pucks give each phone two possible places, mirror images of each other; the building's own walls rule one out, so phone 1 lands as a point in the suite while phone 2 honestly stays 'two places: search both'. Then the record against the phones: the record says who should be in that suite, the phones say who is (on a live record, possibly 'the record says this suite is empty; the phones say three people are in it').",
  "how_it_works": [
   "Pre-plan: a tool-using agent reads the building record (CoStar layer), the aerial image (Vexcel layer, through a vision tool) and the 3D twin (Matterport layer)",
   "Pucks in: DWM3001CDK boards on stock firmware, positions tape-measured and clicked onto the plan; opt-in iPhones range them and report status (lane L16's Beacon module)",
@@ -23,42 +23,68 @@
   "Public open data: LA County assessor and LARIAC, City of LA business listings and GeoHub, US Census TIGERweb, USDA NAIP"
  ],
  "sponsor_tech": {
-  "costar": "Building record: tenants by suite and floor, business category (life hazards inferred), vacancy, construction, stories, area; drives who-is-expected-where in the accountability table and the agent's priorities. Fixture mode only (real public data for 7325 Medical Center Dr, Los Angeles, CoStar-only fields empty); live adapter is a mapping table to fill (docs/TOOLKIT_SWAP.md).",
-  "matterport": "3D twin: rooms, walls, doors, stairs, walking graph; routes the crew and prunes impossible phone candidates (outside the outline, inside a wall, behind a wall on a line-of-sight link). Fixture: synthetic interior fitted to the real footprint. Live adapter written against the Model API GraphQL samples, never called.",
-  "vexcel": "Aerial: the sides of the building, approach, staging, hydrants; the agent looks at the image through a vision tool. Fixture: real USDA NAIP imagery. Live adapter written from the public Vexcel API v2 OpenAPI spec, never called.",
-  "anthropic": "Claude as the command agent (tool use in a plan, act, re-plan loop); the demo replays recorded real responses; the anthropic backend is written and not exercised (no key on the build machine)."
+  "costar": "Building record: tenants by suite and floor, available spaces, employees, construction, stories; drives who-should-be-where in the accountability table and the agent's priorities. Ran privately live from the CoStar hackathon data kit for one real 12-storey building (26 property fields, 72 current tenant rows, 18 available spaces); the public repository runs on real open data for a different building, labelled as not CoStar's.",
+  "matterport": "3D twin: rooms, walls, doorways, walking graph; routes the crew and prunes impossible phone candidates. Ran privately live through the Model API for one scanned suite (8 rooms, 48 walls, 14 doorways, 30 scan positions, 199-edge graph), Showcase SDK view on localhost; public repository: a synthetic twin fitted to the stand-in footprint.",
+  "vexcel": "Aerial: sides of the building, approach, staging; the agent looks at the image through a vision tool. Ran privately live through API v2 (7 images: orthos, a roof detail, four obliques); public repository: real USDA NAIP imagery as the stand-in.",
+  "anthropic": "Claude as the command agent (tool use in a plan, act, re-plan loop); stand-in runs replay recorded real responses; the private live run used a live model."
  },
  "rubric": {
-  "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",
-  "Agentic depth (30%)": "Situations as goals with a reply budget; the agent chooses tools (record, aerial vision, twin, phones, accountability) and ends in actions (assign with route, radio, EMS request, observations, record corrections); must search a ring or two candidates, never 'go to the phone'; re-called when geometry improves. Beacon turns use the labelled fallback policy until recorded.",
+  "Use of the data (30%)": "Record says who should be in each suite (and which suites are available); twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; ran privately on all three live layers for one real building, publicly on labelled stand-ins.",
+  "Agentic depth (30%)": "Situations as goals with a reply budget; the agent chooses tools (record, aerial vision, twin, phones, accountability) and ends in actions (assign with route, radio, EMS request, observations, record corrections); must search a ring or two candidates, never 'go to the phone'; on the stand-in all three exercises replay recorded real model turns with no fallback (results/replay_check_*_auto_3A2T.json).",
   "Usefulness (25%)": "Incident commander and command post: who is inside, where, who is unaccounted for as an honest range, and a report at the end; prevention bureaus get a pre-plan draft for any commercial address.",
   "Demo and polish (15%)": "One screen, two physical pucks and two iPhones, a printable report, a phone page for the rescue team that reads the feed; every uncertain thing drawn as uncertain."
  },
  "limitations": [
-  "No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured",
-  "Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count, and devices are not people; the app must stay open with the screen on as built",
+  "Not run on hardware: no phone and no puck has been in the loop of any result; lane L16's iOS source has not been built or run here; the real range error of an iPhone against these boards is unmeasured",
+  "Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count (the simulated pucks show one, the stock puck firmware cannot collect it), and devices are not people; the app must stay open with the screen on as built",
   "Two pucks often leave two candidates; the twin removes one only when the geometry allows",
-  "All three sponsor layers are fixtures (real public data and NAIP imagery, synthetic interior); the live adapters were never called; the walls that prune a candidate are plausible walls, not surveyed ones",
-  "Expected head counts and life hazards are estimates and inferences from the record",
-  "Agent turns for the Beacon and Scout exercises fall back to a labelled deterministic policy until a real model run is recorded",
+  "The public repository holds no sponsor data: its twin is synthetic, so walls that prune a candidate there are plausible, not real",
+  "The private live run covered one scanned suite, not the storey; the scan's georeference lands about 90 m from the record's map point (flagged, not corrected); its first run needed one order given by hand (fixed since)",
+  "Life hazards and expected head counts are inferences and estimates from the record",
+  "Privacy as built: this board keeps what it received for the incident report and serves /api/beacons and /api/report without authentication on the local network; stop-sharing deletion and 15-minute retention exist in lane L16's module only; the rotating phone id is a design, not implemented",
   "Scout (radar) and Crews (tags) are simulation-only on these boards; the radar simulator was written alongside its detector",
-  "One floor modelled; feeds and the app link have no authentication; not a life-safety product"
+  "One floor modelled; not a life-safety product"
  ],
- "self_score": {"creativity": 4, "utility": 3, "charity": 5, "avidity": 4, "track_fit": 4, "demo_risk": 3},
+ "self_score": {
+  "creativity": 4,
+  "utility": 3,
+  "charity": 4,
+  "avidity": 4,
+  "track_fit": 4,
+  "demo_risk": 3
+ },
  "self_score_reasons": {
-  "creativity": "Using the building's own walls to decide between two possible phone positions is a new use of CoStar-style data; phones as a rescue sensor is not new in itself",
-  "utility": "Runs end to end hands-free on the simulator with a real report and feeds; the live phone path has not been shown working yet",
-  "charity": "Finding trapped and injured people sooner, with their own reported condition, is about as direct a public good as a hack can target",
-  "avidity": "Three sensing modes, a reporting centre, a puck enclosure, a sourced feasibility answer and honest labels throughout",
-  "track_fit": "Uses all three CoStar layers together and agentically, but only as fixtures; agent turns for the Beacon script are not yet recorded",
-  "demo_risk": "The hands-free simulator run is safe; the live two-puck, two-iPhone demo depends on firmware, app and Wi-Fi working at the venue"
+  "creativity": "Using the building's own walls to decide between two possible phone positions, and setting the record against the phones, are new uses of CoStar-style data; phones as a rescue sensor is not new in itself",
+  "utility": "Runs end to end hands-free with a real report and feeds, and ran privately on live sponsor data; nothing has run on the boards or phones",
+  "charity": "Finding trapped people sooner is a real public good, but the Healthcare fit is the pre-hospital end only, with no clinical content",
+  "avidity": "Three sensing modes, a reporting centre, a private live run on three layers, a puck enclosure, a sourced feasibility answer and honest labels throughout",
+  "track_fit": "CoStar: all three layers used together and agentically, live in private; hardware and physical AI are not met until something runs on the boards",
+  "demo_risk": "The hands-free stand-in run is safe; live mode depends on the owner's laptop and keys, and hardware has not been brought up"
  },
  "images": [
-  {"path": "figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png", "caption": "Two pucks, two phones: the twin rules out phone B1's mirror place (outside the building) so it becomes a point in Suite 310 beside the record's tenant; phone B2 stays 'cannot choose: 2 places'. Development sample (hand-made phones), labelled DEV SAMPLE on screen."},
-  {"path": "figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png", "caption": "The same moment on the 2-D plan: rings from P1 and P2, the ruled-out mirror, B2's two weighted places. Development sample."},
-  {"path": "figures/ui_beacon_06b_crew_phone.png", "caption": "The rescue team's phone page: the current order, the route through the twin, and the located people read from the GeoJSON feed. Simulated."},
-  {"path": "figures/report_screen_live.png", "caption": "The reporting centre (/report.html) after a hands-free simulated run on the labelled sample feed: people found with times, accountability against the building record, plan, timeline, limits."},
-  {"path": "figures/puck_render.png", "caption": "The Beacon puck enclosure for one DWM3001CDK and a cell: a self-righting ball, designed and checked in software, not printed."},
-  {"path": "figures/radar_ellipses.png", "caption": "The owner's radar question: how 1, 2, 3 and 5 pucks constrain one target (geometry only). Scout mode is simulation only."}
+  {
+   "path": "figures/ui_beacon_15_dev_sample_wall_rules_out_mirror.png",
+   "caption": "Two pucks, two phones (stand-in building): the twin rules out phone B1's mirror place outside the building so it becomes a point; phone B2 stays 'cannot choose: 2 places'. Development sample (hand-made phones), labelled DEV SAMPLE on screen."
+  },
+  {
+   "path": "figures/ui_beacon_16_dev_sample_resolved_and_unresolved_plan.png",
+   "caption": "The same moment on the 2-D plan: rings from P1 and P2, the ruled-out mirror, B2's two weighted places. Development sample."
+  },
+  {
+   "path": "figures/ui_beacon_06b_crew_phone.png",
+   "caption": "The rescue team's phone page: the current order, the route through the twin, and the located people read from the GeoJSON feed. Simulated."
+  },
+  {
+   "path": "figures/report_screen_live.png",
+   "caption": "The reporting centre (/report.html) after a hands-free simulated run on the labelled sample feed: people found with times, accountability against the building record, plan, timeline, limits."
+  },
+  {
+   "path": "figures/puck_render.png",
+   "caption": "The Beacon puck enclosure for one DWM3001CDK and a cell: a self-righting ball, designed and checked in software, not printed."
+  },
+  {
+   "path": "figures/radar_ellipses.png",
+   "caption": "The owner's radar question: how 1, 2, 3 and 5 pucks constrain one target (geometry only). Scout mode is simulation only."
+  }
  ]
 }

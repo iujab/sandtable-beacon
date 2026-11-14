@@ -25,11 +25,13 @@ class Director:
         self.mode = "auto"
         self.script = "mayday"
         self.beacon = "story"                      # beacon script: "story" (replay a recorded simulated run) or "live"
+        self.playing: str | None = None            # beacon script: which Beacon source is playing, said on screen
         self.steps: list[str] = []                 # every step this run went through (the board and the tests read it)
         self._task: asyncio.Task | None = None
 
     def status(self) -> dict:
-        return {"running": self.running, "step": self.step, "mode": self.mode, "script": self.script, "beacon": self.beacon if self.script == "beacon" else None}
+        return {"running": self.running, "step": self.step, "mode": self.mode, "script": self.script, "beacon": self.beacon if self.script == "beacon" else None,
+                "playing": self.playing if self.script == "beacon" else None}
 
     def start(self, mode: str = "auto", script: str = "mayday", beacon: str = "story") -> None:
         """auto: SIM only, the software moves every crew. assist: a person moves the Engine 1 token
@@ -38,7 +40,7 @@ class Director:
         The HTTP API defaults to "beacon"; this Python default stays "mayday" for the recorded replay tests."""
         if self.running:
             return
-        self.mode, self.script, self.steps, self.beacon = mode, script, [], beacon
+        self.mode, self.script, self.steps, self.beacon, self.playing = mode, script, [], beacon, None
         self._task = asyncio.create_task(self._run_scout() if script == "scout" else self._run_beacon() if script == "beacon" else self._run())
 
     def stop(self) -> None:
@@ -224,7 +226,8 @@ class Director:
             await self._wait(lambda: all(u["status"] == "out" for u in inc.units.values() if u["_was_interior"]), 120 * human, "the crews out")
             if inc.phase != "terminated":
                 inc.phase = "terminated"
-                inc._log("par", "All crews are out of the floor. Accountability complete.")
+                from .beacon_link import closing_line
+                inc._log("par", closing_line(inc))
                 inc._situation("all_out", None, {})
         loop = asyncio.get_running_loop()                  # until all out: a crew sent back in meanwhile (by anyone) is withdrawn again
         end = loop.time() + (config.AGENT_FALLBACK_AFTER_S + 180) * slow * human
@@ -286,13 +289,20 @@ class Director:
         human = 20 if self.mode == "assist" else 1
         try:
             from .beacon_link import SCENE
+            from .beacon_link import live_story_path
             scene = json.loads(SCENE.read_text(encoding="utf-8"))
             fixture_twin = s.provider.modes.get("matterport") != "live" and scene.get("room") in s.twin._rooms
-            if not fixture_twin:                            # a live twin: the recorded run and its scene belong to the fixture building
+            story_path = None if fixture_twin else live_story_path(s.twin.data)
+            have_story = fixture_twin or (story_path is not None and story_path.is_file())
+            if not fixture_twin:                            # a live twin: the fixture's recorded run and scene belong to another building
                 scene = self._scene_for(self._fire_room())
-            self._say("reset" + ("" if self.beacon == "story" and fixture_twin else " (here and on the Beacon server)"))
+            self._say("reset" + ("" if self.beacon == "story" and have_story else " (here and on the Beacon server)"))
             await s.reset()                                 # also ends any earlier replay
-            story = self.beacon == "story" and fixture_twin and link.start_story()
+            story = self.beacon == "story" and have_story and link.start_story(story_path)
+            if story and link.story.get("scene"):           # the live story carries the scene it was recorded with
+                scene = link.story["scene"]
+            self.playing = ("replay of a recorded simulated Beacon run" + ("" if fixture_twin else " on this building (private)")) if story else \
+                           ("Beacon module live" if link.connected else "Beacon SAMPLE (hand-made, not a result)")
             if not story:
                 await link.remote("POST", "/api/reset", {})
             await asyncio.sleep(1.0)
@@ -458,26 +468,8 @@ class Director:
         await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish its turn")
 
     def _scene_for(self, room: str) -> dict:
-        """Two pucks and two simulated phones inside any room of any twin (for a live twin): pucks one metre in from the door and
-        at the room's centre; phones in the two corners farthest from the door, one metre in. What geometry each phone gets
-        (a fix, two candidates) is whatever the Beacon module computes for that room."""
-        from .scout.session import room_door
-        twin = self.s.twin
-        poly = twin.room(room)["polygon"]
-        c = twin.room_centre(room)
-        d = (room_door(twin, room) or {}).get("at") or poly[0]
-
-        def toward(p, q, m):
-            L = math.dist(p, q) or 1.0
-            return [round(p[0] + (q[0] - p[0]) * min(1.0, m / L), 2), round(p[1] + (q[1] - p[1]) * min(1.0, m / L), 2)]
-        corners = sorted(poly, key=lambda v: -math.dist(v, d))
-        p1, p2 = toward(d, c, 1.0), [round(c[0], 2), round(c[1], 2)]
-        ph = [toward(corners[0], c, 1.0), toward(corners[1] if len(corners) > 1 else c, c, 1.0)]
-        reports = [{"status": "trapped", "text": "Two of us here, smoke under the door", "people": 2, "can_move": False, "battery_pct": 38},
-                   {"status": "injured", "text": "Leg hurt", "people": 1, "can_move": False, "battery_pct": 71}]
-        return {"room": room, "floor": twin.room(room).get("floor") or twin.exercise_floor, "derived": True,
-                "pucks": [{"id": "P1", "x": p1[0], "y": p1[1]}, {"id": "P2", "x": p2[0], "y": p2[1]}],
-                "phones": [{"key": f"victim-phone-{i + 1}", "x": q[0], "y": q[1], "report": reports[i]} for i, q in enumerate(ph)]}
+        from .beacon_link import scene_for
+        return scene_for(self.s.twin, room)
 
     def _beacon_target(self) -> str | None:
         """Whom the script expects the rescue to go to: the Beacon accountability's first priority when it is a phone here,

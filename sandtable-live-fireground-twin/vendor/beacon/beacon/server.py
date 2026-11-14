@@ -209,7 +209,13 @@ class AppState:
         self._fake_key: str | None = None
         self._fake_last = 0.0
         self._lock = threading.Lock()
+        self.sim_created: dict[str, float] = {}       # phones created through POST /api/sim/phone -> last time a page asked for them
+        self._plan_seen: dict = {"plan": None, "t": None, "sig": None}
+        self._agent_run: dict = {"busy": False, "t": None, "sig": None}
         self._init_engine()
+        self.agent = None
+        self.agent_note: str | None = None
+        self._init_agent()
 
     # ---- engines
     def _sample(self) -> dict:
@@ -302,6 +308,11 @@ class AppState:
                 pass
         if typ == "beacons":
             self._cot_tick(msg)
+        try:                                   # the incident report's recorder (beacon/report.py) keeps the timeline
+            from . import report
+            report.RECORDER.feed(msg)
+        except Exception:
+            pass
 
     def _cot_tick(self, b: dict) -> None:
         if not self.cot_clients:
@@ -329,9 +340,13 @@ class AppState:
         h = {"type": "hello", "module": "sandtable-beacon", "v": 1, "simulated": self.simulated, "source": self.source,
              "engine": self.engine, "sample": self.engine == "fake", "rungs": rungs or {"cold": False, "ble": False, "uwb": False, "bearing": False},
              "labels": self.labels, "noise": noise, "notice": self.notice,
-             "rig": {"scale": self.session.rig_scale if self.session else 1.0}}
+             "rig": {"scale": self.session.rig_scale if self.session else 1.0},
+             "search_room": self.session.search_room_obj() if self.session else None}
+        if self.world is not None:
+            h["sim_model"] = getattr(self.world, "sim_model", None)
         if self.story is not None:
-            h["story"] = self.story.status()
+            st = self.story.status()
+            h["story"] = {k: st.get(k) for k in ("running", "done", "script", "step", "title", "error", "expected_s")}
         return h
 
     def beacons(self) -> dict:
@@ -417,8 +432,15 @@ class AppState:
 
     async def _sim_loop(self) -> None:
         period = 1.0 / config.SIM_HZ
+        next_expiry = 0.0
         while True:
             t0 = time.time()
+            if t0 >= next_expiry:
+                next_expiry = t0 + 1.0
+                try:
+                    self.expire_sim_phones(t0)
+                except Exception:
+                    log.exception("expiring simulated phones")
             try:
                 with self._lock:
                     obs = self.world.step(t0)
@@ -458,6 +480,96 @@ class AppState:
                                 + (f" ({self.notice})" if self.notice else ""))
         return self.session
 
+    def _init_agent(self) -> None:
+        """The command agent (W4, beacon.agent.BeaconAgent), when it imports and there is a session; never silently."""
+        if self.session is None:
+            self.agent_note = "the command agent needs a session (the hand-made sample has none)"
+            return
+        try:
+            from .agent import BeaconAgent
+            self.agent = BeaconAgent(self.session, self.twin, self.site_raw, self.emit)
+        except Exception as exc:
+            self.agent = None
+            self.agent_note = f"command agent not available ({type(exc).__name__}: {exc})"
+            log.warning(self.agent_note)
+            return
+
+        def status(b: dict | None = None):
+            a = self.agent
+            busy = bool(getattr(a, "busy", False))
+            sig = _situation_signature(b) if b is not None else None
+            if busy and not self._agent_run["busy"]:            # a run starts: the situation it reads
+                self._agent_run = {"busy": True, "t": time.time(), "sig": sig}
+            elif not busy and self._agent_run["busy"]:
+                self._agent_run = dict(self._agent_run, busy=False)
+            last = getattr(a, "last", None)
+            if not last:
+                return None
+            if self._plan_seen["plan"] is not last:             # a new plan: it was made from the situation at its run's start
+                run = self._agent_run
+                fresh_run = run["t"] is not None and (self._plan_seen["t"] is None or run["t"] > self._plan_seen["t"])
+                self._plan_seen = {"plan": last, "t": run["t"] if fresh_run else time.time(), "sig": run["sig"] if fresh_run else sig}
+            seen = self._plan_seen
+            out = {"busy": busy, "backend": getattr(a, "backend", None), "summary": last.get("summary"),
+                   "as_of_t": round(seen["t"], 3) if seen["t"] else None,
+                   "stale": bool(seen["sig"] is not None and sig is not None and sig != seen["sig"])}
+            return out
+        self.session.agent_status = status
+
+    def session_room(self) -> str | None:
+        return self.session.room if self.session is not None else (self.latest or {}).get("room")
+
+    def default_layout_room(self) -> str:
+        """The session's room; else the configured fire room (BEACON_ROOM); else the first suite with a life-hazard tenant."""
+        room = self.session_room()
+        if room:
+            return room
+        try:
+            r = self.twin.room(config.default_room(self.twin))
+            if r.get("kind") == "suite":
+                return r["id"]
+        except (ValueError, TypeError):
+            pass
+        floor = self.twin.exercise_floor
+        idx = next((i for i, f in enumerate(self.twin.data["floors"]) if f["id"] == floor), 0)
+        hazard = {str(t.get("suite")) for t in self.site_raw.get("tenants", []) if t.get("life_hazard") and t.get("floor") == idx + 1}
+        for r in self.twin.rooms("suite"):
+            if r.get("floor") == floor and str(r.get("suite")) in hazard:
+                return r["id"]
+        return next(r["id"] for r in self.twin.rooms("suite") if r.get("floor") == floor)
+
+    # ---- simulated phones created by a page (web/phone.html): they live only while something asks for them
+    def _sim_phone_truth(self, key: str) -> dict | None:
+        with self._lock:
+            truth = self.world.truth()
+        return next((p for p in truth.get("phones", []) if p.get("key") == key), None)
+
+    def sim_bye(self, eid: str | None, now: float | None = None) -> None:
+        """The simulated phone stopped sharing (app unticked, removed, or its page went away): drop it from the session now."""
+        if eid and self.session is not None:
+            try:
+                self.session.ingest({"kind": "bye", "t": now or time.time(), "eid": eid})
+            except ValueError:
+                pass
+
+    def expire_sim_phones(self, now: float) -> list[str]:
+        """Phones created through POST /api/sim/phone expire when nothing polled GET /api/sim/phone/{key} (or re-posted)
+        for SIM_PHONE_TTL_S. Scenario and walk-through phones are never in this table and never expire."""
+        gone = [k for k, t in list(self.sim_created.items()) if now - t > SIM_PHONE_TTL_S]
+        for key in gone:
+            self.sim_created.pop(key, None)
+            truth = self._sim_phone_truth(key)
+            if truth is None:
+                continue
+            with self._lock:
+                try:
+                    self.world.remove_phone(key)
+                except ValueError:
+                    pass
+            self.sim_bye(truth.get("eid") if truth.get("opt_in") else None, now)
+            log.info("simulated phone %r expired: no page asked for it for %g s", key, SIM_PHONE_TTL_S)
+        return gone
+
     def require_sim(self):
         if self.engine != "sim" or self.world is None:
             raise HTTPException(409, f"simulator only: the source is {self.source!r}" + (" (hand-made sample)" if self.engine == "fake" else ""))
@@ -473,14 +585,25 @@ class AppState:
         if self.world is not None:
             with self._lock:
                 self.world.clear()
+        self.sim_created.clear()
         self.session.reset()
 
-    def throw_pucks(self, room: str, n: int, seed: int | None) -> list[dict]:
+    def throw_pucks(self, room: str, n: int, seed: int | None, strategy: str | None = None) -> list[dict]:
+        """Simulated pucks: n == 2 (or a strategy) places the recommended layout (beacon.layout), otherwise a random throw."""
         world = self.require_sim()
         self.twin.room(room)
-        with self._lock:
-            world.throw_pucks(room, n=n, seed=seed)
-            pucks = [dict(p) for p in world.pucks]
+        if strategy is not None or n == 2:
+            if n != 2:
+                raise ValueError("a layout strategy places exactly 2 pucks")
+            from . import layout
+            lay = layout.recommend(self.twin, room, n=2, strategy=strategy or "door-wall")
+            with self._lock:
+                world.set_pucks([{"id": p["id"], "x": p["x"], "y": p["y"]} for p in lay["pucks"]])
+                pucks = [dict(p) for p in world.pucks]
+        else:
+            with self._lock:
+                world.throw_pucks(room, n=n, seed=seed)
+                pucks = [dict(p) for p in world.pucks]
         floor = self.twin.room(room)["floor"]
         self.session.set_pucks(pucks, room=room, floor=floor)
         return pucks
@@ -495,13 +618,22 @@ class AppState:
 
     def load_scenario(self, name: str) -> dict:
         world = self.require_sim()
-        path = (config.SCENARIOS_DIR / f"{name}.json").resolve()
-        if config.SCENARIOS_DIR.resolve() not in path.parents or not path.is_file():
-            raise ValueError(f"unknown scenario {name!r}")
+        data = None
+        if name != "auto":
+            path = (config.SCENARIOS_DIR / f"{name}.json").resolve()
+            if config.SCENARIOS_DIR.resolve() not in path.parents or not path.is_file():
+                raise ValueError(f"unknown scenario {name!r}")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            named_room = data.get("room")
+            if named_room and named_room not in {r["id"] for r in self.twin.data.get("rooms", [])}:
+                data = None                 # a fixture scene on another twin: build one for the twin that is loaded
+        if data is None:
+            from . import autoscene
+            data = autoscene.build(self.twin)
         if self.story is not None:
             self.story.stop()
         self.session.reset()
-        data = json.loads(path.read_text(encoding="utf-8"))
+        self.sim_created.clear()
         with self._lock:
             world.clear()
             world.load_scenario(data)
@@ -528,6 +660,16 @@ class AppState:
             if ph.get("key") == key:
                 return ph, ph.get("eid")
         return None, None
+
+
+SIM_PHONE_TTL_S = 15.0          # a phone created by a page is removed when nothing asked for it for this long
+
+
+def _situation_signature(b: dict) -> str:
+    """What an agent plan depends on: the phones' geometry kinds and statuses, and the puck set (no times, no positions)."""
+    phones = sorted((p.get("id"), p.get("geometry"), (p.get("report") or {}).get("status"), bool((p.get("report") or {}).get("safe_outside")),
+                     bool(p.get("stale"))) for p in b.get("phones") or [])
+    return json.dumps([phones, sorted(p.get("id") for p in b.get("pucks") or [])])
 
 
 STATE: AppState | None = None
@@ -613,7 +755,7 @@ async def api_bundle():
     s = await get_state()
     return {"twin": s.twin_raw, "site": s.site_raw, "labels": s.labels,
             "config": {"source": s.source, "engine": s.engine, "simulated": s.simulated, "sample": s.engine == "fake",
-                       "notice": s.notice, "room": config.DEFAULT_ROOM, "floor": s.twin.exercise_floor,
+                       "notice": s.notice, "room": config.default_room(s.twin), "floor": s.twin.exercise_floor,
                        "stale_s": config.STALE_S, "retention_s": config.RETENTION_S, "step_hz": config.STEP_HZ,
                        "sim_hz": config.SIM_HZ, "rig": {"scale": s.session.rig_scale if s.session else 1.0},
                        "scenarios": sorted(p.stem for p in config.SCENARIOS_DIR.glob("*.json")) if config.SCENARIOS_DIR.is_dir() else []}}
@@ -675,8 +817,12 @@ async def api_pucks(request: Request):
             if not 1 <= n <= 5:
                 raise ValueError("n must be between 1 and 5 pucks")
             seed = body.get("seed")
-            pucks = s.throw_pucks(room or config.DEFAULT_ROOM, n, int(seed) if seed is not None else None)
-            return {"ok": True, "pucks": s.session.pucks, "thrown": len(pucks), "room": room or config.DEFAULT_ROOM}
+            strategy = body.get("strategy")
+            if strategy is not None and strategy not in ("door-wall", "exterior-wall", "careless"):
+                raise ValueError("strategy must be door-wall, exterior-wall or careless")
+            pucks = s.throw_pucks(room or s.session_room() or config.default_room(s.twin), n, int(seed) if seed is not None else None, strategy)
+            return {"ok": True, "pucks": s.session.pucks, "thrown": len(pucks), "room": room or s.session_room() or config.default_room(s.twin),
+                    "strategy": strategy or ("door-wall" if n == 2 else "throw")}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     raise HTTPException(400, "send {'pucks': [...]} or {'n': 1..5}")
@@ -707,6 +853,75 @@ async def api_ingest(request: Request):
         raise HTTPException(400, str(exc))
 
 
+@router.get("/api/search_room")
+async def api_search_room_get():
+    s = await get_state()
+    if s.session is None:
+        return {"search_room": (s.latest or {}).get("search_room")}
+    return {"search_room": s.session.search_room_obj()}
+
+
+@router.post("/api/search_room")
+async def api_search_room_post(request: Request):
+    s = await get_state()
+    session = s.require_session()
+    body = _obj(await _json_body(request))
+    room = body.get("room")
+    if room is not None and not isinstance(room, str):
+        raise HTTPException(400, "room must be a room id or null")
+    try:
+        return {"ok": True, "search_room": session.set_search_room(room or None)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get("/api/layout")
+async def api_layout(room: str | None = None, n: int = 2, strategy: str = "door-wall"):
+    """The recommended puck layout for a room (beacon.layout): drawn as 'place the pucks here' ghosts."""
+    s = await get_state()
+    if strategy not in ("door-wall", "exterior-wall", "careless"):
+        raise HTTPException(400, "strategy must be door-wall, exterior-wall or careless")
+    if n != 2:
+        raise HTTPException(400, "layouts are for n=2 pucks")
+    try:
+        from . import layout
+    except Exception as exc:
+        raise HTTPException(501, f"layout module not available: {exc}")
+    try:
+        return layout.recommend(s.twin, room or s.default_layout_room(), n=n, strategy=strategy)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+def _app_link(request: Request, url: str | None) -> dict:
+    from urllib.parse import quote
+    base = (url or str(request.base_url)).strip()
+    if not (base.startswith("http://") or base.startswith("https://")) or len(base) > 200:
+        raise HTTPException(400, "url must be an http(s) base URL")
+    base = base.rstrip("/")
+    return {"link": "sandtablebeacon://server?url=" + quote(base, safe=""), "server": base}
+
+
+@router.get("/api/app_link")
+async def api_app_link(request: Request, url: str | None = None):
+    """The link that opens the Beacon iOS app with this server filled in (the QR code below encodes it)."""
+    return _app_link(request, url)
+
+
+@router.get("/api/app_link.svg")
+async def api_app_link_svg(request: Request, url: str | None = None):
+    import io
+    try:
+        import segno
+    except Exception as exc:
+        raise HTTPException(501, f"segno (QR codes) is not installed: {exc}")
+    link = _app_link(request, url)["link"]
+    buf = io.BytesIO()
+    segno.make(link, error="m").save(buf, kind="svg", scale=6, border=2, dark="#111", light="#fff",
+                                     title="Open in Sandtable Beacon")
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+
+
 # ---------------------------------------------------------------------------- simulator routes (409 otherwise)
 @router.post("/api/sim/phone")
 async def api_sim_phone(request: Request):
@@ -717,9 +932,12 @@ async def api_sim_phone(request: Request):
     if not isinstance(key, str) or not key or len(key) > 64:
         raise HTTPException(400, "key must be a non-empty string (at most 64 characters)")
     try:
+        before = s._sim_phone_truth(key)
         if body.get("remove"):
             with s._lock:
                 world.remove_phone(key)
+            s.sim_created.pop(key, None)
+            s.sim_bye(before.get("eid") if before and before.get("opt_in") else None)
             return {"ok": True, "removed": key}
         x, y = float(body["x"]), float(body["y"])
         if not (math.isfinite(x) and math.isfinite(y)):
@@ -728,8 +946,19 @@ async def api_sim_phone(request: Request):
         if report is not None and not isinstance(report, dict):
             raise ValueError("report must be an object")
         with s._lock:
+            extra = {}
+            if body.get("chip") in ("U1", "U2"):
+                extra["chip"] = body["chip"]
+            if isinstance(body.get("model"), str) and body["model"]:
+                extra["model"] = body["model"][:40]
+            if "camera_assist" in body:
+                extra["camera_assist"] = bool(body["camera_assist"])
             ph = world.upsert_phone(key, x, y, floor=body.get("floor"), opt_in=bool(body.get("opt_in", True)),
-                                    uwb=bool(body.get("uwb", True)), pointing=bool(body.get("pointing", False)), report=report)
+                                    uwb=bool(body.get("uwb", True)), pointing=bool(body.get("pointing", False)), report=report, **extra)
+        if before is None or key in s.sim_created:
+            s.sim_created[key] = time.time()           # created by a page: lives while the page keeps asking
+        if before and before.get("opt_in") and not ph.get("opt_in"):
+            s.sim_bye(before.get("eid"))                # the app was switched off: stop sharing now (the device still advertises)
     except (KeyError, TypeError) as exc:
         raise HTTPException(400, f"missing or bad field: {exc}")
     except ValueError as exc:
@@ -744,6 +973,8 @@ async def api_sim_phone_get(key: str):
     truth, eid = s.sim_phone_key_eid(key)
     if truth is None:
         raise HTTPException(404, f"no simulated phone {key!r}")
+    if key in s.sim_created:
+        s.sim_created[key] = time.time()
     phone = s.session.phone_by_eid(eid) if eid else None
     return {"key": key, "truth": {"x": truth.get("x"), "y": truth.get("y"), "floor": truth.get("floor")},
             "phone": phone, "ack": s.session.ack(phone)}
@@ -929,4 +1160,38 @@ def create_app(source: str | None = None, story: bool = False, scenario: str | N
     return app
 
 
+# ---------------------------------------------------------------------------- command agent routes (W4's agent_routes)
+def _get_session():
+    """For the report routes: the session, or in the SAMPLE engine the server state itself (its beacons() is the sample,
+    marked sample: the report is stamped SAMPLE)."""
+    s = S()
+    return s.session if s.session is not None else s
+
+
+def _get_agent():
+    """The command agent, or None (the agent routes answer 503 on a run, an empty status, and a report without a plan)."""
+    return S().agent
+
+
+def _register_agent_routes() -> None:
+    try:
+        from .agent_routes import register
+    except Exception as exc:
+        note = f"agent routes not available ({type(exc).__name__}: {exc})"
+        log.warning(note)
+
+        @router.get("/api/agent")
+        async def api_agent_missing():
+            s = await get_state()
+            return {"busy": False, "backend": None, "plan": None, "log": [], "available": False,
+                    "notice": s.agent_note or note}
+
+        @router.post("/api/agent/run")
+        async def api_agent_run_missing():
+            raise HTTPException(501, note)
+        return
+    register(router, _get_session, _get_agent)
+
+
+_register_agent_routes()
 app = create_app()

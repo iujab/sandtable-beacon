@@ -21,11 +21,10 @@
     <div class="clock" id="clock">--:--:--</div>
   </div>
   <div class="controls">
-    <button id="btn-throw" class="primary" title="Throw one more simulated puck into the room">Throw puck</button>
-    <button id="btn-story" title="Simulator: the scripted walk-through (pucks land one by one, the ring collapses to a fix)">Run walk-through</button>
+    <button id="btn-place2" class="primary" title="Two pucks where the twin says they resolve the mirror image (POST /api/pucks {&quot;n&quot;: 2})">Place 2 pucks <small>recommended layout</small></button>
+    <button id="btn-add" title="One more puck">Add a puck</button>
+    <button id="btn-story" title="Simulator: the two-puck walk-through (a ring; a careless second puck leaves two spots; the puck slid to the wall gives one)">Run walk-through</button>
     <button id="btn-reset" title="Clear phones, presence and pucks">Reset</button>
-    <a class="btn" id="lnk-phone" href="phone.html" target="_blank" rel="noopener" title="A simulated occupant phone in a new tab: each tab is one phone">Open simulated phone</a>
-    <a class="btn ghost" id="lnk-report" href="/report.html" target="_blank" rel="noopener" title="The printable incident report">Incident report</a>
   </div>
 </header>
 
@@ -37,6 +36,22 @@
       <option value="1">1 : 1</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option><option value="4">1 : 4</option><option value="5">1 : 5</option>
     </select>
   </label>
+  <div class="links">
+    <a class="mini" id="lnk-phone" href="phone.html" target="_blank" rel="noopener" title="A simulated occupant phone in a new tab: each tab is one phone">Simulated phone</a>
+    <div class="pop-anchor">
+      <button class="mini" id="btn-connect" aria-haspopup="true" aria-expanded="false" title="Scan with the iPhone to open the Beacon app with this server filled in">Connect an iPhone</button>
+      <div class="pop" id="connect-pop" hidden>
+        <div class="pop-head">Connect an iPhone <small>the Beacon occupant app</small></div>
+        <img id="qr" alt="QR code that opens the Beacon app with this server's address" width="220" height="220">
+        <div class="qr-none" id="qr-none" hidden>This server does not make the QR code yet: type the address into the app.</div>
+        <div class="addr-k">Server address</div>
+        <div class="addr" id="addr"></div>
+        <p class="pop-note">Scan with the iPhone's camera, or type the address into the app's settings. Same Wi-Fi as this server.</p>
+        <p class="pop-note"><b>iOS:</b> source, not compiled on this machine; build it with Xcode (docs/IOS_BUILD.md). <a href="app.html" target="_blank" rel="noopener">About the app</a></p>
+      </div>
+    </div>
+    <a class="mini" id="lnk-report" href="/report.html" target="_blank" rel="noopener" title="The printable incident report">Incident report</a>
+  </div>
 </div>
 
 <main class="grid">
@@ -44,24 +59,31 @@
     <div class="panel plan-panel">
       <div class="panel-head">
         <h2>Inside <small id="plan-src"></small></h2>
-        <div class="seg" id="focus-seg">
-          <button data-focus="room" class="on" aria-pressed="true" title="Zoom to the room the pucks were thrown into">Room</button>
-          <button data-focus="floor" aria-pressed="false" title="The whole floor">Floor</button>
+        <div class="head-tools">
+          <button id="btn-search" class="tool-btn" aria-pressed="false" title="Command is searching the puck room: dismiss candidate spots outside it, visibly">Search room</button>
+          <button id="btn-layout" class="tool-btn" aria-pressed="false" title="Show where to put two pucks">Where to put 2 pucks</button>
+          <div class="seg" id="focus-seg">
+            <button data-focus="room" class="on" aria-pressed="true" title="Zoom to the room the pucks were thrown into">Room</button>
+            <button data-focus="floor" aria-pressed="false" title="The whole floor">Floor</button>
+          </div>
         </div>
       </div>
       <div class="plan-wrap" id="plan-wrap">
         <svg id="plan" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan with pucks and phones"></svg>
         <div class="caption" id="caption" hidden></div>
         <div class="cue" id="cue" hidden></div>
-        <div class="tray" id="tray" hidden></div>
+        <div class="banner" id="search-banner" hidden></div>
+        <div class="layout-why" id="layout-why" hidden></div>
       </div>
+      <div class="tray" id="tray" hidden></div>
       <div class="legend" id="legend">
         <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="3.5" fill="#ffe3a3" stroke="#0b0e12"/></svg>puck</span>
         <span><svg viewBox="0 0 18 12"><path d="M1 10 A 10 10 0 0 1 17 6" fill="none" stroke="#ff4fa3" stroke-width="2"/><path d="M17 6 A 10 10 0 0 1 13 11" fill="none" stroke="#ff4fa3" stroke-opacity=".5" stroke-dasharray="1.5 2"/></svg>UWB ring (dashed: ruled out)</span>
         <span><svg viewBox="0 0 18 12"><path d="M1 10 A 10 10 0 0 1 17 6" fill="none" stroke="#ff4fa3" stroke-opacity=".25" stroke-width="6"/></svg>Bluetooth band</span>
         <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="4.5" fill="rgba(255,79,163,.28)" stroke="#ff4fa3"/><text x="9" y="8.4" font-size="7" text-anchor="middle" fill="#fff" font-weight="700">?</text></svg>candidate</span>
         <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="4.5" fill="none" stroke="#8d99a6" stroke-dasharray="2 2"/><path d="M6 3 L12 9 M12 3 L6 9" stroke="#ff8a82" stroke-width="1.4"/></svg>ruled out by the twin</span>
-        <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="5" fill="rgba(255,79,163,.25)" stroke="#ff4fa3"/><circle cx="9" cy="6" r="2" fill="#ffd0e6"/></svg>fix ±1σ</span>
+        <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="4.5" fill="none" stroke="#ffc247" stroke-dasharray="2 2"/><path d="M5.5 9.5 L12.5 2.5" stroke="#ffc247" stroke-width="1.4"/></svg>dismissed on a statement</span>
+        <span><svg viewBox="0 0 18 12"><circle cx="9" cy="6" r="5" fill="rgba(255,79,163,.25)" stroke="#ff4fa3"/><circle cx="9" cy="6" r="2" fill="#ffd0e6"/></svg>fix ±1σ (dashed 2σ)</span>
         <span><svg viewBox="0 0 18 12"><rect x="1" y="2" width="16" height="8" rx="2" fill="#141a21" stroke="#aab6c3"/></svg>devices heard (no app)</span>
       </div>
     </div>

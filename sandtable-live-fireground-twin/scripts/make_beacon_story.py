@@ -9,6 +9,8 @@ across the line between the pucks. The positions below are chosen by computing w
 
     python scripts/make_beacon_story.py            write fixtures/beacon/two_puck_scene.json and record fixtures/beacon/story_two_pucks.json
     python scripts/make_beacon_story.py --scene    the scene only (no recording)
+    SANDTABLE_DATA_MODE=live python scripts/make_beacon_story.py --live
+                                                   the same on the LIVE twin: data/live/beacon/story_<twin hash>.json (private)
 
 The recording runs the VENDORED Beacon module (vendor/beacon, lane L16's work) in-process, simulated, and keeps the Beacons
 objects at the script's steps. The hands-free script replays them, so the agent sees the same objects on every run (the
@@ -19,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -96,9 +99,11 @@ def scene() -> dict:
             "puck_line": {"from": "P1", "to": "P2"}, "phones": phones}
 
 
-def record(sc: dict) -> dict:
-    """Run the vendored Beacon module in-process and keep the Beacons objects at the script's steps."""
-    sys.path.insert(0, str(ROOT / "vendor" / "beacon"))
+def record(sc: dict, beacon_root: Path | None = None) -> dict:
+    """Run the vendored Beacon module in-process (on the fixture, or on the live bundle given in the environment) and keep the Beacons objects at the
+    script's steps: pucks placed; each phone once heard and settled (whatever geometry the module gives it there); phone 1 safe outside."""
+    root = beacon_root or (ROOT / "vendor" / "beacon")
+    sys.path.insert(0, str(root))
     from fastapi.testclient import TestClient
     from beacon.server import create_app
     commit = None
@@ -118,36 +123,38 @@ def record(sc: dict) -> dict:
             frames.append({"step": step, "what": what, "beacons": obj})
             print(f"[story] {step}: {what}")
 
-        def poll(cond, timeout=25.0):
+        def poll(cond, timeout=30.0):
             end = time.time() + timeout
             while time.time() < end:
                 obj = beacons()
                 if cond(obj):
                     return obj
                 time.sleep(0.2)
-            raise SystemExit(f"[story] timed out (last: {json.dumps(beacons())[:300]})")
+            raise SystemExit("[story] timed out waiting for the Beacon module")
+
+        def settled(n):
+            """Heard, at least 20 updates, and the same geometry for two seconds."""
+            obj = poll(lambda o: phone(o, n) is not None and (phone(o, n).get("track") or {}).get("updates", 0) >= 20)
+            g, since = phone(obj, n)["geometry"], time.time()
+            while time.time() - since < 2.0:
+                time.sleep(0.25)
+                o = beacons()
+                if phone(o, n) is None:
+                    continue
+                if phone(o, n)["geometry"] != g:
+                    g, since = phone(o, n)["geometry"], time.time()
+                obj = o
+            return obj
         c.post("/api/reset", json={})
         c.post("/api/pucks", json={"pucks": [{k: p[k] for k in ("id", "x", "y")} for p in sc["pucks"]], "room": sc["room"], "floor": sc["floor"]})
-        keep("pucks", poll(lambda o: len(o.get("pucks") or []) == 2), "two pucks placed by hand")
-        p1, p2 = sc["phones"]
-        c.post("/api/sim/phone", json={"key": p1["key"], "x": p1["x"], "y": p1["y"], "floor": sc["floor"], "opt_in": True, "uwb": True, "pointing": False, "report": p1["report"]})
-        seen = set()
-        obj = poll(lambda o: phone(o, 0) is not None)
-        while True:
-            ph = phone(obj, 0)
-            g = ph["geometry"] if ph else None
-            if g and g not in seen:
-                seen.add(g)
-                keep(f"phone1_{g}", obj, f"phone 1 heard as {g}")
-            if g == "fix":
-                break
-            obj = poll(lambda o: phone(o, 0) is not None and phone(o, 0)["geometry"] not in seen, 30)
-        stable = poll(lambda o: phone(o, 0) and phone(o, 0)["geometry"] == "fix" and (phone(o, 0).get("track") or {}).get("updates", 0) >= 20)
-        frames[-1] = {"step": "phone1_fix", "what": "phone 1: two rings, two candidates, the twin removed the mirror outside the building: a fix", "beacons": stable}
-        print("[story] phone1_fix (settled)")
-        c.post("/api/sim/phone", json={"key": p2["key"], "x": p2["x"], "y": p2["y"], "floor": sc["floor"], "opt_in": True, "uwb": True, "pointing": False, "report": p2["report"]})
-        obj = poll(lambda o: phone(o, 1) is not None and phone(o, 1)["geometry"] in ("candidates", "fix") and (phone(o, 1).get("track") or {}).get("updates", 0) >= 20)
-        keep("phone2_candidates", obj, f"phone 2 heard: {phone(obj, 1)['geometry']} (both mirror candidates inside the room)")
+        keep("pucks", poll(lambda o: len(o.get("pucks") or []) == len(sc["pucks"])), f"{len(sc['pucks'])} pucks placed by hand")
+        for i, ph in enumerate(sc["phones"]):
+            c.post("/api/sim/phone", json={"key": ph["key"], "x": ph["x"], "y": ph["y"], "floor": sc["floor"], "opt_in": True, "uwb": True,
+                                           "pointing": False, "report": ph["report"]})
+            obj = settled(i)
+            g = phone(obj, i)["geometry"]
+            keep(f"phone{i + 1}_{g}", obj, f"phone {i + 1} heard and settled: {g}")
+        p1 = sc["phones"][0]
         rep = {**p1["report"], "safe_outside": True, "status": "ok", "text": "Out with the rescue team"}
         c.post("/api/sim/phone", json={"key": p1["key"], "x": p1["x"], "y": p1["y"], "floor": sc["floor"], "opt_in": True, "uwb": True, "pointing": False, "report": rep})
         obj = poll(lambda o: phone(o, 0) is not None and (phone(o, 0).get("report") or {}).get("safe_outside"))
@@ -158,10 +165,43 @@ def record(sc: dict) -> dict:
             "recorded": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "vendored_commit": commit, "frames": frames}
 
 
+def record_live() -> Path:
+    """The same recorded run on the LIVE twin (private: data/live/beacon/story_<twin hash>.json), for deterministic hands-free live runs.
+    Needs the live layers configured (SANDTABLE_DATA_MODE=live); the vendored Beacon module reads the private live bundle (BEACON_BUNDLE_DIR)."""
+    os.environ.setdefault("SANDTABLE_DATA_MODE", "live")
+    from sandtable.adapters import get_provider
+    from sandtable.beacon_link import live_story_path, scene_for
+    from sandtable.demo import _live_beacon_bundle
+    from sandtable.scout.session import fire_room
+    from sandtable.spatial import Twin
+    provider = get_provider()
+    twin_raw = provider.twin_raw()
+    twin = Twin(twin_raw)
+    sc = scene_for(twin, fire_room(twin, provider))
+    from sandtable.demo import beacon_live_env
+    bundle = _live_beacon_bundle()
+    if bundle is None:
+        raise SystemExit("[story] could not write the live bundle for the Beacon module")
+    os.environ.update(beacon_live_env(bundle))                    # the vendored module reads the live twin and record from here
+    story = record(sc)
+    story.update({"scene": None, "scene_data": sc, "live_twin": True,
+                  "note": "RECORDED RUN of the SIMULATED Beacon module on the LIVE twin (private, never published): replayed by the hands-free beacon "
+                          "exercise in live mode so recorded agent turns replay. Simulated phones and pucks; the building data is the sponsors'."})
+    out = live_story_path(twin_raw)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(story, indent=1) + "\n")
+    print(f"[story] live story written under data/live/beacon/ ({len(story['frames'])} frames: {[f['step'] for f in story['frames']]})")
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", action="store_true")
+    ap.add_argument("--live", action="store_true", help="record on the live twin into data/live/beacon/ (private)")
     args = ap.parse_args(argv)
+    if args.live:
+        record_live()
+        return 0
     sc = scene()
     SCENE.write_text(json.dumps(sc, indent=1) + "\n")
     print(f"[story] scene: phone 1 mirror {sc['phones'][0]['mirror']}; phone 2 mirror {sc['phones'][1]['mirror']}")

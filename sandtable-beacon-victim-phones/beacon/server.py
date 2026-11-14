@@ -1169,10 +1169,8 @@ def _get_session():
 
 
 def _get_agent():
-    s = S()
-    if s.agent is None:
-        raise HTTPException(503, s.agent_note or "command agent not available")
-    return s.agent
+    """The command agent, or None (the agent routes answer 503 on a run, an empty status, and a report without a plan)."""
+    return S().agent
 
 
 def _register_agent_routes() -> None:

@@ -4,7 +4,7 @@
 // Rebuilt when the relayed object changes (at most a few times a second); the ring-to-fix collapse is animated per frame.
 import * as THREE from "three";
 import { sigmaEllipse } from "./scout.js";
-import { reportWords, PHONE_COLOR, STATUS_COLOR, tagText, chipSpot } from "./beacon.js";
+import { reportWords, PHONE_COLOR, STATUS_COLOR, tagText, chipSpot, mirrorPair } from "./beacon.js";
 
 const mat = (color, opacity = 1, extra = {}) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide, ...extra });
 const PINK = new THREE.Color(PHONE_COLOR);
@@ -17,10 +17,10 @@ export class Beacon3D {
   _flat(geo, material, x, y, h, order) { const m = new THREE.Mesh(geo, material); m.rotation.x = -Math.PI / 2; m.position.copy(this.V(x, y, h)); return this._o(m, order); }
   _pickable(x, y, r, data) { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); m.position.copy(this.V(x, y, 0.4)); m.userData = data; this.g.add(m); this.pick.push(m); }
   _ghost(q, strike, t0) {
-    const m = mat(0x9aa4ae, 0.85);
-    for (const a of [Math.PI / 4, -Math.PI / 4]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.08), m); b.position.copy(this.V(q.x, q.y, 0.12)); b.rotation.y = a; this._o(b, 27); }
-    this._flat(new THREE.RingGeometry(0.34, 0.4, 32), mat(0x9aa4ae, 0.6), q.x, q.y, 0.11, 27);
-    this._lab(`ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`, "#c9d1d9", "rgba(30,36,44,.85)", 0.017).position.copy(this.V(q.x, q.y, 0.5));
+    const m = mat(0xd5dbe1, 0.95);
+    for (const a of [Math.PI / 4, -Math.PI / 4]) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.04, 0.16), m); b.position.copy(this.V(q.x, q.y, 0.12)); b.rotation.y = a; this._o(b, 27); }
+    this._flat(new THREE.RingGeometry(0.66, 0.76, 40), mat(0xd5dbe1, 0.8), q.x, q.y, 0.11, 27);
+    this._lab(`ruled out: ${q.reason.length > 44 ? q.reason.slice(0, 42).trim() + "…" : q.reason}`, "#fff", "rgba(60,66,74,.92)", 0.024).position.copy(this.V(q.x, q.y, 0.8));
     this._pickable(q.x, q.y, 0.45, { tip: `Ruled out: ${q.reason}` });
     if (strike) {
       // the resolution moment: the twin deletes the mirror place (big red X, then the grey ghost stays)
@@ -53,7 +53,18 @@ export class Beacon3D {
       s.position.copy(this.V(cx, ylo, 0.5));
       this._pickable(cx, ylo, 0.9, { tip: c.text || "Devices heard with no app: a count, never people, no identities" });
     }
+    const mirrors = new Set();
     (b.phones || []).forEach((ph, idx) => {
+      // the mirror line: through the two pucks; the phone's two places are mirror images across it
+      const pair = mirrorPair(ph, pucks), pk2 = pair && pair.map((q) => q.id).sort().join("-");
+      if (pair && !mirrors.has(pk2)) {
+        mirrors.add(pk2);
+        const [a, c] = pair, dx = c.x - a.x, dy = c.y - a.y, L = Math.hypot(dx, dy) || 1, ext = 30;
+        const pts = [this.V(a.x - dx / L * ext, a.y - dy / L * ext, 0.07), this.V(c.x + dx / L * ext, c.y + dy / L * ext, 0.07)];
+        const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0xffe3a3, dashSize: 0.35, gapSize: 0.22, transparent: true, opacity: 0.85, depthTest: false, fog: false }));
+        ln.computeLineDistances(); this._o(ln, 26);
+        this._lab(`mirror line ${a.id}–${c.id}`, "#ffe3a3", "rgba(40,32,10,.8)", 0.017).position.copy(this.V(c.x + dx / L * 1.6, c.y + dy / L * 1.6, 0.35));
+      }
       const r0 = ph.report || {}, sel = ph.id === selected, dim = ph.stale ? 0.5 : 1, head = `${ph.id} · ${r0.status && r0.status !== "unknown" ? r0.status : "no status"}${r0.people != null ? ` · ${r0.people} ${r0.people === 1 ? "person" : "people"}` : ""}`;
       let lab = null;
       if (ph.geometry === "candidates" || ph.geometry === "fix")
@@ -83,14 +94,14 @@ export class Beacon3D {
           l.computeLineDistances(); this._o(l, 27);
         }
         cs.forEach((c) => {
-          const r = Math.max(0.3, c.sigma_m || 0.3);
+          const r = Math.max(0.45, c.sigma_m || 0.3);
           this._flat(new THREE.CircleGeometry(r, 32), mat(PINK, (0.12 + 0.5 * c.weight) * dim), c.x, c.y, 0.1, 28);
           this._flat(new THREE.RingGeometry(r * 0.9, r, 32), mat(PINK, 0.95 * dim), c.x, c.y, 0.11, 28);
           this._lab(`${Math.round(c.weight * 100)}%`, "#ffd0e6", null, 0.017).position.copy(this.V(c.x, c.y, 0.55));
           this._pickable(c.x, c.y, 0.6, { tip: `${ph.id}: candidate, ${Math.round(c.weight * 100)}% (${c.room_label || "?"}). ${ph.text || ""}`, pick: ph.id });
         });
         for (const q of ph.pruned || []) this._ghost(q);
-        if (cs.length > 1) this._lab(`cannot choose: ${cs.length} places`, "#ffd0e6", "rgba(60,10,34,.85)", 0.019).position.copy(this.V((cs[0].x + cs[1].x) / 2, (cs[0].y + cs[1].y) / 2, 0.6));
+        if (cs.length > 1) this._lab(`cannot choose: ${cs.length} places`, "#fff", "rgba(150,20,80,.9)", 0.024).position.copy(this.V((cs[0].x + cs[1].x) / 2, (cs[0].y + cs[1].y) / 2, 0.6));
         const top = cs.reduce((a, q) => (q.y > a.y ? q : a), cs[0]);
         lab = [top.x, top.y, "", 1.6];
       } else if (ph.geometry === "ring" && ph.ring) {

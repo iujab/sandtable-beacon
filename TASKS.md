@@ -1,6 +1,6 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sat Nov 14 2026, 1:37 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sat Nov 14 2026, 1:52 PM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
 
@@ -81,7 +81,7 @@ Taken from each part's `project.json` at sync time.
 
 **Left to do with real hardware (you):**
 
-1. 1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow sandtable-beacon-victim-phones/hardware (vendored here under vendor/beacon/hardware). Works when http://localhost:1885/healthz answers with source 'pucks'.
+1. 1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow vendor/beacon/hardware/BRINGUP.md (lane L16's guide, vendored; flashing in vendor/beacon/hardware/FLASH.md, the iOS app in vendor/beacon/docs/IOS_BUILD.md). Works when http://localhost:1885/healthz answers with source 'pucks'.
 2. 2. Start this board next to it (about 2 min): python -m sandtable.demo --beacon-url http://localhost:1885 (Windows: .venv\Scripts\python -m sandtable.demo --beacon-url http://localhost:1885). Works when the board at http://localhost:1810/ shows the Beacon badge as connected and not SIM.
 3. 3. Tape-measure the two pucks from two walls of the demo room, click 'Place pucks' and click them onto the room plan (fine-tune the metres in the dialog). Works when P1 and P2 show on the plan as 'placed by hand'.
 4. 4. Open the occupant app on the two iPhones. Works when each phone appears as two rings crossing at two points; where the twin's walls remove the mirror point it becomes a fix, otherwise the board says it cannot choose.
@@ -110,11 +110,11 @@ Taken from each part's `project.json` at sync time.
 - No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured
 - Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count, and devices are not people; the app must stay open with the screen on as built
 - Two pucks often leave two candidates; the twin removes one only when the geometry allows
-- All three sponsor layers are fixtures (real public data and NAIP imagery, synthetic interior); the live adapters were never called; the walls that prune a candidate are plausible walls, not surveyed ones
+- The public repository runs on stand-in data for all three sponsor layers (real public data and NAIP imagery for a different building, a synthetic interior whose walls are plausible, not surveyed). With the owner's keys and the CoStar data kit the same code ran live and privately on Nov 14 2026 on one real Los Angeles office building (CoStar record, a Matterport scan of one suite, Vexcel imagery); none of that data is published, the scan covers one suite, and its georeference is about 94 m from the record's point (flagged, not corrected)
 - Expected head counts and life hazards are estimates and inferences from the record
-- Agent turns for the Beacon and Scout exercises fall back to a labelled deterministic policy until a real model run is recorded
+- Agent turns in the hands-free demo are replays of recorded real model runs (beacon, scout and mayday scripts: every turn replayed, 0 fallbacks, results/replay_check_*_auto_3A2T.json); anything outside the recorded scene runs on a live model when one is configured, otherwise on a labelled deterministic policy that always finishes the exercise
 - Scout (radar) and Crews (tags) are simulation-only on these boards; the radar simulator was written alongside its detector
-- One floor modelled; feeds and the app link have no authentication; not a life-safety product
+- One floor modelled; feeds and the app link have no authentication; the board keeps what it received from phones for the incident report (stop-sharing deletion and retention limits exist only in lane L16's module); not a life-safety product
 
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)

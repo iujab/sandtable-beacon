@@ -187,7 +187,8 @@
    "stale": false,
    "text": "Phone B1: 2 people, cannot move, trapped. UWB fix in Suite 310, 2 m from the south wall and 2.5 m from the west wall, within 0.5 m",
    "assumptions": [],
-   "conflict": null
+   "conflict": null,
+   "last_known": null
   },
   {
    "id": "B2",
@@ -271,7 +272,8 @@
    "stale": false,
    "text": "Phone B2: 1 person, cannot move, injured. UWB range only: 5 m from puck P1, on the part of that circle the twin leaves possible; no position yet",
    "assumptions": [],
-   "conflict": null
+   "conflict": null,
+   "last_known": null
   },
   {
    "id": "B3",
@@ -371,7 +373,8 @@
    "stale": false,
    "text": "Phone B3: 1 person, trapped. Two possible spots in Suite 310, cannot choose between them (in Suite 310, 2.5 m from the west wall and 2.5 m from the north wall; or in Suite 310, 2 m from the south wall and 4.5 m from the west wall); a third puck, or moving one puck to the wall, would decide",
    "assumptions": [],
-   "conflict": null
+   "conflict": null,
+   "last_known": null
   },
   {
    "id": "B4",
@@ -476,7 +479,8 @@
    "stale": false,
    "text": "Phone B4: 1 person, can move, sheltering. Bluetooth only: in Suite 310 (probability 0.7), 2 to 6 m from puck P1",
    "assumptions": [],
-   "conflict": null
+   "conflict": null,
+   "last_known": null
   },
   {
    "id": "B5",
@@ -533,7 +537,8 @@
    "stale": false,
    "text": "Phone B5: says safe outside (I am out). Accounted for, not a victim",
    "assumptions": [],
-   "conflict": null
+   "conflict": null,
+   "last_known": null
   }
  ],
  "presence": [
@@ -542,14 +547,13 @@
    "method": "ble-presence",
    "opt_in": false,
    "simulated": true,
-   "sample": true,
    "puck": "P1",
    "floor": "f3",
    "room": "r310",
    "room_label": "Suite 310",
    "count": 5,
    "count_range": [
-    3,
+    4,
     7
    ],
    "zones": {
@@ -557,27 +561,28 @@
     "mid": 2,
     "far": 4
    },
-   "window_s": 30,
+   "opt_in_phones": 4,
+   "window_s": 30.0,
    "confidence": 0.5,
    "geo": {
     "lat": 34.2032523,
     "lon": -118.6299702
    },
-   "text": "About 5 devices advertising within about 3.5 m of puck P1 in Suite 310 (between 3 and 7); 4 more farther away or through a wall. Devices, not people; no identities kept"
+   "text": "About 5 devices in Suite 310 by puck P1's Bluetooth count (between 4 and 7), including 4 opt-in phones known in this room: 5 within about 3.5 m of the puck, 4 farther away or through a wall. Devices, not people; no identities kept",
+   "sample": true
   },
   {
    "id": "C2",
    "method": "ble-presence",
    "opt_in": false,
    "simulated": true,
-   "sample": true,
    "puck": "P2",
    "floor": "f3",
    "room": "r310",
    "room_label": "Suite 310",
    "count": 5,
    "count_range": [
-    3,
+    4,
     7
    ],
    "zones": {
@@ -585,27 +590,28 @@
     "mid": 1,
     "far": 3
    },
-   "window_s": 30,
+   "opt_in_phones": 4,
+   "window_s": 30.0,
    "confidence": 0.5,
    "geo": {
     "lat": 34.2032523,
     "lon": -118.6299702
    },
-   "text": "About 5 devices advertising within about 3.5 m of puck P2 in Suite 310 (between 3 and 7); 3 more farther away or through a wall. Devices, not people; no identities kept"
+   "text": "About 5 devices in Suite 310 by puck P2's Bluetooth count (between 4 and 7), including 4 opt-in phones known in this room: 5 within about 3.5 m of the puck, 3 farther away or through a wall. Devices, not people; no identities kept",
+   "sample": true
   },
   {
    "id": "C3",
    "method": "ble-presence",
    "opt_in": false,
    "simulated": true,
-   "sample": true,
    "puck": "P3",
    "floor": "f3",
    "room": "r310",
    "room_label": "Suite 310",
    "count": 4,
    "count_range": [
-    3,
+    4,
     7
    ],
    "zones": {
@@ -613,13 +619,15 @@
     "mid": 2,
     "far": 5
    },
-   "window_s": 30,
+   "opt_in_phones": 4,
+   "window_s": 30.0,
    "confidence": 0.5,
    "geo": {
     "lat": 34.2032523,
     "lon": -118.6299702
    },
-   "text": "About 4 devices advertising within about 3.5 m of puck P3 in Suite 310 (between 3 and 7); 5 more farther away or through a wall. Devices, not people; no identities kept"
+   "text": "About 4 devices in Suite 310 by puck P3's Bluetooth count (between 4 and 7), including 4 opt-in phones known in this room: 4 within about 3.5 m of the puck, 5 farther away or through a wall. Devices, not people; no identities kept",
+   "sample": true
   }
  ],
  "accountability": {
@@ -633,6 +641,9 @@
    {
     "suite": "300",
     "room": "r300",
+    "rooms": [
+     "r300"
+    ],
     "room_label": "Suite 300",
     "tenant": "Medical & diagnostic laboratories (name withheld)",
     "tenants": 1,
@@ -675,6 +686,9 @@
    {
     "suite": "301",
     "room": "r301",
+    "rooms": [
+     "r301"
+    ],
     "room_label": "Suite 301",
     "tenant": "Hospitals (name withheld)",
     "tenants": 1,
@@ -717,6 +731,9 @@
    {
     "suite": "302",
     "room": "r302",
+    "rooms": [
+     "r302"
+    ],
     "room_label": "Suite 302",
     "tenant": "Physicians (name withheld)",
     "tenants": 1,
@@ -759,6 +776,9 @@
    {
     "suite": "303",
     "room": "r303",
+    "rooms": [
+     "r303"
+    ],
     "room_label": "Suite 303",
     "tenant": null,
     "tenants": 0,
@@ -799,6 +819,9 @@
    {
     "suite": "304",
     "room": "r304",
+    "rooms": [
+     "r304"
+    ],
     "room_label": "Suite 304",
     "tenant": "Physical, occupational & speech therapists, & audiologists (name withheld); Physicians (name withheld)",
     "tenants": 2,
@@ -842,6 +865,9 @@
    {
     "suite": "305",
     "room": "r305",
+    "rooms": [
+     "r305"
+    ],
     "room_label": "Suite 305",
     "tenant": "Other accounting services (name withheld)",
     "tenants": 1,
@@ -884,6 +910,9 @@
    {
     "suite": "306",
     "room": "r306",
+    "rooms": [
+     "r306"
+    ],
     "room_label": "Suite 306",
     "tenant": "Physicians (name withheld); All other miscellaneous health practitioners (name withheld)",
     "tenants": 2,
@@ -927,6 +956,9 @@
    {
     "suite": "307",
     "room": "r307",
+    "rooms": [
+     "r307"
+    ],
     "room_label": "Suite 307",
     "tenant": "Podiatrists (name withheld)",
     "tenants": 1,
@@ -969,6 +1001,9 @@
    {
     "suite": "308",
     "room": "r308",
+    "rooms": [
+     "r308"
+    ],
     "room_label": "Suite 308",
     "tenant": null,
     "tenants": 0,
@@ -1009,6 +1044,9 @@
    {
     "suite": "309",
     "room": "r309",
+    "rooms": [
+     "r309"
+    ],
     "room_label": "Suite 309",
     "tenant": null,
     "tenants": 0,
@@ -1049,6 +1087,9 @@
    {
     "suite": "310",
     "room": "r310",
+    "rooms": [
+     "r310"
+    ],
     "room_label": "Suite 310",
     "tenant": "Dentists (name withheld)",
     "tenants": 1,
@@ -1076,7 +1117,7 @@
     "located": 1,
     "cold_devices": 5,
     "cold_range": [
-     3,
+     4,
      7
     ],
     "cannot_move": 2,
@@ -1091,6 +1132,9 @@
    {
     "suite": "311",
     "room": "r311",
+    "rooms": [
+     "r311"
+    ],
     "room_label": "Suite 311",
     "tenant": null,
     "tenants": 0,

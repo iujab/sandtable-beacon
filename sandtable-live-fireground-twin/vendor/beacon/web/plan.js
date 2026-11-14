@@ -70,7 +70,10 @@ export class Plan {
     this.fx0 = Math.min(...xs); this.fy0 = Math.min(...ys); this.fx = Math.max(...xs); this.fy = Math.max(...ys);
     this.svg.replaceChildren();
     this.g = {};
-    for (const k of ["rooms", "zones", "walls", "labels", "focus", "orient", "presence", "next", "phones", "pucks"]) { this.g[k] = el("g", { class: `g-${k}` }); this.svg.appendChild(this.g[k]); }
+    for (const k of ["defs", "rooms", "zones", "layout", "walls", "labels", "focus", "orient", "presence", "next", "phones", "pucks"]) { this.g[k] = el("g", { class: `g-${k}` }); this.svg.appendChild(this.g[k]); }
+    const pat = el("pattern", { id: "hatch", patternUnits: "userSpaceOnUse", width: 0.5, height: 0.5, patternTransform: "rotate(45)" });
+    pat.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 0.5, stroke: "#ffc247", "stroke-width": 0.06, "stroke-opacity": 0.35 }));
+    const defs = el("defs"); defs.appendChild(pat); this.g.defs.appendChild(defs);
     this.rooms = Object.fromEntries(t.rooms.filter((r) => r.floor === floor.id).map((r) => [r.id, r]));
     this.roomEls = {}; this.roomLabelEls = {};
     const floorNo = Number(floor.label);
@@ -159,6 +162,7 @@ export class Plan {
     for (const p of d.pucks || []) if (isNum(p.x) && (!p.floor || p.floor === this.floor.id)) pts.push([p.x, p.y]);
     for (const ph of d.phones || []) {
       if (ph.floor && ph.floor !== this.floor.id) continue;
+      if (ph.stale || ph.geometry === "none" || (ph.report && ph.report.safe_outside)) continue;   // a stale phone must not zoom the plan out
       if (ph.geometry === "fix" && isNum(ph.x)) pts.push([ph.x - (ph.sigma_m || 0), ph.y - (ph.sigma_m || 0)], [ph.x + (ph.sigma_m || 0), ph.y + (ph.sigma_m || 0)]);
       for (const c of (ph.geometry === "candidates" ? ph.candidates : []) || []) pts.push([c.x, c.y]);
       if (ph.geometry === "ring" && ph.ring) {
@@ -175,7 +179,9 @@ export class Plan {
     const bb = this.focusMode === "room" ? this._focusBBox() : null;
     const pad = 1.4;
     let to = this._floorBox();
-    if (bb) {
+    const fit = bb || [this.fx0 - 1.2, this.fy0 - 1.2, this.fx + 1.2, this.fy + 1.2];
+    if (fit) {
+      const bb = fit;
       // fit the box below a band kept free for the caption (opts.topReserve, in screen px)
       const rect = this.svg.getBoundingClientRect(), W = Math.max(rect.width, 50), H = Math.max(rect.height, 50);
       const res = Math.min(H * 0.45, (this.opts.topReserve ? this.opts.topReserve() : 0) + 30);
@@ -201,6 +207,7 @@ export class Plan {
       e.classList.toggle("near", dim && lit.has(id));
       for (const l of this.roomLabelEls[id] || []) { l.classList.toggle("dim", dim); l.style.display = isF ? "none" : ""; }
     }
+    this.g.orient.style.display = bb ? "none" : "";
     this.g.focus.replaceChildren();
     const fr = this.focusRoom && this.rooms[this.focusRoom];
     if (fr) {
@@ -227,6 +234,50 @@ export class Plan {
     this.kick();
   }
   select(id) { this.selected = id; for (const [k, ph] of this.phones) ph.g.classList.toggle("sel", k === id); }
+  assumptionTag(a) {
+    const where = (a.room && this.rooms[a.room] && this.rooms[a.room].label) || a.room || "the stated room";
+    if (a.kind === "occupant-statement") return `mirror spot dismissed: occupant says ${where}`;
+    if (a.kind === "search-room") return `mirror spot dismissed: command is searching ${where}`;
+    return a.text ? a.text.slice(0, 60) : "assumption";
+  }
+  // recommended puck layout (GET /api/layout): ghost pucks, the line through them, the side the mirror image falls on
+  setLayout(lay) {
+    const g = this.g.layout;
+    g.replaceChildren(); this.layEls = null;
+    if (!lay || !(lay.pucks || []).length) { this.kick(); return; }
+    const pts = lay.pucks.filter((q) => isNum(q.x) && isNum(q.y));
+    const room = lay.room && this.rooms[lay.room];
+    if (pts.length >= 2 && room) {
+      const A = [pts[0].x, pts[0].y], B = [pts[1].x, pts[1].y], dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy) || 1;
+      const n = [-dy / L, dx / L], c = centroid(room.polygon), side = Math.sign(n[0] * (c[0] - A[0]) + n[1] * (c[1] - A[1])) || 1;
+      const pad = 4, box = [[this.fx0 - pad, this.fy0 - pad], [this.fx + pad, this.fy0 - pad], [this.fx + pad, this.fy + pad], [this.fx0 - pad, this.fy + pad]];
+      // keep the half-plane on the far side of the line from the room (Sutherland-Hodgman against one edge)
+      const keep = (q) => -side * (n[0] * (q[0] - A[0]) + n[1] * (q[1] - A[1])) >= 0, out = [];
+      for (let i = 0; i < box.length; i++) {
+        const P1 = box[i], P2 = box[(i + 1) % box.length], k1 = keep(P1), k2 = keep(P2);
+        if (k1) out.push(P1);
+        if (k1 !== k2) {
+          const f1 = n[0] * (P1[0] - A[0]) + n[1] * (P1[1] - A[1]), f2 = n[0] * (P2[0] - A[0]) + n[1] * (P2[1] - A[1]), t = f1 / (f1 - f2);
+          out.push([P1[0] + t * (P2[0] - P1[0]), P1[1] + t * (P2[1] - P1[1])]);
+        }
+      }
+      if (out.length >= 3) g.appendChild(el("polygon", { points: this.pts(out), class: "lay-mirror" }));
+      const ext = 60, a = this.P([A[0] - dx / L * ext, A[1] - dy / L * ext]), b = this.P([A[0] + dx / L * ext, A[1] + dy / L * ext]);
+      g.appendChild(el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: "lay-line" }));
+      // the note runs along the line, on the mirror side, so it never sits across the room
+      const mid = [(A[0] + B[0]) / 2 - side * n[0] * 0.9, (A[1] + B[1]) / 2 - side * n[1] * 0.9], mp = this.P(mid);
+      let ang = Math.atan2(-dy, dx) * 180 / Math.PI;
+      if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+      g.appendChild(el("text", { x: mp[0], y: mp[1], class: "lay-note", transform: `rotate(${ang.toFixed(1)} ${mp[0]} ${mp[1]})` }, "mirror images fall on this side"));
+    }
+    this.layEls = [];
+    for (const q of pts) {
+      const P = this.P([q.x, q.y]), pg = el("g", { class: "lay-puck" }), c = el("circle", { cx: P[0], cy: P[1] }), t = el("text", { x: P[0] }, `${q.id} here`);
+      pg.append(c, t, el("title", {}, `Recommended spot for ${q.id}${lay.wall ? ` (${lay.wall})` : ""}`));
+      g.appendChild(pg); this.layEls.push({ c, t, P });
+    }
+    this.kick();
+  }
   highlightRoom(id, on) { this.roomEls[id]?.classList.toggle("hot", on); }
   // where the next puck should go (accountability.next_puck.door = [x, y]); null clears it
   setNextPuck(np) {
@@ -236,7 +287,7 @@ export class Plan {
     this.g.next.replaceChildren(); this.nextEl = null;
     if (!key) return;
     const g = el("g", { class: "nextpuck" }), ring = el("path"), dot = el("circle"), t = el("text", {}, `NEXT PUCK${np.suite ? ` · ${np.suite}` : ""}`);
-    g.append(ring, dot, t, el("title", {}, `Next puck: ${np.suite ? "Suite " + np.suite : np.room || ""}${np.why ? ". " + np.why : ""}`));
+    g.append(ring, dot, t, el("title", {}, np.text || `Next puck: ${np.suite ? "Suite " + np.suite : np.room || ""}${np.why ? ". " + np.why : ""}`));
     this.g.next.appendChild(g);
     this.nextEl = { ring, dot, t, x: np.door[0], y: np.door[1] };
     this.kick();
@@ -283,8 +334,23 @@ export class Plan {
   }
   setPlacing(on) { this.placing = !!on; this.svg.classList.toggle("placing", this.placing); }
 
+  // rooms where an opt-in phone is heard now: the presence entry says so (opt_in_phones), or a live phone is ranged
+  // by a puck in that room, or its published geometry sits in that room
+  _optInRooms() {
+    const d = this.data || {}, out = new Set();
+    for (const q of d.presence || []) if (q.room && (q.opt_in_phones || 0) > 0) out.add(q.room);
+    const puckRoom = Object.fromEntries((d.pucks || []).map((p) => [p.id, p.room]));
+    for (const ph of d.phones || []) {
+      if (ph.stale || (ph.report && ph.report.safe_outside)) continue;
+      for (const r of ph.ranges || []) if (puckRoom[r.puck]) out.add(puckRoom[r.puck]);
+      if (ph.ring && puckRoom[ph.ring.puck]) out.add(puckRoom[ph.ring.puck]);
+      for (const r of [ph.room, ph.zone && ph.zone.room, ...(ph.candidates || []).map((c) => c.room)]) if (r) out.add(r);
+    }
+    return out;
+  }
   _updatePresence(list) {
     // one badge per room: several pucks may hear the same devices, so counts are not summed; show the largest band
+    const optIn = this._optInRooms();
     const byRoom = new Map();
     for (const p of list) {
       if (!p.room || !this.rooms[p.room] || (p.floor && p.floor !== this.floor.id)) continue;
@@ -292,23 +358,26 @@ export class Plan {
       if (!cur || (p.count ?? 0) > (cur.best.count ?? 0)) byRoom.set(p.room, { best: p, all: [...(cur?.all || []), p] });
       else cur.all.push(p);
     }
-    const key = JSON.stringify([...byRoom].map(([r, v]) => [r, v.best.count, v.best.count_range, v.all.map((q) => q.puck)]));
+    const key = JSON.stringify([...byRoom].map(([r, v]) => [r, v.best.count, v.best.count_range, v.all.map((q) => q.puck), optIn.has(r)]));
     if (key === this._presKey) return;
     this._presKey = key;
     this.g.presence.replaceChildren();
     this.presEls = [];
     for (const [roomId, v] of byRoom) {
-      const p = v.best, n = p.count ?? 0, rg = p.count_range || [n, n];
+      const p = v.best, n = p.count ?? 0, rg = p.count_range || [n, n], phoneHere = optIn.has(roomId);
       const g = el("g", { class: "pres" });
-      const rect = el("rect", { rx: 0 }), t1 = el("text", { class: "n" }, n === 0 ? "no devices heard" : `about ${n} device${n === 1 ? "" : "s"}`);
-      const t2 = el("text", { class: "s" }, n === 0 ? "weak evidence of empty, never proof" : `${rg[0]} to ${rg[1]} · devices, not people`);
+      // "no devices heard" would be false where an opt-in phone is being ranged: say "no other devices" there
+      const long = n === 0 ? (phoneHere ? "no other devices heard" : "no devices heard") : `about ${n} device${n === 1 ? "" : "s"}`;
+      const short = n === 0 ? (phoneHere ? "no other devices" : "0 devices") : `~${n} device${n === 1 ? "" : "s"}`;
+      const rect = el("rect", { rx: 0 }), t1 = el("text", { class: "n" }, long);
+      const t2 = el("text", { class: "s" }, n === 0 ? (phoneHere ? "besides the opt-in phone · devices, not people" : "weak evidence of empty, never proof") : `${rg[0]} to ${rg[1]} · devices, not people`);
       g.append(rect, t1, t2, el("title", {}, v.all.map((q) => q.text || "").filter(Boolean).join("\n") || "Cold Bluetooth count: devices, not people; no identities kept"));
       this.g.presence.appendChild(g);
-      this.presEls.push({ g, rect, t1, t2, room: this.rooms[roomId] });
+      this.presEls.push({ g, rect, t1, t2, long, short, room: this.rooms[roomId] });
     }
   }
   _updateZones(phones) {
-    const zs = phones.filter((p) => p.geometry === "zone" && p.zone && !(p.report && p.report.safe_outside));
+    const zs = phones.filter((p) => p.geometry === "zone" && p.zone && !p.stale && !(p.report && p.report.safe_outside));
     const key = JSON.stringify(zs.map((p) => [p.id, p.zone.room, p.zone.band, p.zone.prob]));
     if (key === this._zoneKey) return;
     this._zoneKey = key;
@@ -357,15 +426,18 @@ export class Plan {
       if (!ph) { ph = this._newPhone(p.id); this.phones.set(p.id, ph); }
       if (ph.leaving) { ph.leaving = false; ph.key = null; }
       ph.data = p;
+      if (p.ring) ph.lastRing = p.ring;
       ph.g.classList.toggle("stale", !!p.stale);
-      const tgt = this._target(p);
+      const tgt = p.stale ? {} : this._target(p);     // stale: the card says where it was last; the plan draws nothing
       const key = JSON.stringify(tgt, (k, v) => (typeof v === "number" ? Math.round(v * 20) / 20 : v));
-      if (key !== ph.key) { ph.key = key; this._transition(ph, tgt); }
-      this._drawPruned(ph, p);
+      // structure = what kind of shape it is; a change of structure plays the collapse, a change of numbers only glides
+      const sig = `${p.geometry}|${p.ring ? p.ring.puck + p.ring.kind : ""}|${(p.candidates || []).length}`;
+      if (key !== ph.key) { ph.key = key; this._transition(ph, tgt, sig === ph.sig); ph.sig = sig; }
+      this._drawPruned(ph, p.stale ? { ...p, pruned: [] } : p);
     }
     for (const [id, ph] of this.phones) if (!seen.has(id) && !ph.leaving) {
       ph.leaving = true; ph.key = null;
-      this._transition(ph, {});
+      this._transition(ph, {}, true);
     }
   }
   _newPhone(id) {
@@ -374,18 +446,30 @@ export class Plan {
       id, g, cur: {}, from: {}, to: {}, t0: 0, dur: 1,
       pruned: el("g"), ghost: el("circle", { class: "ph-ghostring" }), band: el("path", { class: "ph-band" }), bandLine: el("path", { class: "ph-bandline" }),
       arc: el("path", { class: "ph-arc" }), links: el("g"), cands: el("g"), candEls: {},
-      fixG: el("g", { class: "ph-fix" }), s1: el("ellipse", { class: "s1" }), core: el("circle", { class: "core" }), pulse: el("circle", { class: "pulse" }),
-      lab: el("text", { class: "ph-lab" }), sub: el("text", { class: "ph-sub" }), title: el("title"),
+      fixG: el("g", { class: "ph-fix" }), s1: el("ellipse", { class: "s1" }), s2: el("ellipse", { class: "s2" }), core: el("circle", { class: "core" }), pulse: el("circle", { class: "pulse" }),
+      lab: el("text", { class: "ph-lab" }), sub: el("text", { class: "ph-sub" }), assume: el("text", { class: "ph-assume" }), title: el("title"), leader: el("line", { class: "ph-leader" }),
     };
-    ph.fixG.append(ph.s1, ph.pulse, ph.core);
-    g.append(ph.title, ph.pruned, ph.ghost, ph.band, ph.bandLine, ph.arc, ph.links, ph.cands, ph.fixG, ph.lab, ph.sub);
+    ph.fixG.append(ph.s2, ph.s1, ph.pulse, ph.core);
+    g.append(ph.title, ph.pruned, ph.ghost, ph.band, ph.bandLine, ph.arc, ph.links, ph.cands, ph.fixG, ph.leader, ph.lab, ph.sub, ph.assume);
     g.addEventListener("click", () => this.opts.onPick?.(id));
     g.style.cursor = "pointer";
     this.g.phones.appendChild(g);
     return ph;
   }
   _snapshot(ph) { return clone(ph.cur || {}); }
-  _transition(ph, tgt) {
+  _transition(ph, tgt, smooth = false) {
+    // a new measurement during a collapse: retarget the running animation instead of restarting it
+    if (smooth && ph.structural && performance.now() < ph.t0 + ph.dur) {
+      if (tgt.fix && ph.to.fix) ph.to.fix = { ...tgt.fix };
+      if (tgt.ring && ph.to.ring && ph.to.ring.op > 0) ph.to.ring = { ...tgt.ring, arcs: ph.to.ring.arcs.length === tgt.ring.arcs.length ? tgt.ring.arcs : ph.to.ring.arcs };
+      const live = Object.keys(ph.to).filter((k) => k[0] === "c" && ph.to[k].op > 0);
+      for (const c of Object.keys(tgt).filter((k) => k[0] === "c").map((k) => tgt[k])) {
+        let best = null;
+        for (const k of live) { const d = Math.hypot(ph.to[k].x - c.x, ph.to[k].y - c.y); if (!best || d < best[0]) best = [d, k]; }
+        if (best) ph.to[best[1]] = { ...c };
+      }
+      return;
+    }
     const cur = this._snapshot(ph);
     // drop parts that have already faded out
     for (const k of Object.keys(cur)) if (!(cur[k].op > 0.02)) delete cur[k];
@@ -408,7 +492,9 @@ export class Plan {
     const ring = cur.ring;
     const toPts = Object.keys(to).filter((k) => k[0] === "c").map((k) => [k, to[k]]);
     if (to.fix) toPts.push(["fix", to.fix]);
-    if (ring && !to.ring && toPts.length) {
+    if (smooth) {
+      dur = 450;
+    } else if (ring && !to.ring && toPts.length) {
       // the ah-ha: the ring collapses onto the new point(s)
       const fromArcs = [], toArcs = [];
       let rsum = 0;
@@ -427,7 +513,7 @@ export class Plan {
       from.ring = { ...ring, arcs: fromArcs };
       to.ring = { ...ring, r: rsum / toPts.length, arcs: toArcs, op: 0, ghost: 0 };
       dur = to.fix ? 1500 : 1300; pulse = !!to.fix;
-    } else if (!ring && curC.length && to.fix && !newC.length) {
+    } else if (curC.length && to.fix && !newC.length) {
       // two candidates become one fix: the nearer glides into the fix, the other fades out
       let best = null;
       for (const k of curC) { const d = Math.hypot(cur[k].x - to.fix.x, cur[k].y - to.fix.y); if (!best || d < best[0]) best = [d, k]; }
@@ -442,7 +528,7 @@ export class Plan {
       if (!(k in from)) from[k] = k === "ring" ? { ...to[k], op: 0, ghost: 0 } : k === "fix" ? { ...to[k], op: 0 } : { ...to[k], s: 0, op: 0 };
       if (!(k in to)) to[k] = { ...from[k], op: 0, ...(k === "ring" ? { ghost: 0 } : {}) };
     }
-    ph.from = from; ph.to = to; ph.t0 = performance.now(); ph.dur = reduceMotion() ? 1 : dur;
+    ph.from = from; ph.to = to; ph.t0 = performance.now(); ph.dur = reduceMotion() ? 1 : dur; ph.structural = !smooth;
     if (pulse) ph.pulseT0 = ph.t0 + ph.dur * 0.75;
     this.kick();
   }
@@ -462,19 +548,26 @@ export class Plan {
     return k < 1;
   }
   _drawPruned(ph, p) {
-    const key = JSON.stringify(p.pruned || []);
-    if (key === ph.prunedKey) return;
+    const list = (p.pruned || []).filter((q) => isNum(q.x) && isNum(q.y));
+    const key = JSON.stringify(list.map((q) => [Math.round(q.x * 2) / 2, Math.round(q.y * 2) / 2, q.by || ""]));
+    if (key === ph.prunedKey) {
+      // same ghosts: only refresh their hover text
+      (ph.prunedEls || []).forEach((e, i) => { if (list[i] && e.title) e.title.textContent = `${p.id}: ${e.stated ? "dismissed on a statement" : "ruled out by the twin"}: ${list[i].reason || ""}`; });
+      return;
+    }
     ph.prunedKey = key;
     ph.pruned.replaceChildren();
     ph.prunedEls = [];
-    for (const q of p.pruned || []) {
-      if (!isNum(q.x) || !isNum(q.y)) continue;
-      const g = el("g", { class: "ph-ghost" });
+    for (const q of list) {
+      const stated = q.by === "occupant-statement" || q.by === "search-room";
+      const g = el("g", { class: `ph-ghost${stated ? " stated" : ""}` });
       const c = el("circle"), l1 = el("line"), l2 = el("line");
-      g.append(c, l1, l2, el("title", {}, `${p.id}: ruled out: ${q.reason || "removed by the twin"}`));
+      if (stated) l2.style.display = "none";
+      const title = el("title", {}, `${p.id}: ${stated ? "dismissed on a statement" : "ruled out by the twin"}: ${q.reason || "removed by the twin"}`);
+      g.append(c, l1, l2, title);
       g.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 500, fill: "backwards" });
       ph.pruned.appendChild(g);
-      ph.prunedEls.push({ c, l1, l2, x: q.x, y: q.y });
+      ph.prunedEls.push({ c, l1, l2, x: q.x, y: q.y, title, stated });
     }
   }
   _arcPath(cx, cy, r, arcs) {
@@ -519,7 +612,7 @@ export class Plan {
       const c = S[k];
       let e = ph.candEls[k];
       if (!e) { e = ph.candEls[k] = { g: el("g", { class: "ph-cand" }), s: el("circle", { class: "s" }), m: el("circle", { class: "m" }), q: el("text", {}, "?"), w: el("text", { class: "ph-sub" }) }; e.g.append(e.s, e.m, e.q, e.w); ph.cands.appendChild(e.g); }
-      const P = this.P([c.x, c.y]), rm = (7 + 11 * Math.max(0, Math.min(1, c.w))) * u * Math.min(1, c.op * 1.5);
+      const P = this.P([c.x, c.y]), rm = 12 * u * Math.min(1, c.op * 1.5);   // equal sizes: the heavier spot is not the answer
       e.g.style.opacity = c.op;
       e.s.setAttribute("cx", P[0]); e.s.setAttribute("cy", P[1]); e.s.setAttribute("r", Math.max(0.01, c.s));
       e.s.style.display = c.s > rm ? "" : "none";
@@ -534,7 +627,8 @@ export class Plan {
       ph.fixG.style.opacity = f.op;
       ph.s1.setAttribute("cx", 0); ph.s1.setAttribute("cy", 0); ph.s1.setAttribute("rx", Math.max(0.01, f.ea)); ph.s1.setAttribute("ry", Math.max(0.01, f.eb));
       ph.s1.setAttribute("transform", `translate(${P[0]} ${P[1]}) rotate(${(-f.ang / D2R).toFixed(1)})`);
-      ph.core.setAttribute("cx", P[0]); ph.core.setAttribute("cy", P[1]); ph.core.setAttribute("r", 6 * u);
+      ph.s2.setAttribute("rx", Math.max(0.01, 2 * f.ea)); ph.s2.setAttribute("ry", Math.max(0.01, 2 * f.eb)); ph.s2.setAttribute("transform", ph.s1.getAttribute("transform"));
+      ph.core.setAttribute("cx", P[0]); ph.core.setAttribute("cy", P[1]); ph.core.setAttribute("r", 7 * u);
       const now = performance.now(), pk = ph.pulseT0 ? (now - ph.pulseT0) / 1100 : 2;
       if (pk >= 0 && pk < 1) { ph.pulse.style.opacity = 1 - pk; ph.pulse.setAttribute("cx", P[0]); ph.pulse.setAttribute("cy", P[1]); ph.pulse.setAttribute("r", (8 + 40 * ease(pk)) * u); }
       else ph.pulse.style.opacity = 0;
@@ -548,47 +642,84 @@ export class Plan {
     // label: follows whichever part dominates right now
     const st = statusOf(p.report), n = p.report && isNum(p.report.people) ? p.report.people : null;
     const ppl = n === null ? "" : ` · ${n} ${n === 1 ? "person" : "people"}`;
-    let at = null, lab = "", sub = "", op = 0;
+    let at = null, lab = "", sub = "", op = 0, mark = null;
     const bestC = ck.filter((k) => S[k].op > 0.3).sort((a, b) => S[b].y - S[a].y)[0];   // the top-most candidate on screen
     if (f && f.op > 0.45) {
-      const P = this.P([f.x, f.y]); at = [P[0], P[1] - Math.max(f.ea, f.eb, 10 * u) - 20 * u];
+      const P = this.P([f.x, f.y]); at = [P[0], P[1] - Math.max(f.ea, f.eb, 10 * u) - 20 * u]; mark = P;
       lab = `${ph.id}${ppl}`; sub = `${st.word.toLowerCase()} · ±${num(p.sigma_m)} m`; op = f.op;
     } else if (bestC) {
-      const c = S[bestC], P = this.P([c.x, c.y]), rm = (7 + 11 * c.w) * u; at = [P[0], P[1] - rm - 20 * u];
-      lab = `${ph.id} ?${ppl}`; sub = `${vis.length} possible spots, not one point`; op = c.op;
+      const c = S[bestC], P = this.P([c.x, c.y]), rm = 12 * u; at = [P[0], P[1] - rm - 20 * u]; mark = [P[0], P[1] - rm];
+      lab = `${ph.id} ?${ppl}`; sub = `cannot choose between ${vis.length} spots`; op = c.op;
     } else if (ring && ring.op > 0.3) {
       let la = ring.arcs[0];
       for (const a of ring.arcs) if (a[1] - a[0] > la[1] - la[0]) la = a;
       const mid = (la[0] + la[1]) / 2 * D2R, rr = ring.r + (ring.kind === "ble" ? ring.sg : 0) + 16 * u;
       const P = this.P([ring.cx + rr * Math.cos(mid), ring.cy + rr * Math.sin(mid)]); at = [P[0], P[1]];
-      lab = `${ph.id}${ppl}`; sub = ring.kind === "ble" ? `Bluetooth band · about ${num(p.ring?.r_m)} m from ${p.ring?.puck}` : `range only · ${num(p.ring?.r_m)} m from ${p.ring?.puck}`; op = ring.op;
+      mark = this.P([ring.cx + ring.r * Math.cos(mid), ring.cy + ring.r * Math.sin(mid)]);
+      const rg = p.ring || ph.lastRing || {};
+      lab = `${ph.id}${ppl}`; sub = ring.kind === "ble" ? `Bluetooth band · about ${num(rg.r_m)} m from ${rg.puck}` : `range only · ${num(rg.r_m)} m from ${rg.puck}`; op = ring.op;
     } else if (p.geometry === "zone" && this.zoneEls) {
       const z = this.zoneEls.find((q) => q.id === ph.id);
-      if (z) { const P = this.P(z.c); at = [P[0], P[1] - z.i * 34 * u]; lab = `${ph.id}${ppl}`; sub = `probably here · ${z.words}`; op = 1; }
+      if (z) { const P = this.P(z.c); at = [P[0], P[1] - z.i * 34 * u]; mark = P; lab = `${ph.id}${ppl}`; sub = `probably here · ${z.words}`; op = 1; }
     }
-    ph.labAt = at; ph.labOp = op; ph.labRank = f && f.op > 0.45 ? 0 : bestC ? 1 : ring && ring.op > 0.3 ? 2 : 3;
-    if (at) { ph.lab.textContent = lab; ph.sub.textContent = sub; ph.lab.style.opacity = op; ph.sub.style.opacity = op; }
-    else { ph.lab.style.opacity = 0; ph.sub.style.opacity = 0; }
-    ph.title.textContent = p.text || ph.id;
+    ph.labAt = at; ph.labOp = op; ph.labMark = mark; ph.labRank = f && f.op > 0.45 ? 0 : bestC ? 1 : ring && ring.op > 0.3 ? 2 : 3;
+    const as = (p.assumptions || [])[0];
+    ph.assume.textContent = as ? this.assumptionTag(as) : "";
+    if (at) { ph.lab.textContent = lab; ph.sub.textContent = sub; ph.lab.style.opacity = op; ph.sub.style.opacity = op; ph.assume.style.opacity = op; }
+    else { ph.lab.style.opacity = 0; ph.sub.style.opacity = 0; ph.assume.style.opacity = 0; }
+    // the ± numbers are the locator's model: say so on hover (and that they are simulated, when they are)
+    const sim = !(this.data && this.data.simulated === false);
+    ph.title.textContent = (p.text || ph.id) + (f && f.op > 0.45 ? `\n±${num(p.sigma_m)} m: 1 sigma, from the locator's model${sim ? "; simulated" : ""}` : "");
   }
 
   _placeLabels() {
     const u = this.u, placed = [];
-    // fixed things labels must not cover: pucks and presence badges
-    for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 12 * u, P[1] - 24 * u, P[0] + 12 * u, P[1] + 8 * u]); }
-    const list = [...this.phones.values()].filter((ph) => ph.labAt && ph.labOp > 0.05).sort((a, b) => a.labRank - b.labRank || String(a.id).localeCompare(String(b.id)));
-    const hit = (b) => placed.some((q) => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1]);
-    for (const ph of list) {
-      const w = Math.max(ph.lab.getComputedTextLength(), ph.sub.getComputedTextLength()) / 2 + 4 * u;
-      const [x, y] = ph.labAt;
-      let dy = 0;
-      for (const step of [0, -1, 1, -2, 2, -3, 3]) {
-        const yy = y + step * 30 * u, box = [x - w, yy - 15 * u, x + w, yy + 17 * u];
-        if (!hit(box) || step === 3) { dy = step * 30 * u; placed.push(box); break; }
-      }
-      ph.lab.setAttribute("x", x); ph.lab.setAttribute("y", y + dy);
-      ph.sub.setAttribute("x", x); ph.sub.setAttribute("y", y + dy + 13 * u);
+    const bbox = (e) => { try { const b = e.getBBox(); return b.width ? [b.x, b.y, b.x + b.width, b.y + b.height] : null; } catch { return null; } };
+    // fixed things a label must not cover: pucks with their ids, the device-count badges, the room title, the next-puck marker
+    for (const e of this.pucks.values()) { const P = this.P([e.x, e.y]); placed.push([P[0] - 14 * u, P[1] - 26 * u, P[0] + 14 * u, P[1] + 10 * u]); }
+    for (const b of this.presEls || []) { const q = bbox(b.rect); if (q) placed.push(q); }
+    if (this._focusTag) { const q = bbox(this._focusTag); if (q) placed.push(q); }
+    // the rooms' own labels (suite numbers, tenants) that are on show
+    for (const labs of Object.values(this.roomLabelEls || {})) for (const t of labs) { if (t.style.display === "none") continue; const q = bbox(t); if (q) placed.push(q); }
+    if (this.nextEl) { const q = bbox(this.nextEl.t); if (q) placed.push(q); }
+    // and the phones' own markers (fix cores, candidate markers with their weights)
+    for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) {
+      if (!(q.op > 0.3) || !isNum(q.x) || k === "ring") continue;
+      const P = this.P([q.x, q.y]), r = (k === "fix" ? 9 : 13) * u;
+      placed.push([P[0] - r, P[1] - r, P[0] + r, P[1] + r + (k === "fix" ? 0 : 14 * u)]);
     }
+    const list = [...this.phones.values()].filter((ph) => ph.labAt && ph.labOp > 0.05).sort((a, b) => a.labRank - b.labRank || String(a.id).localeCompare(String(b.id)));
+    const over = (b) => placed.reduce((s, q) => s + Math.max(0, Math.min(b[2], q[2]) - Math.max(b[0], q[0])) * Math.max(0, Math.min(b[3], q[3]) - Math.max(b[1], q[1])), 0);
+    const bx = this.box || [0, 0, 1e9, 1e9];
+    for (const ph of list) {
+      const w = Math.max(ph.lab.getComputedTextLength(), ph.sub.getComputedTextLength(), ph.assume.textContent ? ph.assume.getComputedTextLength() : 0) / 2 + 4 * u;
+      const h1 = 15 * u, h2 = (ph.assume.textContent ? 30 : 17) * u;
+      const clampX = (x) => Math.max(bx[0] + w + 4 * u, Math.min(bx[0] + bx[2] - w - 4 * u, x));
+      const clampY = (y) => Math.max(bx[1] + 20 * u, Math.min(bx[1] + bx[3] - 34 * u, y));
+      const ax = ph.labAt[0], ay = ph.labAt[1];
+      // candidate spots around the anchor: as placed, above, below, right, left, then farther out
+      const steps = [[0, 0], [0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1], [0, -2], [0, 2], [2, 0], [-2, 0]];
+      let best = null;
+      for (const [sx, sy] of steps) {
+        const x = clampX(ax + sx * (w + 12 * u)), y = clampY(ay + sy * 34 * u);
+        const box = [x - w, y - h1, x + w, y + h2], o = over(box);
+        if (!best || o < best[0] - 1e-9) best = [o, x, y, box];
+        if (o === 0) break;
+      }
+      const [, x, y, box] = best;
+      placed.push(box);
+      ph.lab.setAttribute("x", x); ph.lab.setAttribute("y", y);
+      ph.sub.setAttribute("x", x); ph.sub.setAttribute("y", y + 13 * u);
+      ph.assume.setAttribute("x", x); ph.assume.setAttribute("y", y + 26 * u);
+      // a label moved away from its marker keeps a thin leader line to it
+      const m = ph.labMark, moved = m && Math.hypot(x - ax, y - ay) > 20 * u;
+      if (moved) {
+        const ly = m[1] < y - h1 ? y - h1 : m[1] > y + h2 ? y + h2 : m[1], lx = Math.max(x - w, Math.min(x + w, m[0]));
+        ph.leader.setAttribute("x1", m[0]); ph.leader.setAttribute("y1", m[1]); ph.leader.setAttribute("x2", lx); ph.leader.setAttribute("y2", ly);
+        ph.leader.style.opacity = ph.labOp * 0.8;
+      } else ph.leader.style.opacity = 0;
+    }
+    for (const ph of this.phones.values()) if (!(ph.labAt && ph.labOp > 0.05)) ph.leader.style.opacity = 0;
   }
 
   // ------------------------------------------------------------------ frame loop
@@ -619,15 +750,31 @@ export class Plan {
       if (age < 1.2 && !reduceMotion()) { const k = age / 1.2; e.drop.setAttribute("cx", P[0]); e.drop.setAttribute("cy", P[1]); e.drop.setAttribute("r", (11 + 40 * ease(k)) * u); e.drop.style.opacity = 1 - k; more = true; }
       else e.drop.style.opacity = 0;
     }
-    // cold presence badges: sit on the room's top wall, right-aligned, so the room's interior stays free for phones
+    // cold presence badges: inside the room, in the corner farthest from the pucks and the phones' points
+    const busy = [...this.pucks.values()].map((e) => [e.x, e.y]);
+    for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) if (q.op > 0.1 && isNum(q.x)) busy.push([q.x, q.y]);
     for (const b of this.presEls || []) {
-      const bb = bboxOf(b.room.polygon), pad = 7 * u;
+      const bb = bboxOf(b.room.polygon), pad = 7 * u, m = 0.25;
       b.t1.setAttribute("x", 0); b.t1.setAttribute("y", 0); b.t2.setAttribute("x", 0); b.t2.setAttribute("y", 0);
+      b.t1.textContent = b.long; b.t2.style.display = "";       // measure the full badge every frame, then decide (no flip-flop)
       const w = Math.max(b.t1.getComputedTextLength(), b.t2.getComputedTextLength()) + 2 * pad, h = 37 * u;
-      const x = Math.max(bb[0], bb[2] - w), y = this.fy - bb[3] - h * 0.62;
-      b.rect.setAttribute("x", x); b.rect.setAttribute("y", y); b.rect.setAttribute("width", w); b.rect.setAttribute("height", h); b.rect.setAttribute("rx", 4 * u);
+      const compact = w > (bb[2] - bb[0]) * 0.75;
+      b.t2.style.display = compact ? "none" : "";
+      if (compact) b.t1.textContent = b.short; else b.t1.textContent = b.long;
+      const w2 = compact ? b.t1.getComputedTextLength() + 2 * pad : w, h2 = compact ? 22 * u : h;
+      let best = null;
+      for (const [cx, cy] of [[0, 1], [1, 1], [0, 0], [1, 0]]) {      // building-frame corners: x left/right, y bottom/top
+        const x0 = cx ? Math.max(bb[0] + m, bb[2] - m - w2) : bb[0] + m, y0b = cy ? bb[3] - m - h2 : bb[1] + m;   // y0b = bottom of the box, building frame
+        const c = [x0 + w2 / 2, y0b + h2 / 2];
+        const score = busy.length ? Math.min(...busy.map((q) => Math.max(Math.abs(q[0] - c[0]) - w2 / 2, Math.abs(q[1] - c[1]) - h2 / 2))) : (cy ? 1 : 0);
+        if (!best || score > best[0] + 1e-6) best = [score, x0, y0b];
+      }
+      if (best[0] < 0.15) best = [0, Math.max(bb[0], bb[2] - w2), bb[3] + 4 * u];   // nothing free inside: sit on the top wall, outside
+      const x = best[1], y = this.fy - best[2] - h2;
+      b.rect.setAttribute("x", x); b.rect.setAttribute("y", y); b.rect.setAttribute("width", w2); b.rect.setAttribute("height", h2); b.rect.setAttribute("rx", 4 * u);
       b.t1.setAttribute("x", x + pad); b.t1.setAttribute("y", y + 16 * u); b.t2.setAttribute("x", x + pad); b.t2.setAttribute("y", y + 30 * u);
     }
+    for (const q of this.layEls || []) { q.c.setAttribute("r", 10 * u); q.t.setAttribute("y", q.P[1] + 22 * u); }
     if (this.nextEl) {
       const n = this.nextEl, P = this.P([n.x, n.y]), r = 11 * u;
       n.ring.setAttribute("d", `M${P[0]} ${P[1] - r} L${P[0] + r} ${P[1]} L${P[0]} ${P[1] + r} L${P[0] - r} ${P[1]} Z`);

@@ -51,9 +51,13 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
   watch(board);
   const shot = async (page, name) => { await page.screenshot({ path: path.join(OUT, `ui_${name}.png`) }); console.log("saved", `figures/ui_${name}.png`); };
 
+  // the projector check runs beside the big board, so it can be taken mid-walk-through
+  const small = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watch(small);
   if (sim) {
     await post("/api/reset");
     await board.goto(BASE + "/", { waitUntil: "load" });
+    await small.goto(BASE + "/", { waitUntil: "load" });
     await sleep(2500);
     await shot(board, "00_no_pucks");
 
@@ -97,14 +101,31 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
       await sleep(3000);
       await board.hover("table.acct tbody tr.r1").catch(() => {});
       await shot(board, "04_accountability");
+      await shot(small, "08_1280x720");
     }
     const end = Date.now() + 100000;
     while (Date.now() < end) { const st = await story(); if (st.done || !st.running) break; await sleep(1000); }
+    // the command agent on the walk-through's final situation: ask again if its plan is out of date
+    const agent = await get("/api/agent").catch(() => null);
+    if (agent && agent.available !== false) {
+      const b = await get("/api/beacons");
+      if (!agent.plan || (b.agent && b.agent.stale)) {
+        await board.click("#btn-agent").catch(() => {});
+        const aend = Date.now() + 90000;
+        await sleep(1500);
+        while (Date.now() < aend) { const a = await get("/api/agent"); const q = await get("/api/beacons"); if (a.plan && !a.busy && !(q.agent && q.agent.stale)) break; await sleep(1500); }
+      }
+      await sleep(1500);
+      await board.evaluate(() => { const l = document.getElementById("agent-log"); if (l) l.scrollTop = 0; });
+      await shot(board, "06_agent");
+    }
     if (!gotChoose || !gotFix) {
       // the walk-through did not leave two candidates on this engine: stage the careless layout by hand, derived from
       // the fire room's own box (two pucks on a line through the middle of the room, the phone off that line)
       console.log("  staging the two-puck layouts by hand (careless, then slid to the wall) for the missing shots");
       await post("/api/reset");
+      // the server forgets simulated phones nobody asks about: keep asking while this staged one is needed
+      const keep = setInterval(() => { fetch(BASE + "/api/sim/phone/shots-careless").catch(() => {}); }, 3000);
       const bundle = await get("/api/bundle");
       const roomId = bundle.config.room, room = bundle.twin.rooms.find((r) => r.id === roomId);
       const xs = room.polygon.map((p) => p[0]), ys = room.polygon.map((p) => p[1]);
@@ -129,10 +150,9 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
           await shot(board, "03_fix_two_pucks");
         }
       }
+      clearInterval(keep);
       await post("/api/sim/phone", { key: "shots-careless", remove: true });
     }
-    const agent = await get("/api/agent").catch(() => null);
-    if (agent && agent.available !== false && agent.plan) { await sleep(1500); await shot(board, "06_agent"); }
     await board.click('#focus-seg button[data-focus="floor"]');
     await sleep(1500);
     await shot(board, "07_floor");
@@ -147,12 +167,11 @@ const phoneOf = (b, key) => (b.phones || []).find((p) => p.id === key) || null;
     await shot(board, "01_board");
   }
 
-  // the projector check
-  const small = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  watch(small);
-  await small.goto(BASE + "/", { waitUntil: "load" });
-  await sleep(3000);
-  await shot(small, "08_1280x720");
+  if (!sim) {
+    await small.goto(BASE + "/", { waitUntil: "load" });
+    await sleep(3000);
+    await shot(small, "08_1280x720");
+  }
 
   // the simulated phone at phone width
   if (sim) {

@@ -102,7 +102,6 @@ def main(argv=None) -> int:
     for h in shown:
         print(f"[demo]   board            http://{h}:{args.port}/", flush=True)
     if args.lan:
-        print(f"[demo]   board            http://127.0.0.1:{args.port}/", flush=True)
         ips = _lan_ips()
         for ip in ips:
             print(f"[demo]   phones (Wi-Fi)   http://{ip}:{args.port}   <- type this into the iOS app's server field", flush=True)

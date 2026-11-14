@@ -12,7 +12,7 @@ The owner's hardware, as confirmed at noon: five Qorvo DWM3001CDK boards (nRF528
 - The Qorvo DWM3001CDK is the cheapest kit with a working stack: Qorvo's "Nearby Interaction" firmware (QANI) ships as a prebuilt image for this board, with the UWB driver, the configuration-blob generator and the MAC as closed Cortex-M4 libraries. [Qorvo forum: QNI package v3.0](https://forum.qorvo.com/t/qorvo-nearby-interaction-software-package-v-3-0-release/13390), [working report, Feb 2026](https://forum.qorvo.com/t/how-to-use-dwm3001cdk-with-apple-ni/23229). Price for reference: USD 29.50 at [DigiKey](https://www.digikey.com/en/products/detail/qorvo/DWM3001CDK/24367348).
 - Plan: **stock, unmodified Qorvo firmware** on the boards, our own iOS app, our own server. No firmware is built here. The stock firmware advertises a Qorvo Bluetooth service (`2E938FD0-6A61-11ED-A1EB-0242AC120002`); the app connects, exchanges the blobs with the message ids of Apple's sample (`0x0A` initialize, `0x01` accessory configuration, `0x0B` configure and start), and runs one `NISession` per puck. [Qorvo forum: service UUIDs](https://forum.qorvo.com/t/issues-with-apple-nearby-interaction-app-not-detecting-dwm3001cdk-accessory/20321), [Apple sample](https://developer.apple.com/documentation/nearbyinteraction/implementing-spatial-interactions-with-third-party-accessories)
 - What each phone gives: **distance on both** (about 60 updates a second reported with this board). **Direction on neither**: developers report `supportsDirectionMeasurement == false` and a nil `direction` for accessories on the iPhone 14 family and later, including an iPhone 15 with this exact board. Camera assistance can add a horizontal angle, but only after about ten seconds of moving the phone with the camera seeing a lit scene. [Apple forum 822522](https://developer.apple.com/forums/thread/822522), [720292](https://developer.apple.com/forums/thread/720292). The second-generation chip brings no extra range with accessories. [Apple: extended distance is Apple-to-Apple only](https://developer.apple.com/documentation/nearbyinteraction/extending-advanced-direction-finding-and-ranging)
-- One iPhone can run several accessory sessions at once, so several pucks can range the same phone. How many phones one board serves at once is not documented for the stock firmware: assume one, which is why the app has a "max pucks" setting (three for one phone, two for the other, out of five boards).
+- One iPhone can run several accessory sessions at once, so both pucks can range the same phone. **One board serves one phone at a time**: forum reports say the stock firmware is built for a single connection and stops advertising while connected ([24451](https://forum.qorvo.com/t/does-dw3-qm33-sdks-qani-project-support-multiple-fira-sessions/24451), [23706](https://forum.qorvo.com/t/dwm3001cdk-apple-nearby-interaction-with-multiple-iphonse-simultaneously/23706), [18890](https://forum.qorvo.com/t/dwm3001cdk-firmware-to-do-nearby-interaction-twr-with-multiple-phones-via-multiplexing/18890)). So two victims on two boards either take turns (the app's "Take turns" switch: range a board for about 4 s, release it, take the other; never tested) or each puck position carries two boards, one per phone (the app's per-board toggles).
 - Where the number comes out: with the stock firmware the phone app receives the distance, and the board only writes it to its debug channel (SEGGER RTT on the J-Link port), not to a serial port. [Qorvo forum 13613](https://forum.qorvo.com/t/dwm3001cdk-nearby-interaction-trying-to-get-ranging-via-usb-uart/13613). So tonight **the app is the reporter**: it posts each range to the Beacon server over Wi-Fi. A puck host reading the debug channel is written as an experimental second path.
 - What would not have worked: an ESP32 driving a DW3000 (the boards we first assumed). The radio is capable but the two closed libraries exist only for Cortex-M4 and M33. [Qorvo forum 10796](https://forum.qorvo.com/t/apple-ni-configuration-data-frame/10796?page=2)
 - Android phones (not needed now): the same board is community-proven with Jetpack UWB on Pixel Pro models, but only Pro, Ultra and Fold class phones have UWB, and a backgrounded app gets no ranges. Details in `docs/research/android_ble_models.md`.
@@ -51,7 +51,8 @@ The locator never publishes `x`, `y` unless the measurements support a single po
 - **Power only.** With the stock firmware the board needs 5 V on either micro-USB port and nothing else; the range returns through the iPhone app. [Qorvo product brief](https://www.firaconsortium.org/sites/default/files/2024-08/DWM3001CDK%20Product%20Brief.pdf)
 - **Recommended tonight: one USB battery bank per puck.** Some banks switch off at this low current; plugging into the J-Link port adds 10 to 15 mA of load, or use a wall adapter.
 - **UNO Q as a host:** useful as the command post in a box (it can run the Beacon server) and as a diagnostic reader of one puck's debug channel. It acts as a USB host only when powered through a USB-C dongle with power pass-through. See `hardware/UNO_Q.md`.
-- **Android phone as a host: not worth it.** It can power a puck over USB-OTG, which is a fine emergency supply. It cannot read the stock firmware, which prints nothing on a serial port. Use it as a power source or leave it out.
+- **Android phone: a power source, not a host.** It can power puck B over USB-OTG, which is what the owner chose. It cannot read the stock firmware, which prints nothing on a serial port. What can go wrong: some phones switch the 5 V off when no USB device shows up, or after an idle timeout, so use the board's J-Link port (its chip enumerates as a USB device); keep a second battery bank as the fallback. The same phone can also be the Wi-Fi hotspot that the laptop and both iPhones join.
+- **Where the server runs tonight:** on the laptop, on a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic). The iPhones post to it over plain HTTP; the app's Info.plist carries the App Transport Security exception, and the board shows a QR code that fills in the address.
 - Placement matters more than the host: board upright, 15 cm or more off the floor, component-free side toward the phone. A board lying flat on the floor is the worst case.
 - The pucks cannot measure their own positions tonight: the stock firmware does not range board to board. Their positions are measured with a tape and clicked onto the plan.
 
@@ -67,11 +68,48 @@ Closed form first. Two boards a distance b apart see a range difference of b cos
 
 At 5 m, 20 degrees of bearing error is 1.8 m sideways, and the mirror ambiguity is still there. Two separate pucks 3 m apart with the phone 5 m out give about 2.5 times the range error along the line between them and 0.7 times across it: tens of centimetres, plus the same mirror ambiguity, which the twin can often remove.
 
-<!-- LAYOUT_NUMBERS: filled from results/eval_layouts.json -->
+<!-- LAYOUT_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_layouts.json`; 50 trials per row, phone 2 to 8 m away in the fire room, pucks thrown not placed; noise model with sources in `beacon/models.py`). Bearing error is measured after choosing the nearer of the two mirror solutions, so the mirror ambiguity is on top of it:
 
-**Recommendation.**
-- **Live demo:** three separately powered pucks about 2 to 3 m apart, not in a line (a fix), with the fourth and fifth boards for the second phone (two candidates that the twin prunes). Do not mount two boards on one device.
-- **Real fire:** separate pucks, thrown apart, three or more per room. If one throw is all there is, the device needs a rigid baseline of half a metre or more, or better a dual-antenna radio (DW3120 or DW3220 class) that measures angle from phase.
+| Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
+|---|---|---|---|---|---|---|
+| Two boards on one device, 0.1 m apart | 33 degrees | 2.34 m | 100% | 0% | n/a | 16.1 m2 |
+| Two boards on one device, 0.3 m apart | 17 degrees | 1.51 m | 100% | 0% | n/a | 15.5 m2 |
+| Two boards on one device, 0.5 m apart | 22 degrees | 1.51 m | 98% | 0% | n/a | 12.5 m2 |
+| Two separate pucks 2 m apart | 7 degrees | 0.71 m | 100% | 0% | n/a | 5.3 m2 |
+| Two separate pucks 3 m apart | 6 degrees | 0.42 m | 98% | 2% | 0.34 m | 3.5 m2 |
+| Two separate pucks 4 m apart | 5 degrees | 0.34 m | 96% | 4% | 0.33 m | 2.8 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 58% | 0.23 m | 1.2 m2 |
+
+Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
+<!-- LAYOUT_NUMBERS:END -->
+
+**Decision (the owner, 12:35): two separately powered pucks.** Puck A on a battery bank beside the UNO Q, puck B on the Android phone over USB-OTG. Do not mount two boards on one device.
+
+**Making two pucks give one answer.** Two rings always leave two mirror points across the line through the pucks. Put both pucks just inside the wall the door is in (0.35 m inside, about 4 m apart: one beside the door, one slid along the wall; `beacon/layout.py`). Then the mirror image of anyone in the room falls outside the room:
+
+- for a phone deep in the room it falls beyond the corridor, two walls away, where a ranging link is not expected at all: the twin removes it;
+- for a phone within about 2.75 m of that wall it falls in the corridor, where the crew is standing. The twin does not forbid it, so the board dismisses it only on something that was said: the occupant's own suite in the app, or command's "we are searching this room" switch. It is shown as dismissed, with the reason;
+- a careless layout (pucks mid-room) leaves two candidates inside the room that nothing can decide, and the board says "cannot choose".
+
+<!-- TWO_PUCK_NUMBERS:BEGIN -->
+**Simulated** (`results/eval_two_puck.json`; 800 phone positions per layout over the fire room; what a real iPhone would deliver: UWB distances only, no line-of-sight flag; noise model with sources in `beacon/models.py`):
+
+| Layout | One position | of which by the twin alone | of which after the occupant's stated suite | Cannot choose (two spots) | Ring or less | Wrong position: share of the positions shown (share of all trials) | Position error, median / 90th percentile |
+|---|---|---|---|---|---|---|---|
+| Both pucks just inside the wall the door is in (recommended) | 61% | 37% | 24% | 19% | 21% | 1.9% (1.1%) | 0.26 m / 0.76 m |
+| Both pucks along the outside wall | 71% | 71% | 0% | 11% | 18% | 2.3% (1.6%) | 0.25 m / 0.79 m |
+| Both pucks mid-room (careless) | 4% | 4% | 0% | 86% | 10% | 0.0% (0.0%) | 0.28 m / 0.66 m |
+| Three pucks: the door-wall pair plus one in the far corner | 81% | 78% | 3% | 12% | 7% | 1.2% (1.0%) | 0.19 m / 0.59 m |
+
+"Ring or less" is mostly a phone that only one puck reached (a blocked link in the simulation). A wrong position is one more than three sigma or 1.5 m from the truth.
+
+When the occupant's stated suite is false (the phone is really in a neighbouring room, 300 trials): with the door-wall layout the board mostly shows a ring, but it shows a position in 4.3% of trials and 100% of those positions are wrong (4.0% of trials are wrong positions produced by the statement; 13.8% for the suite that shares that wall). That is the price of dismissing a spot on a statement, and why the board shows the dismissal.
+<!-- TWO_PUCK_NUMBERS:END -->
+
+**Better if you have it:** a third puck, not in line with the other two, gives a position with no assumption at all.
+
+**Real fire:** separate pucks, thrown apart, three or more per room. If one throw is all there is, the device needs a rigid baseline of half a metre or more, or better a dual-antenna radio (DW3120 or DW3220 class) that measures angle from phase.
 
 ## 7. What is still unknown until the first power-up
 

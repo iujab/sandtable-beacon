@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .adapters import get_provider
-from .beacon_link import BeaconLink, accountability
+from .beacon_link import BeaconLink, accountability, record_vs_phones
 from .director import Director
 from .hubclient import HubLink
 from .incident import Incident
@@ -259,6 +259,8 @@ class AppState:
         differences += [{"id": c.get("id"), "kind": "record", "text": c.get("text"), "source": "cross-check of " + " and ".join(c.get("layers") or []),
                          "room": next((r["id"] for r in self.twin.rooms("suite") if c.get("suite") and r.get("suite") == c.get("suite")), None)}
                         for c in prov.site().get("cross_checks") or []]
+        if record_vs_phones(acc):                       # a live record that says "empty" where phones report people (contract section 4)
+            differences.append(record_vs_phones(acc))
         word = {"fixture": "fixture", "live": "real"}
         bsrc = self.beacon.source
         beacon_word = "sample" if bsrc == "sample" else "replay" if bsrc == "replay" else ("simulated" if b.get("simulated", True) else "real") if b else "none"

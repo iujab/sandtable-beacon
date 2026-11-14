@@ -27,7 +27,7 @@ def test_short_watchdog_writes_a_report(tmp_path):
         assert s["steps"] > 0 and 0.0 <= s["wrong_share_of_fix_steps"] <= 1.0
         assert len(s["per_seed"]) == 2
     assert {d["scenarios"]["two-phones-board-sharing-turns"]["board_sharing"], d["scenarios"]["bye"]["board_sharing"]} == {"turns", "pairs"}
-    assert "/home/" not in out.read_text()
+    assert str(Path.home()) not in out.read_text()                    # the tree is public: no machine paths
 
 
 def test_the_checker_catches_a_coordinate_leak_and_a_dot_on_a_stale_phone():

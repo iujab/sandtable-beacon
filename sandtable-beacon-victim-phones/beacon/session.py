@@ -14,8 +14,9 @@ What it does:
   - one tracker (`beacon.track.PhoneTrack`) per opt-in phone. A phone's rotating ephemeral id (eid) is linked to the
     same phone through the report's `prev_eid`, so the public id (B1, B2, ...) survives a rotation.
   - cold aggregation: per puck, the latest cold scan in the window becomes one `presence[]` entry (see COUNT_RANGE_RULE).
-  - stale and retention: a phone not heard for STALE_S keeps its last geometry with a growing sigma; it is dropped
-    (everything about it forgotten) after RETENTION_S. A `bye` observation drops it at once.
+  - stale and retention: a phone not heard for STALE_S (40 s live) publishes no position at all (geometry "none"),
+    only `last_known` {geometry, room, room_label, age_s}; its people still count in that room's accountability row as
+    reported, not located. It is dropped (everything about it forgotten) after RETENTION_S. A `bye` drops it at once.
   - `safe_outside`: the phone is published with geometry "none" and counted as accounted for.
   - honesty: x, y, sigma_m, cov, geo, node are null unless geometry == "fix", whatever the locator returned.
   - texts: built only from whole or half metres, wall names (west/east/north/south, from the room polygon and the
@@ -371,6 +372,7 @@ class _Phone:
         self.speed = 0.0
         self.err_logged = False
         self.phone_uwb_t: dict[str, float] = {}             # puck -> last UWB range reported by the phone itself
+        self.last_place: dict | None = None                 # geometry kind and room of the last published estimate
 
 
 # ============================================================================ the session
@@ -1011,6 +1013,7 @@ class BeaconSession:
                     log.exception("prune.apply_statement failed")
             if spatial.get("geometry") not in (None, "none"):
                 ph.last_spatial, ph.last_spatial_t = copy.deepcopy(spatial), now
+                ph.last_place = self._place_of(spatial, now)
         spatial = _honest(spatial)
         geom = spatial["geometry"]
         ranges = self._ranges(ph, now)
@@ -1049,7 +1052,13 @@ class BeaconSession:
 
     def _last_known(self, ph: _Phone, now: float) -> dict | None:
         """Where a stale phone was last placed: geometry kind and room only (never coordinates)."""
-        sp = ph.last_spatial
+        lp = getattr(ph, "last_place", None)
+        if not lp:
+            return None
+        return {**{k: v for k, v in lp.items() if k != "t"}, "age_s": round(max(0.0, now - ph.last_seen), 1)}
+
+    def _place_of(self, sp: dict, now: float) -> dict | None:
+        """Geometry kind and room of a published estimate (kept for when the phone goes quiet; no coordinates)."""
         if not sp or sp.get("geometry") in (None, "none"):
             return None
         room, label, puck = sp.get("room"), sp.get("room_label"), None
@@ -1066,8 +1075,7 @@ class BeaconSession:
                 label = self.twin.room(room)["label"]
             except ValueError:
                 label = None
-        out = {"geometry": geom, "room": room, "room_label": label,
-               "age_s": round(max(0.0, now - (ph.last_spatial_t or ph.last_seen)), 1)}
+        out = {"geometry": geom, "room": room, "room_label": label, "t": now}
         if puck:
             out["puck"] = puck
         return out
@@ -1318,7 +1326,7 @@ class BeaconSession:
             reach = _mid_reach_m(self.noise)
             best = min(max(count, lo), hi)        # the published count is never below the opt-in phones known in the room
             k = optin_in_room.get(room, 0)
-            phones_txt = f"{k} opt-in phone{'s' if k != 1 else ''} being ranged here"
+            phones_txt = f"{k} opt-in phone{'s' if k != 1 else ''} known in this room"
             if best == 0 and far == 0 and k == 0:
                 text = (f"Puck {pid}'s Bluetooth scan{where} hears no advertising device right now: weak evidence of nobody "
                         f"with a phone nearby, never proof. No identities kept")
@@ -1499,23 +1507,6 @@ def _honest(sp: dict) -> dict:
     return sp
 
 
-def _grow(sp: dict, extra: float) -> dict:
-    sp = copy.deepcopy(sp)
-    extra = max(0.0, float(extra))
-    if sp.get("sigma_m") is not None:
-        s = float(sp["sigma_m"]) + extra
-        if sp.get("cov"):
-            f = (s / max(float(sp["sigma_m"]), 1e-6)) ** 2
-            sp["cov"] = [c * f for c in sp["cov"]]
-        sp["sigma_m"] = s
-    if sp.get("ring"):
-        sp["ring"] = dict(sp["ring"])
-        sp["ring"]["sigma_m"] = round(float(sp["ring"].get("sigma_m") or 0.0) + extra, 2)
-    if sp.get("candidates"):
-        sp["candidates"] = [{**c, "sigma_m": round(float(c.get("sigma_m") or 0.0) + extra, 2)} for c in sp["candidates"]]
-    return sp
-
-
 def _walls(twin: Twin, room_id: str, georef_b: float) -> list[tuple[str, list, list]]:
     poly = twin.room(room_id)["polygon"]
     ccw = _ccw(poly)
@@ -1584,7 +1575,7 @@ def phone_text(phone: dict, twin: Twin, georef_b: float, stale_age: float | None
         elif lk.get("room_label"):
             last = f"last located in {lk['room_label']}"
         else:
-            last = "no position was ever published"
+            last = "it had no position"
         return f"{head} Not heard for {int(stale_age)} s; {last}"
     pre = ""
     dismissed = ""

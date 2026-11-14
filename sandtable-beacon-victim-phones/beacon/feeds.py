@@ -265,9 +265,11 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
                 cx, cy = _centroid(poly)
                 age = (p.get("track") or {}).get("last_seen_s")
                 heard = f"not heard for {int(age)} s" if age is not None else "not heard recently"
+                room = lk.get("room_label") or lk.get("room")
+                where = (f"last heard by puck {lk['puck']} in {room} (range only)" if lk.get("geometry") == "ring" and lk.get("puck")
+                         else f"last located in {room}")
                 add(uid, "b-m-p-s-m", cx, cy, _bounding_radius(poly), f"{p['id']} LAST KNOWN",
-                    f"LAST KNOWN: {heard}; last located in {lk.get('room_label') or lk.get('room')}. No current position: "
-                    f"the point is the room's centre. {tag}{text}.")
+                    f"LAST KNOWN: {heard}; {where}. No current position: the point is the room's centre. {tag}{text}.")
             continue
         if geom == "fix" and p.get("x") is not None:
             sig = p.get("sigma_m")

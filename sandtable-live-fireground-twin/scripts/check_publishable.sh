@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # Refuses to call the tree publishable when a publishable file (tracked, or untracked and not ignored) contains:
-#   1. a build-machine path, the local user name, the host name, a tailnet-range address or something that looks like a key;
+#   1. a build-machine path, the local user name, the host name, a tailnet-range host address (a range base such as
+#      100.64.0.0/10 is not an address) or something that looks like a key;
 #   2. a key VALUE from the env files (.env, the bench .secrets/*.env): values are read at check time and never printed;
 #   3. a term of the private building denylist (data/live/denylist_building.txt: one per line, case-insensitive, whole words) or a
 #      Matterport model id from the CoStar kit's commercial-properties.csv (COSTAR_KIT_DIR or the bench drop zone);
 # or when a publishable path is under a directory named `live` (sponsor data), or is imagery over 200 KB outside
-# fixtures/aerial/ and figures/. Prints file names and the reason only. Exit code 1 if anything is found. Run before committing.
+# fixtures/aerial/, figures/ and vendor/beacon/figures/. Prints file names and the reason only. Exit code 1 if anything is found. Run before committing.
 cd "$(dirname "$0")/.."
 U=$(id -un); H=$(hostname)
 OFF=$(mktemp); LIST=$(mktemp); trap 'rm -f "$OFF" "$LIST"' EXIT
 { git ls-files; git ls-files --others --exclude-standard; } | sort -u > "$LIST"
 tr '\n' '\0' < "$LIST" |
-  xargs -0 grep -I -l -E "$U|/home/[a-z]|/Users/[A-Za-z]|$H|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+|sk-ant-|API_KEY=[A-Za-z0-9_-]{12,}" 2>/dev/null |
+  xargs -0 grep -I -l -E "$U|/home/[a-z]|/Users/[A-Za-z]|$H|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[1-9][0-9]*|sk-ant-|API_KEY=[A-Za-z0-9_-]{12,}" 2>/dev/null |
   grep -v "^scripts/check_publishable.sh$" | sed 's/$/  (machine path, user or host name, tailnet address or key pattern)/' >> "$OFF" || true
 PY=.venv/bin/python; [ -x "$PY" ] || PY=.venv/Scripts/python.exe; [ -x "$PY" ] || PY=python3
 "$PY" - "$LIST" >> "$OFF" <<'PYEOF'
@@ -25,11 +26,11 @@ for f in files:
     parts = Path(f).parts
     if "live" in parts[:-1]:
         print(f"{f}  (under a 'live' directory: sponsor data must never be committed or published)")
-    if os.path.getsize(f) > 200_000 and not f.startswith(("fixtures/aerial/", "figures/")):
+    if os.path.getsize(f) > 200_000 and not f.startswith(("fixtures/aerial/", "figures/", "vendor/beacon/figures/")):   # the last: lane L16's committed fixture screenshots
         with open(f, "rb") as fh:
             head = fh.read(12)
         if IMG.search(f) or head.startswith(MAGIC):
-            print(f"{f}  (imagery over 200 KB outside fixtures/aerial/ and figures/)")
+            print(f"{f}  (imagery over 200 KB outside fixtures/aerial/, figures/ and vendor/beacon/figures/)")
 # secrets: every value in the env files (the values stay in memory; only file names are printed)
 env_files = [root / ".env"] + sorted((root.parent / ".secrets").glob("*.env"))
 values = set()

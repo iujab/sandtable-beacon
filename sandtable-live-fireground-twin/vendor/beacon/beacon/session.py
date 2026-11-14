@@ -14,8 +14,9 @@ What it does:
   - one tracker (`beacon.track.PhoneTrack`) per opt-in phone. A phone's rotating ephemeral id (eid) is linked to the
     same phone through the report's `prev_eid`, so the public id (B1, B2, ...) survives a rotation.
   - cold aggregation: per puck, the latest cold scan in the window becomes one `presence[]` entry (see COUNT_RANGE_RULE).
-  - stale and retention: a phone not heard for STALE_S keeps its last geometry with a growing sigma; it is dropped
-    (everything about it forgotten) after RETENTION_S. A `bye` observation drops it at once.
+  - stale and retention: a phone not heard for STALE_S (40 s live) publishes no position at all (geometry "none"),
+    only `last_known` {geometry, room, room_label, age_s}; its people still count in that room's accountability row as
+    reported, not located. It is dropped (everything about it forgotten) after RETENTION_S. A `bye` drops it at once.
   - `safe_outside`: the phone is published with geometry "none" and counted as accounted for.
   - honesty: x, y, sigma_m, cov, geo, node are null unless geometry == "fix", whatever the locator returned.
   - texts: built only from whole or half metres, wall names (west/east/north/south, from the room polygon and the
@@ -47,8 +48,11 @@ log = logging.getLogger("beacon.session")
 
 SCHEMA = "sandtable.beacons/1"
 LINK_STALE_S = 5.0          # a range or RSSI older than this is not "hearing" the phone (ack, presence of a link)
+LIVE_LINK_STALE_S = 25.0    # live: the stock puck firmware serves one phone at a time; each puck reports every 10 to 20 s
+LIVE_STALE_MIN_S = 40.0     # live: a phone is not marked stale before this much silence (BEACON_FEED A8)
 BEARING_FRESH_S = 3.0
 STATUSES = ("trapped", "injured", "sheltering", "ok", "unknown")
+PUCK_MOVED_M = 0.30      # a puck placed more than this from where it was has moved: ranges buffered for it are forgotten
 KINDS = ("cold", "sos", "uwb", "bearing", "report", "bye", "host", "uwb_puck")
 NO_EID_KINDS = ("cold", "host", "uwb_puck")
 HOST_SILENT_S = 20.0        # a puck host silent this long is dropped from its puck (BEACON_FEED A7)
@@ -107,6 +111,11 @@ def half(d: float | None) -> float | None:
     return round(float(d) * 2.0) / 2.0
 
 
+def half_up(sigma: float) -> float:
+    """An uncertainty rounded UP to half metres (never understated), at least 0.5 m."""
+    return max(0.5, math.ceil(float(sigma) * 2.0 - 1e-9) / 2.0)
+
+
 def half_text(d: float) -> str:
     v = half(d)
     if v < 0.5:
@@ -150,6 +159,7 @@ class _StubTrack:
     def __init__(self, eid: str, georef_bearing_deg: float | None = None):
         self.eid = eid
         self.georef_bearing_deg = georef_bearing_deg
+        self.link_stale_s = LINK_STALE_S
         self._uwb: dict[str, deque] = {}
         self._ble: dict[str, deque] = {}
         self._bearing: dict | None = None
@@ -175,14 +185,14 @@ class _StubTrack:
     def inputs(self, now: float):
         ranges = []
         for pid, dq in self._uwb.items():
-            fresh = [s for s in dq if now - s[0] <= LINK_STALE_S]
+            fresh = [s for s in dq if now - s[0] <= self.link_stale_s]
             if fresh:
                 ds = sorted(s[1] for s in fresh)
                 los = [s[2] for s in fresh if s[2] is not None]
                 ranges.append({"puck": pid, "kind": "uwb", "d_m": ds[len(ds) // 2], "los": (sum(los) / len(los)) if los else None, "n": len(fresh)})
         have = {r["puck"] for r in ranges}
         for pid, dq in self._ble.items():
-            fresh = [s for s in dq if now - s[0] <= LINK_STALE_S]
+            fresh = [s for s in dq if now - s[0] <= self.link_stale_s]
             if fresh and pid not in have:
                 ranges.append({"puck": pid, "kind": "ble", "rssi": sum(s[1] for s in fresh) / len(fresh), "tx_dbm": fresh[-1][2], "n": len(fresh)})
         bearing = None
@@ -362,6 +372,7 @@ class _Phone:
         self.speed = 0.0
         self.err_logged = False
         self.phone_uwb_t: dict[str, float] = {}             # puck -> last UWB range reported by the phone itself
+        self.last_place: dict | None = None                 # geometry kind and room of the last published estimate
 
 
 # ============================================================================ the session
@@ -386,6 +397,7 @@ class BeaconSession:
         self._locate, self._Track, self._locator_note = _load_locator(locator)
         self._roster = None
         self._roster_note = None
+        self.agent_status: Callable[[], dict | None] | None = None      # set by the server when a command agent exists
         if use_roster:
             try:
                 from . import roster
@@ -414,6 +426,7 @@ class BeaconSession:
         self._next_phone = 1
         self._cold: dict[str, dict] = {}
         self._hosts: dict[str, dict] = {}
+        self.search_room: str | None = None
         self._presence_ids: dict[tuple, str] = {}
         self._acc_key: str | None = None
         self._acc: dict | None = None
@@ -491,6 +504,7 @@ class BeaconSession:
             self.twin.room(room)
         if floor is not None:
             self.twin.floor(floor)
+        previous = {p["id"]: p for p in self.pucks}
         table = {p["id"]: p for p in self.pucks} if merge else {}
         for p in clean:
             old = table.get(p["id"]) or {}
@@ -509,6 +523,13 @@ class BeaconSession:
                 self._accessories[acc] = p["id"]
                 self._unplaced.pop(acc, None)
         self.pucks = sorted(table.values(), key=lambda q: q["id"])
+        # A puck that moved (or left): every range buffered for it was measured against the old position. Forget them,
+        # so that no phone is drawn from stale ranges and the new position (PUCK_MOVED_M: more than a placement jitter).
+        moved = [pid for pid, old in previous.items()
+                 if pid not in table or old.get("floor") != table[pid].get("floor")
+                 or math.hypot(old["x"] - table[pid]["x"], old["y"] - table[pid]["y"]) > PUCK_MOVED_M]
+        if moved:
+            self._forget_pucks(moved, now)
         if room is None and self.pucks and (not merge or self.room is None):
             rooms = [q["room"] for q in self.pucks if q["room"]]
             room = max(set(rooms), key=rooms.count) if rooms else None
@@ -521,10 +542,26 @@ class BeaconSession:
             self._event("pucks_changed", None, f"Pucks: {ids} ({label})", now)
         return {"pucks": copy.deepcopy(self.pucks), "room": self.room, "floor": self.floor}
 
+    def _forget_pucks(self, puck_ids: list[str], now: float) -> None:
+        """Drop every buffered range to these pucks (they moved, left, or the exercise scale changed)."""
+        ids = set(puck_ids)
+        self._pending = type(self._pending)((o, origin) for (o, origin) in self._pending
+                                            if not (o.get("kind") in ("uwb", "sos", "bearing", "uwb_puck") and o.get("puck") in ids))
+        for ph in list(self._phones.values()):
+            for pid in ids:
+                try:
+                    ph.track.forget_puck(pid, now)
+                except Exception:
+                    log.exception("could not forget puck %s for %s", pid, ph.id)
+            ph.last_spatial, ph.last_spatial_t = None, None
+
     def set_rig_scale(self, scale: float) -> None:
         s = _finite(scale, "scale", 0.0, 100.0, open_lo=True)
         with self._lock:
+            changed = abs(s - self.rig_scale) > 1e-9
             self.rig_scale = s
+            if changed:                     # buffered ranges were scaled with the old value
+                self._forget_pucks([p["id"] for p in self.pucks], time.time())
             self._persist()
 
     # ---- observations
@@ -581,7 +618,7 @@ class BeaconSession:
             if obs.get("version") is not None:
                 o["version"] = str(obs["version"])[:16]
         elif kind in ("uwb", "uwb_puck"):
-            o["d_m"] = _finite(obs.get("d_m"), "d_m", 0.0, 150.0, open_lo=True)
+            o["d_m"] = max(_finite(obs.get("d_m"), "d_m", 0.0, 150.0), 0.01)        # a phone lying on a puck reads 0.00 m
             if o["d_m"] >= 150.0:
                 raise ValueError("d_m out of range")
             for k, lo, hi in (("rssi", -150.0, 20.0), ("fp", -150.0, 20.0), ("los", 0.0, 1.0)):
@@ -669,21 +706,42 @@ class BeaconSession:
             if device.get(k) is not None:
                 dev_info[k] = str(device[k])[:40]
         clean = []
+        skipped = 0
+        rejected: list[str] = []
+        seen = self.__dict__.setdefault("_seen_readings", {})
         for i, item in enumerate(items):
             if not isinstance(item, dict):
                 raise ValueError(f"obs[{i}]: an observation must be an object")
+            if item.get("dry_run"):
+                skipped += 1            # a puck host started with --dry-run: sample values, never use them
+                continue
             it = dict(item)
             if dev_eid and it.get("kind") not in NO_EID_KINDS and "eid" not in it:
                 it["eid"] = dev_eid
             try:
                 o = self.validate(it, now)
             except ValueError as exc:
-                raise ValueError(f"obs[{i}]: {exc}")
+                # one bad value must not silence a phone: the observation is dropped and reported, the rest are used
+                rejected.append(f"obs[{i}]: {exc}")
+                continue
+            # The iOS app re-sends each board's latest reading (with its original time) in every batch for up to 25 s,
+            # because boards are shared by taking turns: the same reading must count once.
+            mapped = o.get("puck") is not None or o.get("accessory") in self._accessories
+            if mapped and o["kind"] in ("uwb", "sos", "bearing") and item.get("t") is not None:
+                key = (o.get("eid"), o["kind"], o.get("accessory") or o.get("puck"))
+                if key in seen and o["t"] <= seen[key]:
+                    skipped += 1
+                    continue
+                seen[key] = o["t"]
+                if len(seen) > 4000:
+                    seen.clear()
             if abs(o["t"] - now) > 120.0:
                 o["t"] = now
             if dev_info and o["kind"] == "report":
                 o["report"] = {**dev_info, **o["report"]}
             clean.append(o)
+        if rejected and not clean and not skipped:
+            raise ValueError("; ".join(rejected[:3]))            # nothing usable in the batch: 400 with the reasons
         unknown = []
         for o in clean:
             acc = o.get("accessory")
@@ -694,7 +752,11 @@ class BeaconSession:
             self._pending.append(({"kind": "_device", "eid": dev_eid.lower(), "t": now, "device": dev_info}, origin))
         eid = (dev_eid or next((o.get("eid") for o in clean if o.get("eid")), None))
         phone = self.phone_by_eid(eid.lower()) if eid else None
-        return {"ok": True, "accepted": len(clean), "unknown_accessories": unknown, "ack": self.ack(phone)}
+        out = {"ok": True, "accepted": len(clean), "skipped": skipped, "unknown_accessories": unknown, "ack": self.ack(phone)}
+        if rejected:
+            out["rejected"] = len(rejected)
+            out["errors"] = rejected[:3]
+        return out
 
     # ---- lookups
     def phone_by_eid(self, eid: str | None) -> dict | None:
@@ -708,9 +770,8 @@ class BeaconSession:
                 return p
         return None
 
-    @staticmethod
-    def ack(phone: dict | None) -> dict:
-        return make_ack(phone)
+    def ack(self, phone: dict | None) -> dict:
+        return make_ack(phone, link_s=LIVE_LINK_STALE_S if self.source == "live" else LINK_STALE_S)
 
     def beacons(self) -> dict:
         return self._latest
@@ -722,6 +783,7 @@ class BeaconSession:
     def reset(self) -> None:
         with self._lock:
             self._pending.clear()
+            self.__dict__.pop("_seen_readings", None)
             self._clear()
             self._persist()
             self._latest = self._build(time.time(), [], [])
@@ -758,7 +820,10 @@ class BeaconSession:
     def _new_phone(self, eid: str, now: float) -> _Phone:
         pid = f"B{self._next_phone}"
         self._next_phone += 1
-        ph = _Phone(pid, eid, self._Track(eid, georef_bearing_deg=self._georef_b), now)
+        tr = self._Track(eid, georef_bearing_deg=self._georef_b)
+        if self.source == "live" and hasattr(tr, "link_stale_s"):
+            tr.link_stale_s = LIVE_LINK_STALE_S
+        ph = _Phone(pid, eid, tr, now)
         self._phones[pid] = ph
         self._eid_to_id[eid] = pid
         return ph
@@ -838,7 +903,8 @@ class BeaconSession:
                 to_track.pop("accessory", None)
                 if kind == "uwb" and self.source == "live" and self.rig_scale != 1.0:
                     to_track["d_m"] = o["d_m"] * self.rig_scale
-                ph.links[(puck, kind)] = to_track
+                if kind in ("uwb", "sos"):
+                    ph.links[(puck, kind)] = to_track
                 if kind == "uwb":
                     ph.phone_uwb_t[puck] = o["t"]
             if kind == "bearing":
@@ -891,7 +957,12 @@ class BeaconSession:
                 if age > self.retention_s:
                     self._drop(ph, f"Phone {ph.id} dropped: not heard for {self.retention_s / 60:g} minutes", now)
                     continue
-                phones.append(self._phone(ph, ctx, pucks, now))
+                try:
+                    phones.append(self._phone(ph, ctx, pucks, now))
+                except Exception:                                  # one broken phone must not stop the feed
+                    if not ph.err_logged:
+                        log.exception("could not publish %s", ph.id)
+                        ph.err_logged = True
             presence = self._presence(now, phones)
             b = self._build(now, phones, presence)
             self._latest = b
@@ -908,12 +979,18 @@ class BeaconSession:
         age = now - ph.last_seen
         rep = self._report(ph, now)
         safe = bool(rep.get("safe_outside"))
-        stale = age > self.stale_s
+        stale = age > self.phone_stale_s
         spatial = None
+        basis = None
+        last_known = None
         if safe:
             spatial = _none_spatial()
-        elif stale and ph.last_spatial is not None:
-            spatial = _grow(ph.last_spatial, (now - (ph.last_spatial_t or now)) * config.STALE_SIGMA_GROWTH_MPS)
+        elif stale:
+            # Not heard for phone_stale_s: no position is published any more (a dot that is minutes old is not where the
+            # person is). Only the room where it was last located is kept, without coordinates.
+            spatial = _none_spatial()
+            spatial["method"] = (ph.last_spatial or {}).get("method")
+            last_known = self._last_known(ph, now)
         else:
             if pucks:
                 try:
@@ -925,8 +1002,18 @@ class BeaconSession:
                     spatial = None
             if spatial is None:
                 spatial = _none_spatial()
+            # stated evidence, strongest first: the occupant's own suite, then command's search room
+            for st in self._statements(rep):
+                if spatial.get("geometry") != "candidates":
+                    break
+                try:
+                    from . import prune
+                    spatial = prune.apply_statement(spatial, st[0], st[1], st[2], st[3])
+                except Exception:
+                    log.exception("prune.apply_statement failed")
             if spatial.get("geometry") not in (None, "none"):
                 ph.last_spatial, ph.last_spatial_t = copy.deepcopy(spatial), now
+                ph.last_place = self._place_of(spatial, now)
         spatial = _honest(spatial)
         geom = spatial["geometry"]
         ranges = self._ranges(ph, now)
@@ -947,6 +1034,8 @@ class BeaconSession:
             "bearing": spatial["bearing"] if "bearing" in spatial else self._bearing(ph, now),
             "report": rep, "track": self._track_info(ph, spatial, now),
             "stale": stale, "hpd_area_m2": spatial.get("hpd_area_m2"),
+            "assumptions": list(spatial.get("assumptions") or []), "conflict": spatial.get("conflict"),
+            "last_known": last_known,
         }
         for r in phone["ranges"]:
             lk = ph.links.get((r.get("puck"), "uwb"))
@@ -957,9 +1046,94 @@ class BeaconSession:
         if safe:
             phone.update({"room": None, "room_label": None, "room_prob": None, "confidence": None})
         self._add_geo(phone)
-        phone["text"] = phone_text(phone, self.twin, self._georef_b, stale_age=age if stale else None)
+        phone["text"] = phone_text(phone, self.twin, self._georef_b, stale_age=age if stale and not safe else None)
         self._events_for(ph, phone, now)
         return phone
+
+    def _last_known(self, ph: _Phone, now: float) -> dict | None:
+        """Where a stale phone was last placed: geometry kind and room only (never coordinates)."""
+        lp = getattr(ph, "last_place", None)
+        if not lp:
+            return None
+        return {**{k: v for k, v in lp.items() if k != "t"}, "age_s": round(max(0.0, now - ph.last_seen), 1)}
+
+    def _place_of(self, sp: dict, now: float) -> dict | None:
+        """Geometry kind and room of a published estimate (kept for when the phone goes quiet; no coordinates)."""
+        if not sp or sp.get("geometry") in (None, "none"):
+            return None
+        room, label, puck = sp.get("room"), sp.get("room_label"), None
+        geom = sp.get("geometry")
+        if not room and geom == "candidates":
+            rooms = {c.get("room") for c in sp.get("candidates") or []}
+            if len(rooms) == 1:
+                room = rooms.pop()
+        if not room and geom == "ring" and sp.get("ring"):
+            puck = sp["ring"].get("puck")
+            room = next((p.get("room") for p in self.pucks if p["id"] == puck), None)
+        if room and not label:
+            try:
+                label = self.twin.room(room)["label"]
+            except ValueError:
+                label = None
+        out = {"geometry": geom, "room": room, "room_label": label, "t": now}
+        if puck:
+            out["puck"] = puck
+        return out
+
+    @property
+    def phone_stale_s(self) -> float:
+        return max(self.stale_s, LIVE_STALE_MIN_S) if self.source == "live" else self.stale_s
+
+    def _suite_room(self, suite: str) -> dict | None:
+        floor = self.floor or self.twin.exercise_floor
+        for r in self.twin.rooms("suite"):
+            if str(r.get("suite")) == suite and r.get("floor") == floor:
+                return r
+        return None
+
+    def _statements(self, rep: dict) -> list[tuple]:
+        """Every piece of stated evidence that may dismiss a candidate (beacon.prune), strongest first: the occupant's
+        stated suite, then command's search room."""
+        out = []
+        first = self._statement(rep)
+        if first is not None:
+            out.append(first)
+        if self.search_room and (first is None or first[3] != "search-room"):
+            label = self.twin.room(self.search_room)["label"]
+            out.append((self.search_room, label, f"command is searching {label} and the crew holds the corridor", "search-room"))
+        return out
+
+    def _statement(self, rep: dict) -> tuple[str, str, str, str] | None:
+        """(room, label, basis, kind) of the stated evidence that may dismiss a candidate (beacon.prune), or None."""
+        suite = rep.get("home_suite")
+        if suite is not None and not rep.get("safe_outside"):
+            floor = self.floor or self.twin.exercise_floor
+            rooms = [r for r in self.twin.rooms("suite") if str(r.get("suite")) == str(suite) and r.get("floor") == floor]
+            if len(rooms) == 1:
+                r = rooms[0]
+                return r["id"], r["label"], f"the occupant says they are in {r['label']}", "occupant-statement"
+            if len(rooms) > 1:          # a suite of several rooms (a scan of one suite): any of its rooms agrees with the statement
+                label = f"Suite {suite}"
+                return [r["id"] for r in rooms], label, f"the occupant says they are in {label}", "occupant-statement"
+        if self.search_room:
+            label = self.twin.room(self.search_room)["label"]
+            return self.search_room, label, f"command is searching {label} and the crew holds the corridor", "search-room"
+        return None
+
+    def set_search_room(self, room: str | None) -> dict | None:
+        """Command's "we are searching this room" assumption (None = off). ValueError for an unknown room."""
+        if room is not None:
+            self.twin.room(room)
+        with self._lock:
+            self.search_room = room
+        lbl = self.twin.room(room)["label"] if room else None
+        self._event("status_changed", None, f"Command search room: {lbl}" if lbl else "Command search room cleared")
+        return self.search_room_obj()
+
+    def search_room_obj(self) -> dict | None:
+        if not self.search_room:
+            return None
+        return {"room": self.search_room, "room_label": self.twin.room(self.search_room)["label"]}
 
     def _report(self, ph: _Phone, now: float) -> dict:
         r = {"status": "unknown", "text": None, "people": None, "can_move": None, "battery_pct": None, "floor_reported": None,
@@ -1067,6 +1241,11 @@ class BeaconSession:
             return {"lat": round(lat, 7), "lon": round(lon, 7)}
         if phone["geometry"] == "fix" and phone["x"] is not None:
             phone["geo"] = g(phone["x"], phone["y"])
+            if not phone.get("node"):
+                try:
+                    phone["node"] = self.twin.locate(phone["x"], phone["y"], self.floor or None)["node"]
+                except Exception:
+                    pass
         if phone.get("ring"):
             phone["ring"] = dict(phone["ring"])
             phone["ring"]["geo"] = g(phone["ring"]["cx"], phone["ring"]["cy"])
@@ -1097,17 +1276,32 @@ class BeaconSession:
             self._event("phone_fix", ph.id, phone["text"], now)
         ph.was_fix = is_fix
         if phone["stale"] and not ph.stale:
-            self._event("phone_lost", ph.id, f"Phone {ph.id} not heard for {self.stale_s:g} s; keeping its last position with growing uncertainty", now)
+            lk = phone.get("last_known") or {}
+            where = f"; last located in {lk['room_label']}" if lk.get("room_label") else ""
+            self._event("phone_lost", ph.id, f"Phone {ph.id} not heard for {self.phone_stale_s:g} s{where}; no position is published", now)
         ph.stale = phone["stale"]
 
     # ---- cold presence
     def _presence(self, now: float, phones: list[dict]) -> list[dict]:
+        """Cold presence per puck. `opt_in_phones` = opt-in phones known in the puck's room: placed there, or with no room
+        yet (a ring, a split) and being ranged by a puck in that room right now. They advertise too, so the count is never
+        published below them, and the text never reads as "no devices" while one of them is being ranged."""
+        pk = {p["id"]: p for p in self.pucks}
+        link_s = LIVE_LINK_STALE_S if self.source == "live" else LINK_STALE_S
         optin_in_room: dict[str, int] = {}
         for p in phones:
-            if p["room"] and not p["stale"] and not p["report"].get("safe_outside"):
-                optin_in_room[p["room"]] = optin_in_room.get(p["room"], 0) + 1
+            if p["stale"] or p["report"].get("safe_outside"):
+                continue
+            rooms = set()
+            if p["room"]:
+                rooms.add(p["room"])
+            else:
+                for r in p.get("ranges") or []:
+                    if (r.get("age_s") or 0.0) <= link_s and pk.get(r.get("puck"), {}).get("room"):
+                        rooms.add(pk[r["puck"]]["room"])
+            for rm in rooms:
+                optin_in_room[rm] = optin_in_room.get(rm, 0) + 1
         out = []
-        pk = {p["id"]: p for p in self.pucks}
         for pid in sorted(self._cold):
             o = self._cold[pid]
             if pid not in pk or now - o["t"] > config.COLD_WINDOW_S:
@@ -1130,13 +1324,23 @@ class BeaconSession:
             lat, lon = self.twin.to_geo(cx, cy)
             where = f" in {label}" if label else ""
             reach = _mid_reach_m(self.noise)
+            best = min(max(count, lo), hi)        # the published count is never below the opt-in phones known in the room
+            k = optin_in_room.get(room, 0)
+            phones_txt = f"{k} opt-in phone{'s' if k != 1 else ''} known in this room"
+            if best == 0 and far == 0 and k == 0:
+                text = (f"Puck {pid}'s Bluetooth scan{where} hears no advertising device right now: weak evidence of nobody "
+                        f"with a phone nearby, never proof. No identities kept")
+            else:
+                text = (f"About {best} device{'s' if best != 1 else ''}{where} by puck {pid}'s Bluetooth count (between {lo} and {hi})"
+                        + (f", including {phones_txt}" if k else "")
+                        + f": {count} within about {reach:g} m of the puck, {far} farther away or through a wall. "
+                          f"Devices, not people; no identities kept")
             out.append({"id": self._presence_ids[key], "method": "ble-presence", "opt_in": False, "simulated": self.simulated,
                         "puck": pid, "floor": puck.get("floor"), "room": room, "room_label": label,
-                        "count": count, "count_range": [lo, hi], "zones": {"near": near, "mid": mid, "far": far},
+                        "count": best, "count_range": [lo, hi], "zones": {"near": near, "mid": mid, "far": far},
+                        "opt_in_phones": k,
                         "window_s": o["window_s"], "confidence": 0.5, "age_s": round(now - o["t"], 1),
-                        "geo": {"lat": round(lat, 7), "lon": round(lon, 7)},
-                        "text": (f"About {count} device{'s' if count != 1 else ''} advertising within about {reach:g} m of puck {pid}{where} "
-                                 f"(between {lo} and {hi}); {far} more farther away or through a wall. Devices, not people; no identities kept")})
+                        "geo": {"lat": round(lat, 7), "lon": round(lon, 7)}, "text": text})
         return out
 
     # ---- the Beacons object
@@ -1145,10 +1349,16 @@ class BeaconSession:
         limits = list(LIMITS_BASE)
         if self.simulated:
             limits.insert(0, "SIMULATED: every number on this feed comes from the simulator's stated noise model (hello.noise), not from a measurement.")
-        limits.append(f"A phone not heard for {self.stale_s:g} s is marked stale and its uncertainty grows by "
-                      f"{config.STALE_SIGMA_GROWTH_MPS:g} m per second; it is dropped after {self.retention_s / 60:g} minutes.")
+        limits.append(f"A phone not heard for {self.phone_stale_s:g} s is marked stale: its position is withdrawn (only the room "
+                      f"where it was last located is kept, and its people still count there as reported, not as located); "
+                      f"it is dropped after {self.retention_s / 60:g} minutes.")
         if self.source == "live" and self.rig_scale != 1.0:
             limits.append(f"Exercise scale 1 : {self.rig_scale:g}: every UWB range is multiplied by {self.rig_scale:g} before the locator.")
+        limits.append("Two pucks leave two mirror-image candidates. The twin removes one only when it is impossible; a possible "
+                      "candidate is dismissed only on stated evidence (the occupant's suite, or command's search room), and the phone "
+                      "then carries that assumption.")
+        if self.source == "live":
+            limits.append(f"Live: the stock puck firmware serves one phone at a time, so a range is kept for {LIVE_LINK_STALE_S:g} s.")
         for note in (self._locator_note, self._roster_note):
             if note:
                 limits.append(note)
@@ -1173,11 +1383,21 @@ class BeaconSession:
             del self._hosts[pid]
         b = {"type": "beacons", "schema": SCHEMA, "seq": self.seq, "t": round(now, 3), "simulated": self.simulated,
              "source": self.source, "floor": self.floor, "room": self.room, "room_label": label, "rungs": dict(self.rungs),
-             "rig": {"scale": self.rig_scale}, "pucks": pucks, "unplaced_pucks": unplaced,
+             "rig": {"scale": self.rig_scale}, "search_room": self.search_room_obj(), "pucks": pucks, "unplaced_pucks": unplaced,
              "phones": sorted(phones, key=lambda p: int(p["id"][1:]) if p["id"][1:].isdigit() else 0),
              "presence": presence, "limits": limits,
              "privacy": {"opt_in_only": True, "cold_identities_kept": False, "retention_s": self.retention_s,
                          "text": PRIVACY_TEXT.format(m=self.retention_s / 60)}}
+        if self.agent_status is not None:
+            try:
+                try:
+                    ag = self.agent_status(b)
+                except TypeError:
+                    ag = self.agent_status()
+            except Exception:
+                ag = None
+            if ag:
+                b["agent"] = ag
         acc = self._accountability(b)
         if acc is not None:
             b["accountability"] = acc
@@ -1191,12 +1411,31 @@ class BeaconSession:
                           [(p["id"], p["x"], p["y"], p["room"]) for p in b["pucks"]], b["room"]], sort_keys=True, default=str)
         if key == self._acc_key and self._acc is not None:
             return self._acc
+        phones = []
+        stale = []
+        for p in b["phones"]:
+            lk = p.get("last_known") or {}
+            if p.get("stale") and not (p.get("report") or {}).get("safe_outside"):
+                q = dict(p)
+                q["room"], q["geometry"], q["ranges"], q["ring"] = lk.get("room"), "none", [], None
+                phones.append(q)
+                if lk.get("room"):
+                    stale.append((p["id"], lk["room"], int((p.get("track") or {}).get("last_seen_s") or 0)))
+            else:
+                phones.append(p)
         try:
-            acc = self._roster.accountability(self.site, self.twin, b["floor"] or self.twin.exercise_floor, b["phones"], b["presence"],
+            acc = self._roster.accountability(self.site, self.twin, b["floor"] or self.twin.exercise_floor, phones, b["presence"],
                                               b["pucks"], labels=self.labels, now_local_hour=None, focus_room=b["room"])
         except Exception:
             log.exception("roster.accountability failed")
             return None
+        for pid, room, age in stale:
+            for row in acc.get("suites") or []:
+                if room == row.get("room") or room in (row.get("rooms") or []):
+                    row.setdefault("stale_phones", []).append(pid)
+                    note = f"phone {pid} not heard for {age} s (people still counted as reported, not as located)"
+                    row["why"] = f"{row['why']}; {note}" if row.get("why") else note
+                    break
         self._acc_key, self._acc = key, acc
         return acc
 
@@ -1268,23 +1507,6 @@ def _honest(sp: dict) -> dict:
     return sp
 
 
-def _grow(sp: dict, extra: float) -> dict:
-    sp = copy.deepcopy(sp)
-    extra = max(0.0, float(extra))
-    if sp.get("sigma_m") is not None:
-        s = float(sp["sigma_m"]) + extra
-        if sp.get("cov"):
-            f = (s / max(float(sp["sigma_m"]), 1e-6)) ** 2
-            sp["cov"] = [c * f for c in sp["cov"]]
-        sp["sigma_m"] = s
-    if sp.get("ring"):
-        sp["ring"] = dict(sp["ring"])
-        sp["ring"]["sigma_m"] = round(float(sp["ring"].get("sigma_m") or 0.0) + extra, 2)
-    if sp.get("candidates"):
-        sp["candidates"] = [{**c, "sigma_m": round(float(c.get("sigma_m") or 0.0) + extra, 2)} for c in sp["candidates"]]
-    return sp
-
-
 def _walls(twin: Twin, room_id: str, georef_b: float) -> list[tuple[str, list, list]]:
     poly = twin.room(room_id)["polygon"]
     ccw = _ccw(poly)
@@ -1346,16 +1568,31 @@ def phone_text(phone: dict, twin: Twin, georef_b: float, stale_age: float | None
         return f"{head}: says safe outside (I am out). Accounted for, not a victim"
     head = f"{head}: {words}." if words else f"{head}:"
     geom = phone.get("geometry")
-    pre = f"Not heard for {int(stale_age)} s; last known: " if stale_age is not None else ""
+    if stale_age is not None:
+        lk = phone.get("last_known") or {}
+        if lk.get("geometry") == "ring" and lk.get("puck"):
+            last = f"last heard by puck {lk['puck']}" + (f" in {lk['room_label']}" if lk.get("room_label") else "") + " (range only)"
+        elif lk.get("room_label"):
+            last = f"last located in {lk['room_label']}"
+        else:
+            last = "it had no position"
+        return f"{head} Not heard for {int(stale_age)} s; {last}"
+    pre = ""
+    dismissed = ""
+    for a in phone.get("assumptions") or []:
+        b = str(a.get("text") or "")
+        m = b.split("Mirror candidate dismissed because ", 1)
+        basis = m[1].split(". ", 1)[0].rstrip(".") if len(m) == 2 else b
+        dismissed = f" (mirror spot dismissed: {basis})"
     if geom == "fix":
         where = describe_point(twin, phone["x"], phone["y"], phone.get("room"), georef_b)
         kind = "UWB fix" if str(phone.get("method", "")).startswith("uwb") else "Bluetooth fix (coarse)"
         if phone.get("method") == "uwb-twr+bearing":
             kind = "UWB fix with the phone's bearing"
         sig = phone.get("sigma_m") or 0.0
-        within = f"within {max(0.5, half(sig)):g} m"
+        within = f"within {half_up(sig):g} m"
         room = phone.get("room_label") or "an unknown room"
-        return f"{head} {pre}{kind} in {room}" + (f", {where}" if where else "") + f", {within}"
+        return f"{head} {pre}{kind} in {room}" + (f", {where}" if where else "") + f", {within}" + dismissed
     if geom == "candidates":
         cands = phone.get("candidates") or []
         descs = []
@@ -1363,8 +1600,16 @@ def phone_text(phone: dict, twin: Twin, georef_b: float, stale_age: float | None
             d = describe_point(twin, c["x"], c["y"], c.get("room"), georef_b)
             descs.append((f"in {c.get('room_label')}" if c.get("room_label") else "outside any room") + (f", {d}" if d else ""))
         n = len(cands)
-        word = {2: "Two", 3: "Three", 4: "Four"}.get(n, str(n))
-        return f"{head} {pre}{word} possible spots: " + "; or ".join(descs)
+        word = {2: "two", 3: "three", 4: "four"}.get(n, str(n))
+        rooms = []
+        for c in cands:
+            lbl = c.get("room_label") or "outside any room"
+            if lbl not in rooms:
+                rooms.append(lbl)
+        where = f"in {rooms[0]}" if len(rooms) == 1 else "in " + " or ".join(rooms)
+        cap = (pre + word) if pre else word.capitalize()
+        return (f"{head} {cap} possible spots {where}, cannot choose between them ({'; or '.join(descs)}); "
+                f"a third puck, or moving one puck to the wall, would decide")
     if geom == "ring":
         r = phone.get("ring") or {}
         kind = "UWB" if r.get("kind") == "uwb" else "Bluetooth"
@@ -1380,13 +1625,13 @@ def phone_text(phone: dict, twin: Twin, georef_b: float, stale_age: float | None
     return f"{head} {pre}heard, no position yet"
 
 
-def make_ack(phone: dict | None) -> dict:
+def make_ack(phone: dict | None, link_s: float = LINK_STALE_S) -> dict:
     """What the occupant's app shows back (the simulated phone page shows the same)."""
     if phone is None:
         return {"heard_by": [], "geometry": None, "sigma_m": None,
                 "text": "No rescue beacon hears you yet. Keep the app open and the phone uncovered."}
     rep = phone.get("report") or {}
-    heard = sorted({r["puck"] for r in phone.get("ranges") or [] if (r.get("age_s") or 0.0) <= LINK_STALE_S})
+    heard = sorted({r["puck"] for r in phone.get("ranges") or [] if (r.get("age_s") or 0.0) <= link_s})
     n = len(heard)
     geom = phone.get("geometry")
     sig = phone.get("sigma_m") if geom == "fix" else None
@@ -1396,7 +1641,7 @@ def make_ack(phone: dict | None) -> dict:
     elif n == 0:
         text = "No rescue beacon hears you right now. Keep the app open and the phone uncovered."
     elif geom == "fix":
-        text = f"{beacons}; they know where you are to within {max(0.5, half(sig or 0)):g} m"
+        text = f"{beacons}; they know where you are to within {half_up(sig or 0):g} m"
     elif geom == "candidates":
         text = f"{beacons}; they have narrowed you down to {len(phone.get('candidates') or [])} spots"
     elif geom == "ring":
@@ -1431,6 +1676,9 @@ def brief_from_beacons(b: dict) -> dict:
                         "still": rep.get("still"), "floor_reported": rep.get("floor_reported"), "home_suite": rep.get("home_suite"),
                         "safe_outside": bool(rep.get("safe_outside"))},
              "text": p.get("text")}
+        if p.get("last_known"):
+            lk = p["last_known"]
+            e["last_known"] = {"geometry": lk.get("geometry"), "room": lk.get("room"), "room_label": lk.get("room_label")}
         if p.get("geometry") == "fix":
             e.update({"x": _r05(p.get("x")), "y": _r05(p.get("y")), "sigma_m": max(0.5, _r05(p.get("sigma_m")) or 0.5)})
         if p.get("ring"):
@@ -1450,7 +1698,8 @@ def brief_from_beacons(b: dict) -> dict:
            "unplaced_pucks": len(b.get("unplaced_pucks") or []),
            "phones": phones,
            "presence": [{"id": c["id"], "puck": c.get("puck"), "room": c.get("room"), "room_label": c.get("room_label"),
-                         "count": c.get("count"), "count_range": c.get("count_range"), "zones": c.get("zones")}
+                         "count": c.get("count"), "count_range": c.get("count_range"), "zones": c.get("zones"),
+                         "opt_in_phones": c.get("opt_in_phones")}
                         for c in sorted(b.get("presence") or [], key=lambda q: q["id"])],
            "limits": b.get("limits") or []}
     if b.get("sample"):

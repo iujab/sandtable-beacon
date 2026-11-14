@@ -190,7 +190,7 @@ function cardHtml(p) {
   if (p.stale) {
     // not heard: no position is claimed; say where it was last located and how long ago
     const lk = p.last_known || (p.geometry && p.geometry !== "none" ? { geometry: p.geometry, room_label: p.room_label || (p.zone && p.zone.room_label) } : {});
-    const age = isNum(lk.age_s) ? lk.age_s : p.track && p.track.last_seen_s;
+    const age = p.track && isNum(p.track.last_seen_s) ? p.track.last_seen_s : lk.age_s;   // time since it was last heard
     const where = lk.room_label ? `last located in ${lk.room_label}${lk.geometry && lk.geometry !== "fix" ? ` (${lk.geometry === "candidates" ? "two possible spots" : lk.geometry === "ring" ? "range only" : lk.geometry})` : ""}` : "no position before it went quiet";
     return top + `<div class="pc-stale">Not heard for ${num(age, 0)} s; ${esc(where)}</div>` + (r.text ? `<div class="pc-quote">“${esc(r.text)}”</div>` : "");
   }

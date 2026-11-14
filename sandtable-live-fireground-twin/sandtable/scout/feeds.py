@@ -47,6 +47,20 @@ SCAN_STALE_S = 600.0
 
 
 # ---------------------------------------------------------------------------- shared
+
+def band_text(c: dict) -> str:
+    """A cold presence band in words: the band only, never "about 0", always devices, not people."""
+    lo, hi = (list(c.get("count_range") or []) + [None, None])[:2]
+    if lo is None or hi is None:
+        lo = hi = int(c.get("count") or 0)
+    lo, hi = int(lo), int(hi)
+    where = f" in {c['room_label']}" if c.get("room_label") else ""
+    if hi <= 0:
+        return f"No device heard{where}."
+    if lo == hi:
+        return f"{lo} device{'s' if lo != 1 else ''} heard{where}, not {'a person' if lo == 1 else 'people'}."
+    return f"{lo} to {hi} devices heard{where}: devices, not people."
+
 def _ll(twin, x: float, y: float) -> tuple[float, float]:
     lat, lon = twin.to_geo(float(x), float(y))
     return round(lat, 7), round(lon, 7)
@@ -165,7 +179,7 @@ def _phone_features(b: dict | None, twin, phones: dict | None) -> list[dict]:
         ring = _closed([[*reversed(_ll(twin, x, y))] for x, y in poly])
         feats.append({"type": "Feature", "id": f"presence-{c['id']}", "geometry": {"type": "Polygon", "coordinates": [ring]},
                       "properties": {"kind": "presence", "id": c["id"], "count": c.get("count"), "count_range": c.get("count_range"), "zones": c.get("zones"),
-                                     "opt_in": False, "room": c.get("room"), "text": c.get("text"), "simulated": sim, "source": src,
+                                     "opt_in": False, "room": c.get("room"), "text": band_text(c), "simulated": sim, "source": src,
                                      "note": "devices, not people; no identities"}})
     return feats
 
@@ -296,7 +310,7 @@ def _phone_cot(b: dict | None, twin, now: float, phones: dict | None) -> list[tu
         lat, lon = _ll(twin, cx, cy)
         uid = f"sandtable.beacon.{c['id']}"
         out.append((uid, _event(uid, "b-m-p-s-p-i", how, lat, lon, max(((q[0] - cx) ** 2 + (q[1] - cy) ** 2) ** 0.5 for q in poly), now, SCAN_STALE_S,
-                                f"Devices {c.get('room_label')}", f"{tag}{c.get('text') or ''} Count band {c.get('count_range')}: devices, not people.")))
+                                f"Devices {c.get('room_label')}", f"{tag}{band_text(c)}")))
     for pk in pucks.values():
         if pk.get("x") is None:
             continue

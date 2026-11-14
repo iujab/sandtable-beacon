@@ -327,7 +327,7 @@ def test_scout_script_situations_do_not_depend_on_how_long_the_agent_takes(monke
     for i in range(2):
         with monkeypatch.context() as m:
             if i == 1:
-                _slow_agent(m, 2.0)
+                _slow_agent(m, 1.0)
             seen = []
             real_on = server.AppState._on_situation
             m.setattr(server.AppState, "_on_situation", lambda self, sit: (seen.append(json.loads(json.dumps(sit))), real_on(self, sit))[1])

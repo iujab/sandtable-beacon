@@ -197,10 +197,10 @@ def test_beacon_script_replays_the_recorded_two_puck_run_identically(monkeypatch
     """The hands-free beacon exercise: two pucks placed by hand, phone 1 a fix (its mirror pruned outside the building), phone 2 two
     candidates; the agent's situations must be byte-identical across runs so recorded model turns replay."""
     runs, aar = [], []
-    for i in range(2):                      # the second run has a slow agent (2 s inside every turn, like a live model): same situations
+    for i in range(2):                      # the second run has a slow agent (1 s inside every turn, like a live model): same situations
         with monkeypatch.context() as m:
             if i == 1:
-                _slow_agent(m, 2.0)
+                _slow_agent(m, 1.0)
             s, events, step, seen = _beacon_run(m, tmp_path / str(i))
             inc = s.incident
             assert step == "done" and inc.phase == "terminated", s.director.steps
@@ -220,7 +220,7 @@ def test_beacon_script_replays_the_recorded_two_puck_run_identically(monkeypatch
             b1 = next(p for p in relayed[0]["phones"] if p["id"] == "B1")
             assert b1["pruned"] and "outside the building" in b1["pruned"][0]["reason"]
             par = next(e["text"] for e in inc.timeline if e["kind"] == "par")
-            assert "B1" in par and "B2" in par and "Accountability complete" in par
+            assert par.startswith("All crews") and "3 of 3" in par and "ACCOUNTABILITY COMPLETE" not in par.upper()   # suites stay unsearched
             runs.append([x for x in seen if x["kind"] in ("phone", "phone_reached", "all_out")])
             aar.append(_aar_lines(inc))
     kinds = [x["kind"] for x in runs[0]]

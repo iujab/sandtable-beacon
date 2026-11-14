@@ -7,6 +7,7 @@ come from the frozen snapshot of the situation being handled, not from live stat
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import math
@@ -150,10 +151,15 @@ class ToolBox:
     async def call(self, name: str, args: dict) -> dict:
         if name not in self._fns:
             return {"error": f"unknown tool {name!r}"}
+        fn, args = self._fns[name], dict(args or {}) if isinstance(args, dict) else {}
+        params = inspect.signature(fn).parameters
+        ignored = [k for k in args if k not in params]
         try:
-            out = self._fns[name](**(args or {}))
+            out = fn(**{k: v for k, v in args.items() if k in params})
             if hasattr(out, "__await__"):
                 out = await out
+            if ignored and isinstance(out, dict):              # one fixed phrase, no argument names or values echoed
+                out = {**out, "note": "unrecognised arguments were ignored"}
             return out
         except TypeError as exc:
             return {"error": f"bad arguments for {name}: {exc}"}
@@ -560,8 +566,18 @@ class ToolBox:
         """The accountability table, trimmed to discrete facts. Suites against phones from the Beacon module (the frozen
         brief first, else the latest object, else the record alone); crews, targets and who was reached are joined here
         from the frozen snapshot, so the result does not change while the agent thinks."""
-        acc = next((src["accountability"] for src in self._beacon_sources()
-                    if isinstance(src.get("accountability"), dict) and (src["accountability"].get("suites") or src["accountability"].get("rows"))), None)
+        if (getattr(self.provider, "modes", None) or {}).get("costar") == "live":
+            return self._accountability_live_view()
+        acc = None
+        if self._live_beacons() is not None:                               # the one table the panel, the report and the incident's last line use
+            try:
+                from ..beacon_link import accountability as joined
+                acc = joined(self._live_beacons(), self.incident, self.twin, self.provider)
+            except Exception:
+                log.exception("accountability table failed")
+        if acc is None:
+            acc = next((src["accountability"] for src in self._beacon_sources()
+                        if isinstance(src.get("accountability"), dict) and (src["accountability"].get("suites") or src["accountability"].get("rows"))), None)
         if acc is None:                                                    # the table the incident keeps, if it keeps one
             inc_acc = getattr(self.incident, "accountability", None)
             inc_acc = inc_acc() if callable(inc_acc) else inc_acc
@@ -574,6 +590,7 @@ class ToolBox:
             except Exception:
                 return None
         snap = self._snap()
+        snap_phones = [q for q in snap.get("phones") or [] if isinstance(q, dict)]
         people = [{"id": q.get("id"), "room": q.get("room"), "rescuer": q.get("rescuer"), "status": q.get("status")}
                   for q in list(snap.get("phones") or []) + list((snap.get("scan") or {}).get("victims") or []) if isinstance(q, dict)]
         rows = []
@@ -584,9 +601,12 @@ class ToolBox:
             un = r.get("unaccounted") or {}
             room = r.get("room")
             here = [q for q in people if q["room"] == room]
+            mine = [q for q in snap_phones if q.get("room") in set(r.get("rooms") or ([room] if room else []))]     # never below what the incident holds
             rows.append({"suite": r.get("suite"), "tenant": r.get("industry") or r.get("tenant"), "life_hazard": r.get("life_hazard"),
                          "expected": {"low": exp.get("low"), "high": exp.get("high"), "basis": exp.get("basis")} if exp else None,
-                         "phones": r.get("phones_opt_in"), "people_reported": r.get("people_reported"), "located": r.get("located"),
+                         "phones": max(int(r.get("phones_opt_in") or 0), len(mine)),
+                         "people_reported": max(int(r.get("people_reported") or 0), sum(int(q.get("people") or 1) for q in mine)),
+                         "located": max(int(r.get("located") or 0), sum(1 for q in mine if q.get("geometry") == "fix")),
                          "devices_heard": r.get("cold_devices"), "unaccounted": [un.get("low"), un.get("high")] if un else None,
                          "state": r.get("state"), "priority": r.get("priority"), "why": r.get("why"),
                          "crews_here": sorted(u["id"] for u in snap["units"] if u.get("room") == room),
@@ -595,8 +615,39 @@ class ToolBox:
                          "reached": sorted(q["id"] for q in here if q.get("status") in ("reached", "evacuating", "out"))})
         src = acc.get("source")
         totals = {k: v for k, v in (acc.get("totals") or {}).items() if k not in ("targets", "assigned", "reached", "out")}
-        return {"floor": acc.get("floor"), "source": (src.get("text") or src.get("beacon")) if isinstance(src, dict) else src, "suites": rows, "totals": totals,
+        for k, col in (("phones_opt_in", "phones"), ("people_reported", "people_reported"), ("located", "located")):
+            if k in totals:
+                totals[k] = max(int(totals[k] or 0), sum(int(r[col] or 0) for r in rows))
+        un_total = [totals.get("unaccounted_low"), totals.get("unaccounted_high")] if "unaccounted_low" in totals else None
+        return {"floor": acc.get("floor"), "source": (src.get("text") or src.get("beacon")) if isinstance(src, dict) else src,
+                "unaccounted": un_total, "suites": rows, "totals": totals,
                 "priorities": [{k: q.get(k) for k in ("rank", "suite", "target", "text")} for q in acc.get("priorities") or [] if isinstance(q, dict)],
+                "limits": acc.get("limits") or []}
+
+    def _accountability_live_view(self) -> dict | None:
+        """Live record (contract section 4): the headline, the storey summary and compact rows, counts only (no tenant names)."""
+        try:
+            from ..beacon_link import accountability as table
+            acc = table(self._live_beacons(), self.incident, self.twin, self.provider)
+        except Exception:
+            log.exception("live accountability failed")
+            return None
+        rows = []
+        for r in acc.get("rows") or []:
+            exp, un, rec = r.get("expected") or {}, r.get("unaccounted") or {}, r.get("record") or {}
+            rows.append({"suite": r.get("suite"), "room_label": r.get("room_label"), "scope": r.get("scope"), "covered": r.get("covered"),
+                         "record": {k: rec.get(k) for k in ("status", "tenants", "employees", "area_sf", "text")},
+                         "life_hazard": r.get("life_hazard"), "expected": [exp.get("low"), exp.get("high")], "expected_basis": exp.get("basis"),
+                         "phones": r.get("phones_opt_in"), "people_reported": r.get("people_reported"), "located": r.get("located"),
+                         "devices_heard": r.get("cold_devices"), "unaccounted": [un.get("low"), un.get("high")] if un else None,
+                         "state": r.get("state"), "priority": r.get("priority"), "why": r.get("why"),
+                         "crews_here": r.get("crews"), "targets": r.get("targets"), "assigned": r.get("assigned"), "reached": r.get("reached")})
+        t = acc.get("totals") or {}
+        return {"headline": acc.get("headline"), "storey": acc.get("storey"), "source": (acc.get("source") or {}).get("text"),
+                "unaccounted": [t.get("unaccounted_low"), t.get("unaccounted_high")], "suites": rows,
+                "totals": {k: t.get(k) for k in ("expected_low", "expected_high", "unaccounted_low", "unaccounted_high", "people_reported", "located",
+                                                 "against_record_people", "not_covered_suites")},
+                "priorities": [{k: q.get(k) for k in ("rank", "suite", "target", "text")} for q in acc.get("priorities") or []],
                 "limits": acc.get("limits") or []}
 
     def t_get_phones(self) -> dict:

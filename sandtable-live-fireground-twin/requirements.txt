@@ -19,3 +19,4 @@ pytest-asyncio>=0.24
 ./vendor/uwbkit
 # from vendor/beacon (lane L16's Beacon module)
 matplotlib>=3.9
+segno>=1.6

@@ -1,0 +1,5 @@
+# Qorvo's firmware images: licence not found, never commit them
+*.hex
+*.zip
+# RTT logs written by JLinkRTTLogger
+*.log

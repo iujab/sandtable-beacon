@@ -123,13 +123,13 @@ or should the five boards be separate pucks a few metres apart?
 
 | Layout | Bearing error to the phone, median | Sideways (cross-range) error, median | Mirror ambiguity left | A position is published | Position error when published, median | Area the phone is confined to, median |
 |---|---|---|---|---|---|---|
-| Two boards on one device, 0.1 m apart | 22 degrees | 1.71 m | 100% | 0% | n/a | 5.8 m2 |
-| Two boards on one device, 0.3 m apart | 17 degrees | 1.34 m | 100% | 0% | n/a | 4.8 m2 |
-| Two boards on one device, 0.5 m apart | 14 degrees | 1.29 m | 98% | 0% | n/a | 4.2 m2 |
-| Two separate pucks 2 m apart | 8 degrees | 0.64 m | 72% | 28% | 0.77 m | 2.0 m2 |
-| Two separate pucks 3 m apart | 5 degrees | 0.38 m | 60% | 40% | 0.36 m | 1.4 m2 |
-| Two separate pucks 4 m apart | 5 degrees | 0.36 m | 42% | 58% | 0.43 m | 1.2 m2 |
-| Three separate pucks (thrown) | n/a | n/a | n/a | 80% | 0.22 m | 0.8 m2 |
+| Two boards on one device, 0.1 m apart | 33 degrees | 2.34 m | 100% | 0% | n/a | 16.1 m2 |
+| Two boards on one device, 0.3 m apart | 17 degrees | 1.51 m | 100% | 0% | n/a | 15.5 m2 |
+| Two boards on one device, 0.5 m apart | 22 degrees | 1.51 m | 98% | 0% | n/a | 12.5 m2 |
+| Two separate pucks 2 m apart | 7 degrees | 0.71 m | 100% | 0% | n/a | 5.3 m2 |
+| Two separate pucks 3 m apart | 6 degrees | 0.42 m | 98% | 2% | 0.34 m | 3.6 m2 |
+| Two separate pucks 4 m apart | 4 degrees | 0.33 m | 96% | 4% | 0.33 m | 2.8 m2 |
+| Three separate pucks (thrown) | n/a | n/a | n/a | 58% | 0.23 m | 1.2 m2 |
 
 Two boards on one device never produce a position: the locator publishes a ring. Two separate pucks a few metres apart confine the phone to a much smaller area with a several times better bearing, and the twin removes the mirror solution in part of the cases even with thrown pucks (the placed layouts are in `results/eval_two_puck.json`).
 <!-- LAYOUT_NUMBERS:END -->

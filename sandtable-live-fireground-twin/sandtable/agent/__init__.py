@@ -216,7 +216,8 @@ class CommandAgent:
         if phones is not None:
             template = prompts.AAR_BEACON.replace("{phones}", json.dumps(phones, sort_keys=True)).replace(
                 "{accountability}", json.dumps(accountability, sort_keys=True)).replace(
-                "{scan_section}", "" if scan is None else "SCAN BRIEF (UWB radar pucks thrown into a room during the incident):\n" + json.dumps(scan, sort_keys=True) + "\n")
+                "{scan_section}", ("" if scan is None else "SCAN BRIEF (UWB radar pucks thrown into a room during the incident):\n" + json.dumps(scan, sort_keys=True) + "\n")
+                + (f"THE RECORD AGAINST THE PHONES (live building record): {accountability['headline']}\n" if (accountability or {}).get("headline") else ""))
         elif scan is not None:
             template = prompts.AAR_SCOUT.replace("{scan}", json.dumps(scan, sort_keys=True))
         else:

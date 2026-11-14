@@ -324,3 +324,37 @@ A puck host is a small computer that powers a puck and may read it (the UNO Q; `
 - `host`: a heartbeat every 5 s. The puck's `host` field becomes that name and it gains `host_seen_s`; a host silent for 20 s is dropped from the puck.
 - `uwb_puck`: a range read on the PUCK side (the stock firmware's debug log), with no phone id. The session attributes it to the phone that last reported a range to that puck within 30 s; when that phone has gone quiet (screen off), these keep its ring or fix alive, and the phone's `ranges[]` entry gets `"reporter": "puck"`. Experimental: the log format of the stock firmware is not confirmed.
 - `cold`: section 2 of `docs/CONTRACTS.md`; counts only.
+
+## A8. Two pucks, one answer; stated evidence (12:50 CST: the owner chose a two-puck live demo)
+
+- Two pucks leave two mirror candidates. The twin deletes one by itself only when it is impossible (outside the building, inside a wall). A candidate that is possible but contradicts something that was said is dismissed **visibly** (`beacon/prune.py`): it moves to `pruned` with `"by": "occupant-statement"` (the app's "Which suite are you in?") or `"by": "search-room"` (command's decision), and the phone gains `"assumptions": [{"kind", "room", "text"}]`, which a board must show next to the position. When nothing decides, `geometry` stays `"candidates"` and `text` says so plainly ("cannot choose between two spots").
+- `report.home_suite` is the suite the occupant says they are in now.
+- `GET /api/search_room` and `POST /api/search_room {"room": "r310" | null}`: command's "we are searching this room" assumption (default null = off). The Beacons object carries `"search_room": {"room", "room_label"} | null`.
+- `GET /api/layout?room=r310&n=2` returns the recommended puck layout for a room: `{"pucks": [{"id", "x", "y"}], "wall": "...", "why": "...", "mirror_falls": "..."}` (drawn as ghost markers: "place the pucks here").
+- `GET /api/app_link.svg?url=<server base url>` returns a QR code (SVG) of `sandtablebeacon://server?url=...`; scanning it with the iPhone's camera opens the Beacon app and fills in the server address.
+- The stock puck firmware serves one phone at a time. A phone that takes turns on a board reports each puck only every 10 to 20 s; the session keeps a still phone's last range for 25 s.
+
+## A9. Ingest details (13:00 CST)
+
+- The iOS app re-sends each board's latest `uwb` and `sos` reading, with its original `t`, in every batch for up to 25 s (boards are shared by taking turns). The server counts a reading once: an observation whose (`eid`, `kind`, `accessory`) was already received with the same or a later `t` is skipped and counted in the response's `"skipped"`.
+- An observation carrying `"dry_run": true` (a puck host started with `--dry-run`) is skipped.
+- Cold bands are signal-strength thresholds, not distances: `near` is stronger than -60 dBm (within about 1 m in the open with the stated model), `mid` is -60 to -75 dBm (to about 3.5 m), `far` is weaker (farther, or through a wall or a body). The "2 m / 6 m" wording in section 2.3 was written before the path-loss model was fixed from sources.
+- `Presence.count` is clamped into `count_range`: it is never below the number of opt-in phones known to be in that room; the raw band counts stay in `zones`.
+- A batch is no longer all-or-nothing: an observation that fails validation is dropped and reported (`"rejected": n, "errors": [first three reasons]`), the rest are used; the answer is 400 only when nothing in the batch is usable. `d_m` of 0 is accepted (a phone lying on a puck) and treated as 0.01 m.
+
+## A10. Running the module on another building (13:20 CST; for the command board's live mode)
+
+The twin and the building record default to this repository's labelled fixtures. A launcher that holds other data points the module at it through the environment, with no copy of the module needed:
+
+| Variable | Meaning |
+|---|---|
+| `BEACON_TWIN_JSON`, `BEACON_SITE_JSON` | paths to a twin (`sandtable.twin/1`) and a record (`sandtable.site/1`); either or both |
+| `BEACON_BUNDLE_DIR` | one directory holding `twin.json` and `site.json` (used for whichever of the two paths is not set) |
+| `BEACON_COSTAR_MODE`, `BEACON_MATTERPORT_MODE` | `live` or `fixture`: what the honesty labels say about that bundle (Sandtable's `COSTAR_MODE` / `MATTERPORT_MODE` are honoured too). Unset with an external bundle: the label says the provenance is not stated |
+| `BEACON_ROOM` | the room pucks go into by default; when the loaded twin has no such room, the largest room with a door on the exercise floor is used |
+| `BEACON_SCENARIO` | `auto` (the default with an external bundle) builds the simulated scene for the loaded twin from its geometry (`beacon/autoscene.py`); a named fixture scene whose room is not in the loaded twin falls back to `auto` |
+| `BEACON_DATA_DIR` | where the server writes. With an external bundle everything it writes goes under a directory named `live` (`<data dir>/live`, or the data dir itself when its path already contains `live`): the puck table, record checks, and recorded model output (`BEACON_LLM_CACHE_DIR` overrides the last) |
+
+With an external bundle nothing read from it is written into this tree: no fixture, no log line with room or tenant text, no recorded prompt under `fixtures/`. `tests/test_external_bundle.py` runs the walk-through on a synthetic external bundle and checks that `fixtures/` and `data/` are untouched.
+
+What changes on another twin: suites are grouped by suite number, so a scan of one suite (several rooms carrying the same suite number) is one accountability row with `rooms: [...]`; the record's tenants are joined by suite number, and the record's storey is used only when the same number exists on several floors; a record head count (`employees`) replaces the floor-area estimate; an occupant's stated suite covers all the rooms of that suite.

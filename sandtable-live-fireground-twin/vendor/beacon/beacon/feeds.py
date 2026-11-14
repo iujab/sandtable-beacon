@@ -19,8 +19,10 @@ Honesty rules enforced here, whatever the input says:
 
 Cursor-on-Target choices follow Sandtable's scout feed (sandtable/scout/feeds.py, copied with credit): the XML is built
 with ElementTree (always well-formed, text escaped), times are ISO 8601 UTC with a Z, unknown hae/le use 9999999.0.
-Types: puck a-f-G-E-S, phone a-u-G, zone and presence b-m-p-s-m (all as in BEACON_FEED section 5). Not tested
-against a TAK server.
+Types: puck a-f-G-E-S; a phone FIX a-u-G (callsign "B1 phone (trapped)"); everything that is not a position is a map
+point b-m-p-s-m with a callsign that says so: a ring "B2 RANGE ONLY" at the puck (remarks "RANGE ONLY: within N m of puck
+P1, no position"), candidates "B2 CANDIDATE 1 OF 2", a zone "B4 ROOM ONLY" at the room centre, a stale phone "B1 LAST
+KNOWN" at the centre of the room it was last located in, presence at the room centre. Not tested against a TAK server.
 """
 from __future__ import annotations
 
@@ -123,6 +125,15 @@ def _report_props(p: dict) -> dict:
             "opt_in": True}
 
 
+def _last_known(p: dict) -> dict:
+    """The room a stale phone was last placed in (from `last_known`; an older producer may only have `room`)."""
+    lk = p.get("last_known")
+    if isinstance(lk, dict) and lk.get("room"):
+        return lk
+    return {"geometry": p.get("geometry"), "room": p.get("room"), "room_label": p.get("room_label"),
+            "age_s": (p.get("track") or {}).get("last_seen_s")}
+
+
 def beacons_to_geojson(beacons: dict, twin=None) -> dict:
     tw = _twin(twin)
     b = beacons or {}
@@ -151,6 +162,15 @@ def beacons_to_geojson(beacons: dict, twin=None) -> dict:
         geom = p.get("geometry")
         common = {"id": p["id"], "method": p.get("method"), "geometry": geom, "text": p.get("text") or "",
                   "stale": bool(p.get("stale")), **_report_props(p)}
+        if p.get("stale"):
+            # a phone not heard for a while is never drawn where it was: at most the room where it was last located
+            lk = _last_known(p)
+            poly = _room_polygon(tw, lk.get("room"))
+            if poly and not (p.get("report") or {}).get("safe_outside"):
+                features.append(feat({"type": "Polygon", "coordinates": [_ring_lonlat(tw, poly)]},
+                                     {"kind": "phone-last-known", **common, "room": lk.get("room"),
+                                      "last_known": {k: lk.get(k) for k in ("geometry", "room", "room_label", "age_s")}}, p))
+            continue
         if geom == "fix" and p.get("x") is not None and p.get("y") is not None:
             features.append(feat({"type": "Point", "coordinates": _lonlat(tw, p["x"], p["y"])},
                                  {"kind": "phone", **common, "sigma_m": p.get("sigma_m"), "confidence": p.get("confidence"),
@@ -191,6 +211,10 @@ def beacons_to_geojson(beacons: dict, twin=None) -> dict:
 
 
 # ---------------------------------------------------------------------------- Cursor-on-Target
+def _half_up(v: float) -> float:
+    return max(0.5, math.ceil(float(v) * 2.0 - 1e-9) / 2.0)
+
+
 def _iso(t: float) -> str:
     t = float(t)
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
@@ -233,30 +257,48 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
         rep = p.get("report") or {}
         status = rep.get("status") or "unknown"
         cs = f"{p['id']} phone ({status})"
+        uid = f"sandtable.beacon.{p['id']}"
+        if p.get("stale"):
+            lk = _last_known(p)
+            poly = _room_polygon(tw, lk.get("room"))
+            if poly and not rep.get("safe_outside"):
+                cx, cy = _centroid(poly)
+                age = (p.get("track") or {}).get("last_seen_s")
+                heard = f"not heard for {int(age)} s" if age is not None else "not heard recently"
+                room = lk.get("room_label") or lk.get("room")
+                where = (f"last heard by puck {lk['puck']} in {room} (range only)" if lk.get("geometry") == "ring" and lk.get("puck")
+                         else f"last located in {room}")
+                add(uid, "b-m-p-s-m", cx, cy, _bounding_radius(poly), f"{p['id']} LAST KNOWN",
+                    f"LAST KNOWN: {heard}; {where}. No current position: the point is the room's centre. {tag}{text}.")
+            continue
         if geom == "fix" and p.get("x") is not None:
             sig = p.get("sigma_m")
             add(f"sandtable.beacon.{p['id']}", "a-u-G", p["x"], p["y"], 2 * float(sig) if sig is not None else None, cs,
                 f"{tag}{text}. Method {p.get('method')}; ce is 2 sigma.")
         elif geom == "ring" and p.get("ring"):
+            # A ring is not a position: a map-point marker at the PUCK, with a circular error that contains the whole ring.
             r = p["ring"]
             ce = float(r["r_m"]) + 2 * float(r.get("sigma_m") or 0.0)
-            add(f"sandtable.beacon.{p['id']}", "a-u-G", r["cx"], r["cy"], ce, cs,
-                f"{tag}Range only: {text}. The point is puck {r.get('puck')}; the phone is on a ring of radius "
-                f"{float(r['r_m']):.1f} m around it (ce = radius + 2 sigma).")
+            add(uid, "b-m-p-s-m", r["cx"], r["cy"], ce, f"{p['id']} RANGE ONLY",
+                f"RANGE ONLY: within {_half_up(ce):g} m of puck {r.get('puck')}, no position. The point is the puck; the phone is "
+                f"somewhere on a ring of radius {float(r['r_m']):.1f} m around it (ce = radius + 2 sigma). {tag}{text}.")
         elif geom == "candidates" and p.get("candidates"):
             cands = p["candidates"]
+            n = len(cands)
             for i, c in enumerate(cands, 1):
                 sig = c.get("sigma_m")
-                add(f"sandtable.beacon.{p['id']}.c{i}", "a-u-G", c["x"], c["y"], 2 * float(sig) if sig is not None else None,
-                    f"{p['id']} candidate {i}/{len(cands)}",
-                    f"{tag}Candidate {i} of {len(cands)} (weight {float(c.get('weight') or 0):.2f}): {text}.")
+                add(f"{uid}.c{i}", "b-m-p-s-m", c["x"], c["y"], 2 * float(sig) if sig is not None else None,
+                    f"{p['id']} CANDIDATE {i} OF {n}",
+                    f"CANDIDATE {i} OF {n}: one of {n} possible spots (weight {float(c.get('weight') or 0):.2f}), not a position; "
+                    f"the phone is at one of them, the board cannot choose. {tag}{text}.")
         elif geom == "zone" and p.get("zone"):
             z = p["zone"]
             poly = z.get("polygon") or _room_polygon(tw, z.get("room"))
             if poly:
                 cx, cy = _centroid(poly)
-                add(f"sandtable.beacon.{p['id']}", "b-m-p-s-m", cx, cy, _bounding_radius(poly), cs,
-                    f"{tag}Room-level only ({z.get('band')} band of puck {z.get('puck')}, probability {float(z.get('prob') or 0):.1f}): {text}.")
+                add(uid, "b-m-p-s-m", cx, cy, _bounding_radius(poly), f"{p['id']} ROOM ONLY",
+                    f"ROOM ONLY: in {z.get('room_label') or z.get('room')} (probability {float(z.get('prob') or 0):.1f}, "
+                    f"{z.get('band')} band of puck {z.get('puck')}), no position; the point is the room's centre. {tag}{text}.")
 
     for c in b.get("presence") or []:
         poly = _room_polygon(tw, c.get("room"))

@@ -511,3 +511,19 @@ def test_live_links_kept_25_s_and_stale_after_40(twin_raw, site_raw):
     assert s.ack(p)["heard_by"] == ["P1"]
     assert s.step(T0 + 35.0)["phones"][0]["stale"] is False
     assert s.step(T0 + 41.0)["phones"][0]["stale"] is True
+
+
+def test_presence_never_reads_empty_while_a_phone_is_ranged(twin_raw, site_raw):
+    s, _ = _session(twin_raw, site_raw)
+    s.set_pucks(P3[:1], room="r310")
+    s.ingest({"kind": "cold", "t": T0, "puck": "P1", "window_s": 10.0, "near": 0, "mid": 0, "far": 0})
+    b = _run(s, P3[:1])                                                  # a ring around P1: no room, but ranged by P1
+    assert b["phones"][0]["geometry"] == "ring"
+    c = b["presence"][0]
+    assert c["opt_in_phones"] == 1 and c["count"] >= 1
+    assert "no advertising device" not in c["text"] and "including 1 opt-in phone known in this room" in c["text"]
+    s2, _ = _session(twin_raw, site_raw)
+    s2.set_pucks(P3[:1], room="r310")
+    s2.ingest({"kind": "cold", "t": T0, "puck": "P1", "window_s": 10.0, "near": 0, "mid": 0, "far": 0})
+    c2 = s2.step(T0 + 0.5)["presence"][0]
+    assert c2["opt_in_phones"] == 0 and c2["count"] == 0 and "hears no advertising device" in c2["text"]

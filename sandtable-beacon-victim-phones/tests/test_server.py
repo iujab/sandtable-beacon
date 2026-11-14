@@ -146,12 +146,15 @@ def test_sim_routes(make_client):
     r = c.post("/api/sim/phone", json={"key": "victim", "x": 2.4, "y": 2.1, "opt_in": True, "uwb": True,
                                         "report": {"status": "trapped", "people": 2, "can_move": False}})
     assert r.status_code == 200, r.text
-    got = _wait(lambda: (c.get("/api/sim/phone/victim").json().get("phone") or {}).get("geometry") == "fix", 8.0)
+    # three random pucks: a fix, or candidates when the throw leaves the mirror spot unexplained (the locator decides)
+    got = _wait(lambda: (c.get("/api/sim/phone/victim").json().get("phone") or {}).get("geometry") in ("fix", "candidates"), 8.0)
     v = c.get("/api/sim/phone/victim").json()
     assert set(v) >= {"key", "truth", "phone", "ack"}
     assert v["truth"]["x"] == 2.4 and set(v["ack"]) >= {"heard_by", "geometry", "sigma_m", "text"}
     assert got, v
-    assert v["ack"]["heard_by"] and v["ack"]["geometry"] == "fix"
+    assert v["ack"]["heard_by"] and v["ack"]["geometry"] == v["phone"]["geometry"]
+    if v["phone"]["geometry"] != "fix":
+        assert v["phone"]["x"] is None and v["ack"]["sigma_m"] is None
     assert c.get("/api/sim/phone/nobody").status_code == 404
     assert c.post("/api/sim/phone", json={"key": "", "x": 1, "y": 1}).status_code == 400
     assert c.post("/api/sim/phone", json={"key": "bad", "x": "a", "y": 1}).status_code == 400
@@ -348,3 +351,81 @@ def test_app_link(make_client):
         pytest.skip("segno not installed")
     assert svg.status_code == 200 and svg.headers["content-type"].startswith("image/svg+xml") and "<svg" in svg.text
     assert c.get("/api/app_link?url=javascript:alert(1)").status_code == 400
+
+
+# ---------------------------------------------------------------------------- round 2: judge findings
+def _phone_ids(c):
+    return [p["id"] for p in c.get("/api/beacons").json()["phones"]]
+
+
+@needs_sim
+def test_unticking_the_app_drops_the_phone_at_once(make_client):
+    c = make_client("sim")
+    c.post("/api/pucks", json={"n": 2, "room": "r310"})
+    c.post("/api/sim/phone", json={"key": "tab", "x": 2.1, "y": 1.8, "opt_in": True, "uwb": True, "report": {"status": "trapped"}})
+    assert _wait(lambda: _phone_ids(c), 6.0)
+    r = c.post("/api/sim/phone", json={"key": "tab", "x": 2.1, "y": 1.8, "opt_in": False})
+    assert r.status_code == 200
+    assert _wait(lambda: not _phone_ids(c), 1.5), "the phone must leave the board as soon as the app is switched off"
+    truth = c.get("/api/sim/truth").json()
+    dev = next(p for p in truth["phones"] if p["key"] == "tab")
+    assert dev["opt_in"] is False                                       # still a device in the simulator (cold count)
+    c.post("/api/sim/phone", json={"key": "tab2", "x": 3.0, "y": 5.0, "opt_in": True, "uwb": True})
+    assert _wait(lambda: _phone_ids(c), 6.0)
+    assert c.post("/api/sim/phone", json={"key": "tab2", "remove": True}).json()["ok"] is True
+    assert _wait(lambda: not _phone_ids(c), 1.5)
+
+
+@needs_sim
+def test_page_phones_expire_scenario_phones_do_not(make_client, monkeypatch):
+    from beacon import server
+    monkeypatch.setattr(server, "SIM_PHONE_TTL_S", 1.5)
+    c = make_client("sim")
+    assert c.post("/api/sim/scenario", json={"name": "suite-310"}).status_code == 200
+    scene = {p["key"] for p in c.get("/api/sim/truth").json()["phones"]}
+    c.post("/api/sim/phone", json={"key": "closed-tab", "x": 3.0, "y": 5.0, "opt_in": True, "uwb": True})
+    c.post("/api/sim/phone", json={"key": "open-tab", "x": 4.0, "y": 3.0, "opt_in": True, "uwb": True})
+    t0 = time.time()
+    while time.time() - t0 < 4.0:                                       # only one page keeps polling
+        assert c.get("/api/sim/phone/open-tab").status_code == 200
+        time.sleep(0.3)
+    keys = {p["key"] for p in c.get("/api/sim/truth").json()["phones"]}
+    assert "closed-tab" not in keys and "open-tab" in keys and scene <= keys
+    assert c.get("/api/sim/phone/closed-tab").status_code == 404
+
+
+@needs_sim
+def test_agent_summary_marks_old_orders(make_client):
+    from beacon import server
+    c = make_client("sim")
+    st = server.S()
+    if st.session.agent_status is None:
+        pytest.skip("no command agent wired")
+
+    class _Agent:
+        busy, backend, last = False, "replay", {"summary": "RIT to Suite 310"}
+    st.agent = _Agent()
+    c.post("/api/pucks", json={"n": 2, "room": "r310"})
+    b = _wait(lambda: (lambda b: b if b.get("agent") else None)(c.get("/api/beacons").json()), 3.0)
+    assert b["agent"]["summary"] == "RIT to Suite 310" and b["agent"]["as_of_t"] and b["agent"]["stale"] is False
+    c.post("/api/pucks", json={"n": 3, "room": "r310", "seed": 1})        # the puck set changed since the plan
+    assert _wait(lambda: c.get("/api/beacons").json()["agent"]["stale"] is True, 3.0)
+
+
+@needs_sim
+def test_hello_carries_sim_model_and_story_length(make_client):
+    c = make_client("sim")
+    with c.websocket_connect("/ws") as ws:
+        h = ws.receive_json()
+    assert isinstance(h.get("sim_model"), dict)
+    st = c.post("/api/sim/story", json={"action": "start"}).json()["story"]
+    assert st["expected_s"] > 0 and st["expected_basis"]
+    c.post("/api/sim/story", json={"action": "stop"})
+
+
+def test_report_in_fake_mode_is_the_sample(make_client):
+    c = make_client("fake")
+    r = c.get("/report.html")
+    if r.status_code == 404:
+        pytest.skip("report routes not wired")
+    assert r.status_code == 200 and "SAMPLE" in r.text

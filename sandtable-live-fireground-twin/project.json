@@ -33,10 +33,10 @@
     "Public open data: LA County assessor and LARIAC, City of LA business listings and GeoHub, US Census TIGERweb, USDA NAIP"
   ],
   "sponsor_tech": {
-    "costar": "Building record: tenants by suite and floor, business category (life hazards inferred), vacancy, construction, stories, area; drives who-is-expected-where in the accountability table and the agent's priorities. Fixture mode only (real public data for 7325 Medical Center Dr, Los Angeles, CoStar-only fields empty); live adapter is a mapping table to fill (docs/TOOLKIT_SWAP.md).",
-    "matterport": "3D twin: rooms, walls, doors, stairs, walking graph; routes the crew and prunes impossible phone candidates (outside the outline, inside a wall, behind a wall on a line-of-sight link). Fixture: synthetic interior fitted to the real footprint. Live adapter written against the Model API GraphQL samples, never called.",
-    "vexcel": "Aerial: the sides of the building, approach, staging, hydrants; the agent looks at the image through a vision tool. Fixture: real USDA NAIP imagery. Live adapter written from the public Vexcel API v2 OpenAPI spec, never called.",
-    "anthropic": "Claude as the command agent (tool use in a plan, act, re-plan loop); the demo replays recorded real responses; the anthropic backend is written and not exercised (no key on the build machine)."
+    "costar": "Building record: tenants by suite and floor, business category (life hazards inferred), available space, construction, stories, sprinklers; drives who-is-expected-where in the accountability table (the record against what the phones report) and the agent's pre-plan. Public repository: stand-in record from real public data for another building. Ran live and privately on Nov 14 2026 from the CoStar hackathon data kit (26 property fields, 72 current tenant rows, 18 available spaces for one building); docs/LIVE_STATUS.md, docs/TOOLKIT_SWAP.md.",
+    "matterport": "3D twin: rooms, walls, doors, walking graph; routes the crew and prunes impossible phone candidates (outside the outline, inside a wall). Public repository: synthetic interior fitted to a real footprint. Ran live and privately on Nov 14 2026 through the Model API on a scanned suite (8 rooms with real boundaries, 48 walls, 14 doorways, 30 scan positions) with the Showcase SDK view embedded and steered on localhost.",
+    "vexcel": "Aerial: the sides of the building, approach, staging, hydrants, roof; the agent looks at the image through a vision tool. Public repository: real USDA NAIP imagery. Ran live and privately on Nov 14 2026 through the Vexcel API v2 (a 3 to 6 cm ortho, roof, four obliques; the vision tool counted parking stalls on them).",
+    "anthropic": "Claude as the command agent (tool use in a plan, act, re-plan loop); the hands-free demo replays recorded real responses; the live private run used the Claude CLI backend end to end (pre-plan, five situation turns, after-action report, 0 fallbacks); the API-key backend is written and not exercised (no key on the build machine)."
   },
   "hardware": {
     "used": [
@@ -70,7 +70,7 @@
       "Final write-up pass: what ran live on Nov 14, what is stand-in data in the public repository, what did not run on hardware"
     ],
     "left_hardware": [
-      "1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow sandtable-beacon-victim-phones/hardware (vendored here under vendor/beacon/hardware). Works when http://localhost:1885/healthz answers with source 'pucks'.",
+      "1. (Lane L16) Bring up the two DWM3001CDK pucks and the iPhone app with the Beacon module: follow vendor/beacon/hardware/BRINGUP.md (lane L16's guide, vendored; flashing in vendor/beacon/hardware/FLASH.md, the iOS app in vendor/beacon/docs/IOS_BUILD.md). Works when http://localhost:1885/healthz answers with source 'pucks'.",
       "2. Start this board next to it (about 2 min): python -m sandtable.demo --beacon-url http://localhost:1885 (Windows: .venv\\Scripts\\python -m sandtable.demo --beacon-url http://localhost:1885). Works when the board at http://localhost:1810/ shows the Beacon badge as connected and not SIM.",
       "3. Tape-measure the two pucks from two walls of the demo room, click 'Place pucks' and click them onto the room plan (fine-tune the metres in the dialog). Works when P1 and P2 show on the plan as 'placed by hand'.",
       "4. Open the occupant app on the two iPhones. Works when each phone appears as two rings crossing at two points; where the twin's walls remove the mirror point it becomes a fix, otherwise the board says it cannot choose.",
@@ -83,7 +83,7 @@
       "ANTHROPIC_API_KEY for live agent decisions with real phones and live sponsor data (recorded turns only cover the fixture-mode simulator scene)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T13:25:19-06:00"
+    "updated": "2026-11-14T13:40:09-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'.",
@@ -133,19 +133,19 @@
   ],
   "tests": {
     "command": "bash run_tests.sh",
-    "passed": 0,
+    "passed": 174,
     "failed": 0,
-    "last_run": ""
+    "last_run": "2026-11-14T13:27:18-0600"
   },
   "limitations": [
     "No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured",
     "Opt-in only: a phone without the app is never ranged or identified; the most a puck could give is a Bluetooth device count, and devices are not people; the app must stay open with the screen on as built",
     "Two pucks often leave two candidates; the twin removes one only when the geometry allows",
-    "All three sponsor layers are fixtures (real public data and NAIP imagery, synthetic interior); the live adapters were never called; the walls that prune a candidate are plausible walls, not surveyed ones",
+    "The public repository runs on stand-in data for all three sponsor layers (real public data and NAIP imagery for a different building, a synthetic interior whose walls are plausible, not surveyed). With the owner's keys and the CoStar data kit the same code ran live and privately on Nov 14 2026 on one real Los Angeles office building (CoStar record, a Matterport scan of one suite, Vexcel imagery); none of that data is published, the scan covers one suite, and its georeference is about 94 m from the record's point (flagged, not corrected)",
     "Expected head counts and life hazards are estimates and inferences from the record",
-    "Agent turns for the Beacon and Scout exercises fall back to a labelled deterministic policy until a real model run is recorded",
+    "Agent turns in the hands-free demo are replays of recorded real model runs (beacon, scout and mayday scripts: every turn replayed, 0 fallbacks, results/replay_check_*_auto_3A2T.json); anything outside the recorded scene runs on a live model when one is configured, otherwise on a labelled deterministic policy that always finishes the exercise",
     "Scout (radar) and Crews (tags) are simulation-only on these boards; the radar simulator was written alongside its detector",
-    "One floor modelled; feeds and the app link have no authentication; not a life-safety product"
+    "One floor modelled; feeds and the app link have no authentication; the board keeps what it received from phones for the incident report (stop-sharing deletion and retention limits exist only in lane L16's module); not a life-safety product"
   ],
   "team": {
     "lead_model": "claude-fable-5-2",
@@ -190,7 +190,7 @@
     },
     {
       "q": "[Radar] Why not?",
-      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 \u00b5s, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
+      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 µs, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
     },
     {
       "q": "[Radar] How do multiple boards fix it?",
@@ -198,7 +198,7 @@
     },
     {
       "q": "[Radar] How many are needed, and what does each added board buy?",
-      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m\u00b2 (two boards) to 0.40 m\u00b2 (three) and 0.15 m\u00b2 (five)."
+      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m² (two boards) to 0.40 m² (three) and 0.15 m² (five)."
     },
     {
       "q": "[Radar] What is the 'map', and what is it not?",
@@ -206,7 +206,7 @@
     },
     {
       "q": "[Radar] Why does this beat cameras and LiDAR in smoke, and where does it not?",
-      "a": "Smoke particles (0.01 to 1 \u00b5m) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
+      "a": "Smoke particles (0.01 to 1 µm) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
     },
     {
       "q": "[Radar] What is the biggest open risk?",

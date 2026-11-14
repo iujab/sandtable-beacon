@@ -1,0 +1,22 @@
+// J-Link Commander script: flash Qorvo's stock Nearby Interaction (QANI) hex onto ONE DWM3001CDK (nRF52833).
+// Written from SEGGER's J-Link Commander documentation (https://kb.segger.com/J-Link_Commander); NEVER RUN on a board.
+//
+// Cable: micro-USB data cable into J9 (the bottom port, labelled "J-Link"). Run from the project folder:
+//   macOS / Linux:  JLinkExe -device NRF52833_XXAA -if SWD -speed 4000 -autoconnect 1 -CommanderScript hardware/jlink/flash_qani.jlink
+//   Windows:        & "C:\Program Files\SEGGER\JLink\JLink.exe" -device NRF52833_XXAA -if SWD -speed 4000 -autoconnect 1 -CommanderScript hardware\jlink\flash_qani.jlink
+// (Older J-Link versions: -CommandFile instead of -CommanderScript.)
+//
+// THE ONE THING TO EDIT: the path on the loadfile line. Either copy Qorvo's hex to data/qani.hex in the project
+// folder (data/ is git-ignored: Qorvo's licence was not found, never commit the hex), or put the full path of the
+// hex (kept outside the repository folder) on the loadfile line, with no spaces in the path.
+//
+// erase      "Erases all flash sectors" (SEGGER), i.e. a full chip erase, including the flash storage pages
+//            that an "fds_init() returned 0x860A" / NRF_ERROR_STORAGE_FULL boot error complains about
+// loadfile   programs the hex
+// r, g       reset the CPU and let it run
+// exit       closes the connection and J-Link Commander
+erase
+loadfile data/qani.hex
+r
+g
+exit

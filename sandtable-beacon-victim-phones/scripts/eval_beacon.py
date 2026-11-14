@@ -11,6 +11,10 @@
 Everything here is SIMULATED with the stated noise model (beacon/sim.py docstring + models.DEFAULT_NOISE, both copied
 into the JSON). Nothing is a measurement.
 
+Observations are live-like everywhere (a UWB observation carries a distance only, as an iPhone gives), except the arm
+`los-flag` in eval_beacon.json, a labelled STUDY of what a line-of-sight flag would add (an iPhone does not report one).
+Boards: "pairs" (each puck position carries one board per phone) except the two-phone "turns" arm in eval_two_puck.json.
+
 Pipeline per trial (what the server does): a `beacon.sim.World` with pucks thrown into the fire room and one opt-in
 phone; the world is stepped at 10 Hz and every observation of the phone goes into a `beacon.track.PhoneTrack`, whose
 `estimate` (locator + hysteresis) is called 4 times a second during the last second of OBS_S (3 s) of observations
@@ -530,7 +534,8 @@ def summarize_layouts(recs: list[dict]) -> dict:
     for (lay, size, noise, bearing, twin), rs in groups.items():
         a0 = rs[0]["arm"]
         row = {"layout": lay, "name": a0["name"], "size_m": size, "noise": noise, "white_m": a0["white_m"], "bias_m": a0["bias_m"],
-               "bearing": bearing, "twin": twin, **aggregate(rs)}
+               "bearing": bearing, "twin": twin, "observations": "live-like: UWB distance only", "reports_los": False,
+               "board_sharing": "pairs", **aggregate(rs)}
         be = [r.get("bearing_err_deg") for r in rs]
         if any(v is not None for v in be):
             row["bearing_err_median_deg"] = _q(be, 0.5)
@@ -798,7 +803,8 @@ def summarize_two_puck(recs: list[dict], info: dict, neigh: list[str]) -> dict:
             sm = _tp_summary(rs)
             sm["wrong_fix_rate_of_trials"] = sm["all_fixes"]["wrong_fix_rate_of_trials"]
             sm["wrong_fix_rate_of_fixes"] = sm["all_fixes"]["wrong_fix_rate_of_fixes"]
-            res["layouts"][lay] = {**sm, "pucks": info[lay]}
+            res["layouts"][lay] = {**sm, "pucks": info[lay], "observations": "live-like: UWB distance only", "reports_los": False,
+                                   "board_sharing": "pairs"}
     for lay in TP_LAYOUTS:
         rs = [r for r in recs if r["layout"] == lay and r["false_statement"]]
         if rs:
@@ -1098,8 +1104,8 @@ def main(argv=None) -> int:
 INK, INK2, GRID, SURF = "#0b0b0b", "#52514e", "#e6e5e0", "#fcfcfb"
 MCOL = {"ble-rssi": "#eb6834", "uwb-twr": "#2a78d6", "uwb-twr+bearing": "#1baf7a"}
 GCOL = {"fix": "#2a78d6", "candidates": "#1baf7a", "ring": "#eda100", "zone": "#e87ba4", "none": "#d4d3cf"}
-NOTE = ("SIMULATED: beacon.sim world, noise model = models.DEFAULT_NOISE + beacon/sim.py (stated in the results JSON); "
-        "pipeline: PhoneTrack -> locate.estimate after 3 s of observations.")
+NOTE = ("SIMULATED: beacon.sim world, live-like (UWB distance only, as from an iPhone), noise model = models.DEFAULT_NOISE + "
+        "beacon/sim.py (stated in the results JSON); pipeline: PhoneTrack -> locate.estimate after 3 s of observations.")
 
 
 def _plt():

@@ -31,8 +31,9 @@ log = logging.getLogger("beacon.story")
 
 # Measured, not estimated: wall-clock length of the suite-310 walk-through, from the start request to "done", on the
 # simulator with the replay/fallback agent (steps wait for conditions, so a run varies by a few seconds).
-EXPECTED_S = 0.0
-EXPECTED_BASIS = "not measured yet"
+EXPECTED_S = 32.5
+EXPECTED_BASIS = ("measured: two runs of suite-310 on the simulator, 2 pucks, reflex-fallback agent, start request to 'done': "
+                  "32.5 s and 32.4 s (Sat Nov 14, after the round-2 fixes)")
 
 
 class Story:

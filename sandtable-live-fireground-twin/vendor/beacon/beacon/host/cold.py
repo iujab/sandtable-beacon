@@ -27,12 +27,15 @@ Bands: `beacon.models.cold_band` when it can be imported (it needs numpy), else 
 Research (docs/research/puck_hardware.md section 3): the UNO Q's radio is a Qualcomm WCN3980 (Bluetooth 5.1); a
 Qualcomm project runs a bleak scanner on its Debian side over SSH. Not confirmed: that BlueZ passive scanning works on
 the WCN3980 firmware. If passive mode fails, this module says so and does nothing else (it does not fall back to an
-active scan, which would send scan requests).
+active scan, which would send scan requests). bleak: "Passive scanning is not supported on macOS!"
+(https://bleak.readthedocs.io/en/latest/api/scanner.html), so on a Mac the cold scan stays off. On Linux, bleak's
+passive mode goes through BlueZ, which filters by `or_patterns` (`_bluez_passive_args`; not confirmed).
 """
 from __future__ import annotations
 
 import hashlib
 import os
+import sys
 import threading
 import time
 
@@ -106,6 +109,25 @@ def bleak_available() -> bool:
     return importlib.util.find_spec("bleak") is not None
 
 
+def _bluez_passive_args():
+    """Best effort, NOT CONFIRMED: on BlueZ, bleak's passive mode filters advertisements by `or_patterns`. Match the
+    common Flags values (0x02, 0x06, 0x1a, 0x1e) and Apple's company id (0x004c) so ordinary advertisers pass. The import
+    paths moved between bleak versions; if none works, return None and let bleak decide (it may refuse passive mode,
+    and then the cold scan stays off: it never falls back to an active scan). Contents are matched by BlueZ, never read here."""
+    try:
+        try:
+            from bleak.args.bluez import BlueZScannerArgs, OrPattern          # type: ignore  # newer bleak
+        except ImportError:
+            from bleak.backends.bluezdbus.advertisement_monitor import OrPattern   # type: ignore  # older bleak
+            from bleak.backends.bluezdbus.scanner import BlueZScannerArgs           # type: ignore
+        from bleak.assigned_numbers import AdvertisementDataType                    # type: ignore
+        pats = [OrPattern(0, AdvertisementDataType.FLAGS, bytes([f])) for f in (0x02, 0x06, 0x1A, 0x1E)]
+        pats.append(OrPattern(0, AdvertisementDataType.MANUFACTURER_SPECIFIC_DATA, b"\x4c\x00"))
+        return BlueZScannerArgs(or_patterns=pats)
+    except Exception:                           # noqa: BLE001
+        return None
+
+
 def run_cold_scan(puck: str, emit, stop: threading.Event, window_s: float = 10.0, log=print) -> None:
     """Blocking: scan in windows of `window_s` until `stop` is set; call `emit(obs)` with each `cold` observation.
 
@@ -124,8 +146,12 @@ def run_cold_scan(puck: str, emit, stop: threading.Event, window_s: float = 10.0
         def _on_adv(device, adv) -> None:       # the address goes into the hash and is dropped
             agg.add(device.address, getattr(adv, "rssi", None))
 
+        kwargs = {"detection_callback": _on_adv, "scanning_mode": "passive"}
+        bluez = _bluez_passive_args() if sys.platform.startswith("linux") else None
+        if bluez is not None:
+            kwargs["bluez"] = bluez
         try:
-            scanner = BleakScanner(detection_callback=_on_adv, scanning_mode="passive")
+            scanner = BleakScanner(**kwargs)
         except Exception as e:                  # noqa: BLE001
             log(f"cold scan: passive scanning is not available here ({type(e).__name__}); cold scan disabled")
             return

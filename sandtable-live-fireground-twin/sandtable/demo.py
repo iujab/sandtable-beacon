@@ -182,6 +182,35 @@ def main(argv=None) -> int:
 _live_room: str | None = None
 
 
+def _twin_key(twin: dict) -> dict:
+    return {"floor": twin.get("exercise_floor"), "rooms": sorted(str(r.get("id")) for r in twin.get("rooms") or [])}
+
+
+def _same_building(url: str):
+    """True when the Beacon server at `url` runs on this board's twin (same floor and room ids), False when it does not, None when
+    it cannot tell (no /api/bundle). Compares ids only: nothing is printed."""
+    try:
+        theirs = (_get(url.rstrip("/") + "/api/bundle", timeout=4.0) or {}).get("twin") or {}
+    except Exception:
+        return None
+    if not theirs.get("rooms"):
+        return None
+    try:
+        sys.path.insert(0, str(ROOT))
+        from sandtable.adapters import get_provider
+        ours = get_provider().twin_raw()
+    except Exception:
+        return None
+    return _twin_key(theirs) == _twin_key(ours)
+
+
+def _free_port() -> int:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 def _modes() -> dict:
     """Per-layer data modes as the server will see them: the command line, then .env and the bench drop zone (sandtable.config
     loads those without overriding what is set). Imported only after UWBKIT_URL is known, since config reads it at import."""
@@ -194,12 +223,11 @@ def _live_mode() -> bool:
     return any(m == "live" for m in _modes().values())
 
 
-def _live_beacon_bundle(vendored: Path):
-    """The vendored Beacon module reads its twin and site from fixed paths (its fixtures/building/). In live mode it must prune and
-    join against the live twin and record, so a runnable copy is assembled under data/live/beacon_bundle/ (private, git-ignored):
-    its code and web pages, plus fixtures/building/{twin,site}.json written from the live provider. Nothing here is committed."""
+def _live_beacon_bundle(vendored: Path | None = None):
+    """In live mode the Beacon module must prune and join against the live twin and record. It reads them from an external bundle
+    (BEACON_BUNDLE_DIR, honoured since lane L16's commit 26d0428): twin.json and site.json written from the live provider under
+    data/live/beacon_bundle/ (private, git-ignored; no code is copied). Returns that directory, or None."""
     global _live_room
-    import shutil
     try:
         sys.path.insert(0, str(ROOT))
         from sandtable import config
@@ -210,26 +238,28 @@ def _live_beacon_bundle(vendored: Path):
         twin_raw, site = provider.twin_raw(), provider.site()
         live_dir = getattr(config, "LIVE_DIR", config.DATA_DIR / "live")
         bundle = live_dir / "beacon_bundle"
-        tmp = live_dir / "beacon_bundle.tmp"
-        if tmp.exists():
-            shutil.rmtree(tmp)
-        for part in ("beacon", "web"):
-            if (vendored / part).is_dir():
-                shutil.copytree(vendored / part, tmp / part, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        if (vendored / "fixtures" / "beacon").is_dir():
-            shutil.copytree(vendored / "fixtures" / "beacon", tmp / "fixtures" / "beacon")
-        (tmp / "fixtures" / "building").mkdir(parents=True, exist_ok=True)
-        (tmp / "fixtures" / "building" / "twin.json").write_text(json.dumps(twin_raw), encoding="utf-8")
-        (tmp / "fixtures" / "building" / "site.json").write_text(json.dumps(site), encoding="utf-8")
-        if bundle.exists():
+        if bundle.exists() and (bundle / "beacon").is_dir():           # an older layout held a copy of the code: start clean
+            import shutil
             shutil.rmtree(bundle)
-        tmp.rename(bundle)
+        bundle.mkdir(parents=True, exist_ok=True)
+        (bundle / "twin.json").write_text(json.dumps(twin_raw), encoding="utf-8")
+        (bundle / "site.json").write_text(json.dumps(site), encoding="utf-8")
         _live_room = fire_room(Twin(twin_raw), provider)
-        print("[demo] live mode: the Beacon module runs on the live twin and record (a private copy under data/live/beacon_bundle/)", flush=True)
+        print("[demo] live mode: the Beacon module runs on the live twin and record (private bundle under data/live/beacon_bundle/)", flush=True)
         return bundle
     except Exception as exc:                                           # never print data: the type of the failure only
         print(f"[demo] live mode: Beacon bundle failed ({type(exc).__name__})", flush=True)
         return None
+
+
+def beacon_live_env(bundle: Path) -> dict:
+    """The environment that points the vendored Beacon module at the live bundle and keeps everything it writes private."""
+    modes = _modes()
+    out = {"BEACON_BUNDLE_DIR": str(bundle), "BEACON_DATA_DIR": str(bundle.parent / "beacon"), "BEACON_SCENARIO": "auto",
+           "COSTAR_MODE": modes["costar"], "MATTERPORT_MODE": modes["matterport"]}
+    if _live_room:
+        out["BEACON_ROOM"] = _live_room
+    return out
 
 
 def _start_beacon(args):
@@ -237,16 +267,30 @@ def _start_beacon(args):
     Returns the subprocess this launcher owns (or None). Any failure leaves the board on the labelled sample."""
     if args.beacon_url:
         os.environ["BEACON_URL"] = args.beacon_url.rstrip("/")
-        print(f"[demo] Beacon module: using {os.environ['BEACON_URL']}", flush=True)
+        same = _same_building(os.environ["BEACON_URL"])
+        if same is False:
+            print(f"[demo] WARNING: the Beacon server at {os.environ['BEACON_URL']} is on ANOTHER building (its twin's floor and rooms differ "
+                  "from this board's): its phones will not fit this twin. Using it only because --beacon-url asks for it.", flush=True)
+        print(f"[demo] Beacon module: using {os.environ['BEACON_URL']}" + (" (same building checked)" if same else ""), flush=True)
         return None
     url = f"http://127.0.0.1:{args.beacon_port}"
     os.environ["BEACON_URL"] = url
     try:
         h = _get(url + "/healthz")
-        print(f"[demo] Beacon module already answering on {url} (source {h.get('source')}): using it", flush=True)
-        return None
+        answering = True
     except Exception:
-        pass
+        answering = False
+    if answering:
+        same = _same_building(url)
+        if same:
+            print(f"[demo] Beacon module already answering on {url} (source {h.get('source')}), on this building: using it", flush=True)
+            return None
+        port = _free_port()
+        print(f"[demo] a Beacon server answers on {url} but " + ("it is on another building (its twin's floor and rooms differ from this board's)"
+              if same is False else "it does not say which building it is on") + f": not adopting it; starting this board's own copy on port {port}", flush=True)
+        args.beacon_port = port
+        url = f"http://127.0.0.1:{port}"
+        os.environ["BEACON_URL"] = url
     vendored = ROOT / "vendor" / "beacon"
     if not (vendored / "beacon" / "server.py").is_file():
         print("[demo] Beacon module not vendored (python scripts/vendor_beacon.py): the board relays the labelled SAMPLE", flush=True)
@@ -255,14 +299,11 @@ def _start_beacon(args):
     data_root = Path(os.environ.get("SANDTABLE_DATA_DIR") or (ROOT / "data"))
     env["BEACON_DATA_DIR"] = str(data_root / "beacon")
     if _live_mode():
-        bundle = _live_beacon_bundle(vendored)
+        bundle = _live_beacon_bundle()
         if bundle is None:
-            print("[demo] live mode: could not assemble the Beacon module on the live twin: the board relays the labelled SAMPLE", flush=True)
+            print("[demo] live mode: could not write the live bundle for the Beacon module: the board relays the labelled SAMPLE", flush=True)
             return None
-        vendored = bundle
-        env["BEACON_DATA_DIR"] = str(bundle.parent / "beacon")
-        if _live_room:
-            env["BEACON_ROOM"] = _live_room
+        env.update(beacon_live_env(bundle))
     env["PYTHONPATH"] = str(vendored) + os.pathsep + env.get("PYTHONPATH", "")
     for k in ("PORT", "HOST"):
         env.pop(k, None)

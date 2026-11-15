@@ -25,20 +25,3 @@ bash run_demo.sh --storyboard        # open http://127.0.0.1:1810
 ```
 
 Windows, the real building's data, and the real boards and phones: **[RUNBOOK.md](RUNBOOK.md)**, step by step.
-
-## What is in this repository
-
-| Folder | What it is |
-|---|---|
-| `sandtable-live-fireground-twin/` | The command and reporting board: the building from its three data layers, the AI command agent, the report; also two secondary simulated modes (tagged crews, thrown radar pucks) |
-| `sandtable-beacon-victim-phones/` | The beacon: the iPhone app, the server and locator that turn puck-to-phone distances into positions, a simulator, the board-to-board ranging firmware, and the hardware guides |
-| `RUNBOOK.md` | How to run everything, from the laptop demo to the real boards |
-| `TASKS.md` | What is done, what is left, and the owner's hardware checklist |
-
-## What is real today
-
-- **Runs end to end on a simulator**, with the AI command agent replaying recorded real model turns. Every screen labels what is simulated (SIM), stand-in (STAND-IN), recorded (REPLAY) or live.
-- **Ran privately on live sponsor data** (CoStar record, Matterport scan, Vexcel imagery) for one real building. None of that data is in this repository; the repository runs on labelled stand-ins.
-- **On real hardware so far:** two DWM3001CDK boards ranged each other with our board-to-board firmware (about 1.57 m apart: 4.9 ranges a second, every poll of the last 50 answered, spread ±0.04 m; repeatability only, as no tape-measured reference was taken: `sandtable-beacon-victim-phones/results/twr_measured_2026-11-15.json`); with Qorvo's phone firmware, the owner's iPhone connected to each board and showed a distance in Qorvo's app (reported by the owner, 2026-11-15).
-- **Not yet:** our iPhone app has not been compiled and run; no phone position from real boards has been measured, so every phone-position accuracy figure is simulated.
-- Not a certified life-safety system.

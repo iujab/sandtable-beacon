@@ -23,8 +23,8 @@ class HubLink:
         self.hello: dict | None = None
         self.connected = False
         self.last_msg_t = 0.0
-        self._pending: dict[str, tuple[float, float]] = {}
-        self._busy: set[str] = set()
+        self._pending: dict[str, tuple[float, float]] = {}       # the newest target per tag, not yet sent
+        self._senders: dict[str, asyncio.Task] = {}               # per tag: the task sending its targets, while it runs
         self._loop: asyncio.AbstractEventLoop | None = None
 
     async def run(self) -> None:
@@ -57,21 +57,21 @@ class HubLink:
 
     # --- simulator helpers (refused by the kit when the source is real boards) -------------
     def teleport(self, tag: str, x: float, y: float) -> None:
-        """Non-blocking: keeps only the newest target per tag."""
+        """Non-blocking, called on the event loop: keeps only the newest target per tag, and the newest target is always sent.
+        One sender per tag posts the targets one after the other (the HTTP call runs in a worker thread); all the bookkeeping
+        stays on the loop, so a target requested while one is in flight, or after one failed, is never dropped."""
         self._pending[tag] = (x, y)
-        if tag in self._busy or not self._loop:
+        if tag in self._senders or not self._loop:
             return
-        self._busy.add(tag)
-        self._loop.run_in_executor(None, self._drain, tag)
+        self._senders[tag] = self._loop.create_task(self._send(tag))
 
-    def _drain(self, tag: str) -> None:
+    async def _send(self, tag: str) -> None:
         try:
             while tag in self._pending:
                 x, y = self._pending.pop(tag)
                 try:
-                    self.kit.teleport(tag, x, y)
-                except Exception as exc:
+                    await asyncio.to_thread(self.kit.teleport, tag, x, y)
+                except Exception as exc:                  # the hub refused or is away: the next target is still tried
                     log.debug("teleport failed: %s", exc)
-                    break
         finally:
-            self._busy.discard(tag)
+            self._senders.pop(tag, None)

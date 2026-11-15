@@ -212,7 +212,7 @@ function header(r) {
   const ph = PHASES[inc.phase] || [words(inc.phase) || "Not recorded", "active"];
   const floorLabel = inc.floor_label || r.accountability?.floor_label || (bundle?.twin?.floors || []).find((f) => f.id === (inc.floor || r.accountability?.floor))?.label;
   const stories = b.stories || bundle?.site?.property?.stories;
-  const sub = [a.rest, floorLabel ? `Floor ${floorLabel}${stories ? ` of ${stories}` : ""}` : null, b.property_type || bundle?.site?.property?.property_type].filter(Boolean).join("  ·  ");
+  const sub = [a.rest, floorLabel ? `Floor ${floorLabel}${stories ? ` of ${stories}` : ""}` : null, b.property_type || bundle?.site?.property?.property_type].filter(Boolean).join(", ");
   const sb = inc.storyboard || {};
   const mode = inc.mode ? words(inc.mode) + (inc.script ? `, ${inc.script} script` : "") : sb.script ? `Exercise, ${sb.script} script${sb.mode === "auto" ? " (hands-free)" : ""}` : bundle?.config?.exercise ? "Exercise" : "Not recorded";
   const started = wallTime(inc.started_t), gen = wallTime(r.generated_t);
@@ -479,7 +479,7 @@ function plan(r) {
       [K.uns, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" fill="var(--p-suite)" stroke="var(--p-wall)" stroke-width=".06"/><rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-uns"/>`), "Suite not searched (no puck in range)"],
       [K.outside, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-outside" stroke="var(--p-wall)" stroke-width=".06"/>`), "Outside the building"],
       [K.focus, sw(`<rect x="-1.2" y="-.7" width="2.4" height="1.4" class="pl-focus"/>`), "Frame of the close-up"],
-      [K.side, sw(`<circle cx="0" cy="0" r=".6" fill="#ffdd00"/><text x="0" y=".05" font-size=".8" text-anchor="middle" dominant-baseline="central" font-weight="700" fill="#111">A</text>`), "Building side (A = address side, then clockwise)"],
+      [K.side, sw(`<circle cx="0" cy="0" r=".6" fill="var(--p-ink)"/><text x="0" y=".05" font-size=".8" text-anchor="middle" dominant-baseline="central" font-weight="700" fill="var(--p-halo)">A</text>`), "Building side (A = address side, then clockwise)"],
     ].filter((x) => x[0]).map(([, s, t]) => `<li>${s}<span>${t}</span></li>`).join("");
     const drawnList = M.drawn.length ? `<ul class="who">${M.drawn.map((d) => `<li><span class="cs" style="color:var(--person)">${esc(d.id)}</span><span>${esc(d.text)}${d.sub ? `<small>${esc(d.sub)}</small>` : ""}</span></li>`).join("")}</ul>` : NONE("No person has a position to draw.");
     const nd = M.notDrawn.length ? `<p class="notdrawn">Not drawn: ${M.notDrawn.map((d) => `${esc(d.id)} (${esc(d.why)})`).join("; ")}.</p>` : "";
@@ -644,7 +644,7 @@ function planModel(r, tw, floor) {
 function personMarks(M, e, o, pl, z, withLabels) {
   const { P, pts } = M, { p, g, rep } = e, K = M.present, L = [];
   const n = num(rep.people), st = stateOf(p, M.r)[0].toLowerCase();
-  const head = `${p.id}${n !== null ? ` · ${nPeople(n)}` : ""}`;
+  const head = `${p.id}${n !== null ? `, ${nPeople(n)}` : ""}`;
   const X = (a, s) => `<path d="M${f2(a[0] - s)} ${f2(a[1] - s)} L${f2(a[0] + s)} ${f2(a[1] + s)} M${f2(a[0] - s)} ${f2(a[1] + s)} L${f2(a[0] + s)} ${f2(a[1] - s)}" class="pl-x" style="stroke-width:${f2(s * 0.34)}px"/>`;
   const ruledOut = (from) => {
     for (const q of arr(g.pruned)) {
@@ -661,7 +661,7 @@ function personMarks(M, e, o, pl, z, withLabels) {
     ruledOut(a);
     o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f2(s)}" class="pl-pers-ring" style="stroke-width:${f2(z.lw * 1.2)}px;stroke-dasharray:${f2(z.lw * 2.5)} ${f2(z.lw * 1.5)}"/><circle cx="${a[0]}" cy="${a[1]}" r="${f2(z.dot)}" class="pl-pers"/>`);
     pl.addPt(a[0], a[1], s); K.fix = true;
-    if (withLabels) L.push({ at: a, rr: s, lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `fix${num(g.sigma_m) !== null ? ` ±${(+g.sigma_m).toFixed(1)} m` : ""} · ${st}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+    if (withLabels) L.push({ at: a, rr: s, lines: [{ t: head, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `fix${num(g.sigma_m) !== null ? ` ±${(+g.sigma_m).toFixed(1)} m` : ""}, ${st}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
   } else if (g.kind === "candidates" && arr(g.candidates).length) {
     const cs = arr(g.candidates).filter((q) => num(q?.x) !== null);
     ruledOut(null);
@@ -670,7 +670,7 @@ function personMarks(M, e, o, pl, z, withLabels) {
       const a = P([q.x, q.y]), s = Math.max(z.dot * 1.4, num(q.sigma_m) ?? 0.4);
       o.push(`<circle cx="${a[0]}" cy="${a[1]}" r="${f2(s)}" class="pl-cand" style="stroke-width:${f2(z.lw * 1.4)}px"/><circle cx="${a[0]}" cy="${a[1]}" r="${f2(z.dot * 0.45)}" class="pl-pers"/>`);
       pl.addPt(a[0], a[1], s);
-      if (withLabels) L.push({ at: a, rr: s, lines: [{ t: i === 0 ? head : p.id, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `${num(q.weight) !== null ? `${Math.round(q.weight * 100)} %` : "one of two"}${i === 0 ? ` · ${st}` : ""}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
+      if (withLabels) L.push({ at: a, rr: s, lines: [{ t: i === 0 ? head : p.id, size: z.lab, fam: "cond", weight: 700, cls: "pl-pt" }, { t: `${num(q.weight) !== null ? `${Math.round(q.weight * 100)} %` : "one of two"}${i === 0 ? `, ${st}` : ""}`, size: z.sub, fam: "sans", weight: 500, cls: "pl-ps" }] });
     });
     K.cand = true;
   } else if (g.kind === "ring" && num(g.r_m) !== null) {
@@ -1014,7 +1014,7 @@ function foot(r) {
 function pageBoxes(r) {
   const css = (s) => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
   // live sponsor data: every printed page says so, beside the banner live_marker.js puts on the first page
-  const marks = [anyLive() ? "LIVE SPONSOR DATA, PRIVATE" : null, isSample(r) ? "SAMPLE" : null, isSim(r) ? "SIMULATED" : null].filter(Boolean).join("  ·  ") || "LIVE DATA";
+  const marks = [anyLive() ? "LIVE SPONSOR DATA, PRIVATE" : null, isSample(r) ? "SAMPLE" : null, isSim(r) ? "SIMULATED" : null].filter(Boolean).join(", ") || "LIVE DATA";
   const a = addrLine(r);
   $("#page-boxes").textContent = `@page { size: letter; margin: 15mm 13mm 16mm 13mm;
     @top-left { content: ${css("Sandtable Beacon incident report")}; font: 600 8pt Barlow, Arial, sans-serif; color: #333; }

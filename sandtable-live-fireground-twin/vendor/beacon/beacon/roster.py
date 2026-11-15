@@ -24,7 +24,6 @@ Pure functions over plain dicts; no I/O.
 from __future__ import annotations
 
 import math
-from typing import Any
 
 SQM_TO_SQFT = 10.7639
 
@@ -208,14 +207,20 @@ def _hazard_weight(text: str | None) -> float:
 
 
 def _walk_m(twin, src_room: str | None, dst_room: str) -> float:
-    """Walking distance in the twin between two rooms (for ranking where the next puck goes); large when unknown."""
+    """Walking distance in the twin between two rooms (for ranking where the next puck goes); large when unknown.
+    A route depends only on the twin, which does not change once loaded, so each pair is computed once per twin (the
+    session rebuilds the accountability table on every step while phones move; the routes were most of that cost)."""
     if not src_room:
         return 0.0
-    try:
-        r = twin.route(src_room, dst_room)
-        return float(r["length_m"]) if r.get("ok") else 999.0
-    except Exception:
-        return 999.0
+    cache = twin.__dict__.setdefault("_roster_walk_m", {})
+    key = (src_room, dst_room)
+    if key not in cache:
+        try:
+            r = twin.route(src_room, dst_room)
+            cache[key] = float(r["length_m"]) if r.get("ok") else 999.0
+        except Exception:
+            cache[key] = 999.0
+    return cache[key]
 
 
 def _door_of(twin, room_id: str, rooms: list[str] | None = None) -> list[float] | None:

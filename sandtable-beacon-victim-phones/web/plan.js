@@ -5,6 +5,7 @@
 import { isNum, num, pct, statusOf } from "./common.js";
 
 const NS = "http://www.w3.org/2000/svg";
+const PLACED_BY = { hand: "placed by hand", baseline: "placed from the measured spacing", layout: "recommended layout (simulated)", sim: "simulated" };
 const el = (name, attrs = {}, text) => {
   const e = document.createElementNS(NS, name);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
@@ -70,7 +71,8 @@ export class Plan {
     this.fx0 = Math.min(...xs); this.fy0 = Math.min(...ys); this.fx = Math.max(...xs); this.fy = Math.max(...ys);
     this.svg.replaceChildren();
     this.g = {};
-    for (const k of ["defs", "rooms", "zones", "layout", "walls", "labels", "focus", "orient", "presence", "next", "phones", "pucks"]) { this.g[k] = el("g", { class: `g-${k}` }); this.svg.appendChild(this.g[k]); }
+    for (const k of ["defs", "rooms", "zones", "layout", "walls", "labels", "focus", "orient", "presence", "next", "phones", "baselines", "pucks"]) { this.g[k] = el("g", { class: `g-${k}` }); this.svg.appendChild(this.g[k]); }
+    this.baseEls = new Map();
     const pat = el("pattern", { id: "hatch", patternUnits: "userSpaceOnUse", width: 0.5, height: 0.5, patternTransform: "rotate(45)" });
     pat.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 0.5, stroke: "#ffc247", "stroke-width": 0.06, "stroke-opacity": 0.35 }));
     const defs = el("defs"); defs.appendChild(pat); this.g.defs.appendChild(defs);
@@ -228,6 +230,7 @@ export class Plan {
     if (room !== this.focusRoom) { this.focusRoom = room; this._focusKey = null; }
     this._applyFocus();
     this._updatePucks(beacons.pucks || []);
+    this._updateBaselines(beacons.baselines || [], beacons.warnings || []);
     this._updatePresence(beacons.presence || []);
     this._updateZones(beacons.phones || []);
     this._updatePhones(beacons.phones || []);
@@ -313,10 +316,47 @@ export class Plan {
       }
       e.data = p;
       if (!(this.drag && this.drag.id === p.id)) { e.x = p.x; e.y = p.y; }
+      e.g.classList.toggle("by-baseline", p.placed_by === "baseline");
       e.title.textContent = `Puck ${p.id}${p.accessory ? ` · ${p.accessory}` : ""}${p.host ? ` · host: ${p.host}` : ""}${p.room ? ` · in ${this.rooms[p.room]?.label || p.room}` : ""}` +
+        `${PLACED_BY[p.placed_by] ? ` · ${PLACED_BY[p.placed_by]}` : ""}` +
         `${isNum(p.sigma_m) ? ` · placed to ±${num(p.sigma_m, 2)} m` : ""}${(p.radios || []).length ? ` · radios: ${p.radios.join(", ")}` : ""}${this.opts.canDragPuck?.() ? " · drag to correct" : ""}`;
     }
     for (const [id, e] of this.pucks) if (!seen.has(id)) { e.g.remove(); this.pucks.delete(id); }
+  }
+  // measured puck-to-puck spacings (BEACON_FEED A12): a thin line between the pair with the measured distance; amber with
+  // both numbers when the pucks' spacing on the plan disagrees with the measurement
+  _updateBaselines(list, warnings) {
+    const seen = new Set();
+    for (const b of list) {
+      const key = b.pair.join("-"); seen.add(key);
+      let e = this.baseEls.get(key);
+      if (!e) {
+        e = { g: el("g", { class: "baseline" }), line: el("line"), lab: el("text"), title: el("title") };
+        e.g.append(e.line, e.lab, e.title); this.g.baselines.appendChild(e.g); this.baseEls.set(key, e);
+      }
+      const w = warnings.find((q) => q.kind === "baseline-mismatch" && q.pair.join("-") === key);
+      e.b = b; e.g.classList.toggle("warn", !!w);
+      const src = b.source === "twr" ? "UWB board to board" : "entered by hand";
+      e.lab.textContent = w ? `measured ${num(b.d_m, 2)} m ≠ ${num(w.placed_m, 2)} m placed` : `${num(b.d_m, 2)} m measured`;
+      e.title.textContent = `${b.pair[0]}–${b.pair[1]}: ${num(b.d_m, 3)} m${isNum(b.sigma_m) ? ` ± ${num(b.sigma_m, 3)} m` : ""} (${src}` +
+        `${isNum(b.samples) ? `, ${b.samples} ranges` : ""})${w ? `. ${w.text}` : ""}`;
+    }
+    for (const [k, e] of this.baseEls) if (!seen.has(k)) { e.g.remove(); this.baseEls.delete(k); }
+  }
+  _drawBaselines(u) {
+    for (const e of this.baseEls.values()) {
+      const a = this.pucks.get(e.b.pair[0]), c = this.pucks.get(e.b.pair[1]);
+      e.g.style.display = a && c ? "" : "none";
+      if (!(a && c)) continue;
+      const A = this.P([a.x, a.y]), C = this.P([c.x, c.y]);
+      e.line.setAttribute("x1", A[0]); e.line.setAttribute("y1", A[1]); e.line.setAttribute("x2", C[0]); e.line.setAttribute("y2", C[1]);
+      // the label sits beside the middle of the line, on the side toward the room's centre (pucks stand at walls)
+      const mx = (A[0] + C[0]) / 2, my = (A[1] + C[1]) / 2, rc = this.focusRoom && this.rooms[this.focusRoom];
+      const cx = rc ? this.P(rc.polygon.reduce((s, q) => [s[0] + q[0] / rc.polygon.length, s[1] + q[1] / rc.polygon.length], [0, 0]))[0] : mx - 1;
+      const left = cx < mx;
+      e.lab.setAttribute("text-anchor", left ? "end" : "start");
+      e.lab.setAttribute("x", mx + (left ? -8 : 8) * u); e.lab.setAttribute("y", my);
+    }
   }
   _dragMove(ev) {
     if (!this.drag) return;
@@ -750,6 +790,7 @@ export class Plan {
       if (age < 1.2 && !reduceMotion()) { const k = age / 1.2; e.drop.setAttribute("cx", P[0]); e.drop.setAttribute("cy", P[1]); e.drop.setAttribute("r", (11 + 40 * ease(k)) * u); e.drop.style.opacity = 1 - k; more = true; }
       else e.drop.style.opacity = 0;
     }
+    this._drawBaselines(u);
     // cold presence badges: inside the room, in the corner farthest from the pucks and the phones' points
     const busy = [...this.pucks.values()].map((e) => [e.x, e.y]);
     for (const ph of this.phones.values()) for (const [k, q] of Object.entries(ph.cur || {})) if (q.op > 0.1 && isNum(q.x)) busy.push([q.x, q.y]);

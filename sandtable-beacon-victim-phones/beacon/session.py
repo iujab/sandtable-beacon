@@ -41,7 +41,9 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Callable
 
+from . import baseline as _bl
 from . import config
+from . import prune as _prune
 from .twin import Twin, _pip
 
 log = logging.getLogger("beacon.session")
@@ -53,6 +55,9 @@ LIVE_STALE_MIN_S = 40.0     # live: a phone is not marked stale before this much
 BEARING_FRESH_S = 3.0
 STATUSES = ("trapped", "injured", "sheltering", "ok", "unknown")
 PUCK_MOVED_M = 0.30      # a puck placed more than this from where it was has moved: ranges buffered for it are forgotten
+PUCK_SIGMA_M = 0.08      # default 1-sigma of a placed puck's position (models.DEFAULT_NOISE["puck"]["position_sigma_m"])
+SEEN_KEEP_S = 120.0      # how long the ingest de-duplication remembers a reading (the iOS app re-sends for up to 25 s)
+SEEN_MAX = 4000          # ... and how many readings it remembers before old ones are evicted
 KINDS = ("cold", "sos", "uwb", "bearing", "report", "bye", "host", "uwb_puck")
 NO_EID_KINDS = ("cold", "host", "uwb_puck")
 HOST_SILENT_S = 20.0        # a puck host silent this long is dropped from its puck (BEACON_FEED A7)
@@ -181,6 +186,13 @@ class _StubTrack:
             self._bearing = dict(obs)
         elif k == "report":
             self.report.update(obs.get("report") or {})
+
+    def forget_puck(self, puck_id: str, now: float | None = None) -> None:
+        """The puck moved or left (same contract as track.PhoneTrack.forget_puck, without the time guard)."""
+        self._uwb.pop(puck_id, None)
+        self._ble.pop(puck_id, None)
+        if self._bearing is not None and self._bearing.get("puck") == puck_id:
+            self._bearing = None
 
     def inputs(self, now: float):
         ranges = []
@@ -397,7 +409,8 @@ class BeaconSession:
         self._locate, self._Track, self._locator_note = _load_locator(locator)
         self._roster = None
         self._roster_note = None
-        self.agent_status: Callable[[], dict | None] | None = None      # set by the server when a command agent exists
+        # set by the server when a command agent exists: called with the Beacons object being built, returns its summary
+        self.agent_status: Callable[[dict], dict | None] | None = None
         if use_roster:
             try:
                 from . import roster
@@ -410,6 +423,7 @@ class BeaconSession:
         self._ctx = None
         self._ctx_floor = None
         self._georef_b = float((self.twin_raw.get("georef") or {}).get("bearing_deg", 90.0))
+        self._reach_m = _mid_reach_m(self.noise)          # cold-count text: fixed by the noise model, computed once
         self._clear()
         self._load_persisted()
         self._latest = self._build(time.time(), [], [])
@@ -426,6 +440,8 @@ class BeaconSession:
         self._next_phone = 1
         self._cold: dict[str, dict] = {}
         self._hosts: dict[str, dict] = {}
+        self._baselines: dict[tuple[str, str], dict] = {}   # unordered puck pair -> latest measured spacing (A12)
+        self._seen_readings: dict[tuple, float] = {}       # ingest de-duplication: (eid, kind, puck) -> latest t
         self.search_room: str | None = None
         self._presence_ids: dict[tuple, str] = {}
         self._acc_key: str | None = None
@@ -440,9 +456,11 @@ class BeaconSession:
         try:
             self.persist_path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.persist_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"pucks": [{k: p.get(k) for k in ("id", "x", "y", "sigma_m", "accessory", "host", "floor")} for p in self.pucks],
+            keys = ("id", "x", "y", "sigma_m", "accessory", "host", "floor", "placed_by")
+            tmp.write_text(json.dumps({"pucks": [{k: p.get(k) for k in keys} for p in self.pucks],
                                        "room": self.room, "floor": self.floor, "accessories": self._accessories,
-                                       "rig": {"scale": self.rig_scale}}, indent=1), encoding="utf-8")
+                                       "rig": {"scale": self.rig_scale}, "baselines": self.baselines()}, indent=1),
+                           encoding="utf-8")
             tmp.replace(self.persist_path)
         except OSError as exc:
             log.warning("could not save the puck table: %s", exc)
@@ -457,6 +475,13 @@ class BeaconSession:
                 self._set_pucks_locked(data["pucks"], data.get("room"), data.get("floor"), False, now=time.time(), quiet=True)
             for acc, pid in (data.get("accessories") or {}).items():
                 self._accessories[str(acc)] = str(pid)
+            for bl in data.get("baselines") or []:
+                try:
+                    b = _bl.make_baseline(bl.get("pair"), bl.get("d_m"), sigma_m=bl.get("sigma_m"), samples=bl.get("samples"),
+                                          source=bl.get("source"), t=bl.get("t") or time.time())
+                    self._baselines[tuple(b["pair"])] = b
+                except (ValueError, AttributeError) as exc:
+                    log.warning("ignored a saved baseline: %s", exc)
             log.info("restored %d pucks from %s", len(self.pucks), self.persist_path.name)
         except Exception as exc:
             log.warning("could not restore the puck table: %s", exc)
@@ -473,15 +498,30 @@ class BeaconSession:
                    **({"simulated": True} if self.simulated else {})})
 
     # ---- pucks
-    def set_pucks(self, pucks: list[dict], room: str | None = None, floor: str | None = None, merge: bool = False) -> dict:
+    def set_pucks(self, pucks: list[dict], room: str | None = None, floor: str | None = None, merge: bool = False,
+                  placed_by: str = "hand") -> dict:
+        """Place pucks. `placed_by` (BEACON_FEED A12: "hand" | "baseline" | "layout" | "sim") is the default for entries
+        that do not carry their own."""
         with self._lock:
-            res = self._set_pucks_locked(pucks, room, floor, merge, now=time.time())
+            res = self._set_pucks_locked(pucks, room, floor, merge, now=time.time(), placed_by=placed_by)
             self._persist()
             return res
 
-    def _set_pucks_locked(self, pucks, room, floor, merge, now, quiet=False) -> dict:
+    def _check_room(self, room: Any) -> None:
+        """ValueError unless `room` is None or a room id of the twin."""
+        if room is not None and (not isinstance(room, str) or room not in self.twin._rooms):
+            raise ValueError(f"unknown room {room!r}")
+
+    def _check_floor(self, floor: Any) -> None:
+        """ValueError unless `floor` is None or a floor id of the twin."""
+        if floor is not None and (not isinstance(floor, str) or floor not in self.twin._floors):
+            raise ValueError(f"unknown floor {floor!r}")
+
+    def _set_pucks_locked(self, pucks, room, floor, merge, now, quiet=False, placed_by: str = "hand") -> dict:
         if not isinstance(pucks, list):
             raise ValueError("pucks must be a list")
+        self._check_room(room)
+        self._check_floor(floor)
         clean = []
         for p in pucks:
             if not isinstance(p, dict):
@@ -491,31 +531,42 @@ class BeaconSession:
                 raise ValueError(f"bad puck id {pid!r}")
             x = _finite(p.get("x"), f"{pid}.x", -1000, 1000)
             y = _finite(p.get("y"), f"{pid}.y", -1000, 1000)
-            sig = _finite(p.get("sigma_m", 0.08) if p.get("sigma_m") is not None else 0.08, f"{pid}.sigma_m", 0, 50)
+            sig = _finite(PUCK_SIGMA_M if p.get("sigma_m") is None else p["sigma_m"], f"{pid}.sigma_m", 0, 50)
             acc = p.get("accessory")
             if acc is not None and (not isinstance(acc, str) or not acc or len(acc) > 80):
                 raise ValueError(f"bad accessory name for {pid}")
             host = p.get("host")
             if host is not None and host not in ("uno-q", "battery", "android", "laptop"):
                 host = str(host)[:16]
+            self._check_floor(p.get("floor"))
+            how = placed_by if p.get("placed_by") is None else p["placed_by"]
+            if how not in _bl.PLACED_BY:
+                raise ValueError(f"{pid}.placed_by must be one of {', '.join(_bl.PLACED_BY)}, got {how!r}")
             clean.append({"id": pid, "x": x, "y": y, "sigma_m": sig, "accessory": acc, "host": host, "floor": p.get("floor"),
-                          "radios": p.get("radios") if isinstance(p.get("radios"), list) else None})
-        if room is not None:
-            self.twin.room(room)
-        if floor is not None:
-            self.twin.floor(floor)
+                          "radios": p.get("radios") if isinstance(p.get("radios"), list) else None, "placed_by": how})
         previous = {p["id"]: p for p in self.pucks}
         table = {p["id"]: p for p in self.pucks} if merge else {}
+        # A board's Bluetooth name is its identity, not part of where it is drawn: an entry without a name keeps the name
+        # its puck id already had, so re-placing pucks by position (the command board's placement guide) does not
+        # unmap them from the phones' ranges. A name claimed in this request moves to the claiming puck.
+        claimed = {p["accessory"]: p["id"] for p in clean if p["accessory"]}
+        for q in table.values():
+            if q["id"] not in {c["id"] for c in clean} and q.get("accessory") in claimed:
+                table[q["id"]] = {**q, "accessory": None}
         for p in clean:
             old = table.get(p["id"]) or {}
+            kept = old.get("accessory") or (previous.get(p["id"]) or {}).get("accessory")
+            if kept and claimed.get(kept, p["id"]) != p["id"]:
+                kept = None
             fl = p["floor"] or floor or old.get("floor") or self.floor or (self.twin.room(room)["floor"] if room else self.twin.exercise_floor)
             loc = self.twin.locate(p["x"], p["y"], fl)
             lat, lon = self.twin.to_geo(p["x"], p["y"])
-            acc = p["accessory"] if p["accessory"] is not None else old.get("accessory")
+            acc = p["accessory"] if p["accessory"] is not None else kept
             table[p["id"]] = {"id": p["id"], "x": round(p["x"], 3), "y": round(p["y"], 3), "floor": fl, "sigma_m": round(p["sigma_m"], 3),
                               "room": loc["room"], "radios": p["radios"] or old.get("radios") or ["ble", "uwb"],
                               "geo": {"lat": round(lat, 7), "lon": round(lon, 7)}, "accessory": acc,
-                              "host": p["host"] if p["host"] is not None else old.get("host"), "simulated": self.simulated}
+                              "host": p["host"] if p["host"] is not None else old.get("host"), "placed_by": p["placed_by"],
+                              "simulated": self.simulated}
             if acc:
                 for a, i in list(self._accessories.items()):
                     if i == p["id"] and a != acc:
@@ -563,6 +614,66 @@ class BeaconSession:
             if changed:                     # buffered ranges were scaled with the old value
                 self._forget_pucks([p["id"] for p in self.pucks], time.time())
             self._persist()
+
+    def range_scale(self) -> float:
+        """Building metres per measured metre: the exercise scale in live mode (BEACON_FEED A4), else 1."""
+        return self.rig_scale if self.source == "live" else 1.0
+
+    # ---- puck-to-puck baselines (BEACON_FEED A12)
+    def baselines(self) -> list[dict]:
+        """The latest measured spacing per unordered puck pair, sorted by pair."""
+        return [dict(self._baselines[k]) for k in sorted(self._baselines)]
+
+    def set_baseline(self, pair: Any, d_m: Any, *, sigma_m: Any = None, samples: Any = None, source: Any = "manual",
+                     now: float | None = None) -> dict:
+        """Record the measured spacing of two pucks (the latest per pair wins). ValueError when invalid."""
+        now = time.time() if now is None else now
+        b = _bl.make_baseline(pair, d_m, sigma_m=sigma_m, samples=samples, source=source, t=now)
+        with self._lock:
+            self._baselines[tuple(b["pair"])] = b
+            self._persist()
+        sig = f" ± {b['sigma_m']:.2f} m" if b["sigma_m"] is not None else ""
+        n = f", {b['samples']} samples" if b["samples"] is not None else ""
+        self._event("pucks_changed", None, f"Baseline {b['pair'][0]}-{b['pair'][1]}: {b['d_m']:.2f} m{sig} "
+                    f"({'measured by UWB board-to-board ranging' if b['source'] == 'twr' else 'entered by hand'}{n})", now)
+        return dict(b)
+
+    def anchor(self, anchor: Any, x: Any, y: Any, toward: Any, other: Any, room: str | None = None,
+               floor: str | None = None) -> dict:
+        """On-landing calibration: put `anchor` at (x, y) and `other` at the measured spacing along the direction to
+        `toward` (plan metres = baseline d_m * range_scale()). Both become placed_by "baseline". ValueError when there is
+        no baseline for the pair or `toward` gives no direction."""
+        a, o = _bl.puck_id(anchor, "anchor"), _bl.puck_id(other, "other")
+        if a == o:
+            raise ValueError("anchor and other must be different pucks")
+        ax, ay = _finite(x, "x", -1000, 1000), _finite(y, "y", -1000, 1000)
+        if not isinstance(toward, dict):
+            raise ValueError("toward must be an object {\"x\", \"y\"}")
+        tx, ty = _finite(toward.get("x"), "toward.x", -1000, 1000), _finite(toward.get("y"), "toward.y", -1000, 1000)
+        with self._lock:
+            b = self._baselines.get(_bl.pair_key(a, o))
+            if b is None:
+                raise ValueError(f"no baseline for {a} and {o}: POST /api/pucks/baseline first")
+            d_plan = b["d_m"] * self.range_scale()
+            ox, oy = _bl.anchor_point(ax, ay, tx, ty, d_plan)
+            sig_o = math.hypot(PUCK_SIGMA_M, b["sigma_m"] or 0.0)
+            res = self._set_pucks_locked([{"id": a, "x": ax, "y": ay, "sigma_m": PUCK_SIGMA_M},
+                                          {"id": o, "x": ox, "y": oy, "sigma_m": sig_o}],
+                                         room, floor, merge=True, now=time.time(), placed_by="baseline")
+            self._persist()
+        return {**res, "baseline": dict(b), "spacing_plan_m": round(d_plan, 3)}
+
+    def _baseline_warnings(self) -> list[dict]:
+        """A placed pair whose spacing on the plan disagrees with its measured baseline (baseline.spacing_check)."""
+        pk = {p["id"]: p for p in self.pucks}
+        out = []
+        for key in sorted(self._baselines):
+            a, b = key
+            if a in pk and b in pk:
+                w = _bl.spacing_check(self._baselines[key], pk[a], pk[b], self.range_scale())
+                if w is not None:
+                    out.append(w)
+        return out
 
     # ---- observations
     def ingest(self, obs: dict, origin: str | None = None) -> dict:
@@ -678,9 +789,10 @@ class BeaconSession:
         return out
 
     def ingest_batch(self, body: Any, origin: str = "http", now: float | None = None) -> dict:
-        """POST /api/ingest: {"device": {...}, "obs": [...]}, a list of observations, or one observation.
-        All-or-nothing: one bad observation rejects the batch with ValueError. Times more than 120 s from the server
-        clock are replaced by the server's receive time (a phone clock that is off must not make every link stale)."""
+        """POST /api/ingest: {"device": {...}, "obs": [...]}, a list of observations, or one observation (BEACON_FEED A2, A9).
+        An observation that fails validation is dropped and reported (`rejected`, `errors`); ValueError (HTTP 400) only
+        when the envelope is malformed or nothing in the batch is usable. Times more than 120 s from the server clock are
+        replaced by the server's receive time (a phone clock that is off must not make every link stale)."""
         now = time.time() if now is None else now
         device: dict = {}
         if isinstance(body, dict) and "obs" in body:
@@ -708,10 +820,11 @@ class BeaconSession:
         clean = []
         skipped = 0
         rejected: list[str] = []
-        seen = self.__dict__.setdefault("_seen_readings", {})
+        seen = self._seen_readings
         for i, item in enumerate(items):
             if not isinstance(item, dict):
-                raise ValueError(f"obs[{i}]: an observation must be an object")
+                rejected.append(f"obs[{i}]: an observation must be an object")
+                continue
             if item.get("dry_run"):
                 skipped += 1            # a puck host started with --dry-run: sample values, never use them
                 continue
@@ -733,8 +846,8 @@ class BeaconSession:
                     skipped += 1
                     continue
                 seen[key] = o["t"]
-                if len(seen) > 4000:
-                    seen.clear()
+                if len(seen) > SEEN_MAX:
+                    self._forget_seen(now)
             if abs(o["t"] - now) > 120.0:
                 o["t"] = now
             if dev_info and o["kind"] == "report":
@@ -757,6 +870,16 @@ class BeaconSession:
             out["rejected"] = len(rejected)
             out["errors"] = rejected[:3]
         return out
+
+    def _forget_seen(self, now: float) -> None:
+        """Evict de-duplication entries older than SEEN_KEEP_S (clearing them all would let the readings the app is still
+        re-sending count twice); if that frees nothing, keep the newest half."""
+        seen = self._seen_readings
+        for k in [k for k, t in seen.items() if now - t > SEEN_KEEP_S]:
+            del seen[k]
+        if len(seen) > SEEN_MAX:
+            for k in sorted(seen, key=seen.get)[: len(seen) - SEEN_MAX // 2]:
+                del seen[k]
 
     # ---- lookups
     def phone_by_eid(self, eid: str | None) -> dict | None:
@@ -783,7 +906,6 @@ class BeaconSession:
     def reset(self) -> None:
         with self._lock:
             self._pending.clear()
-            self.__dict__.pop("_seen_readings", None)
             self._clear()
             self._persist()
             self._latest = self._build(time.time(), [], [])
@@ -901,8 +1023,8 @@ class BeaconSession:
                     continue                                          # heard by a puck that is not placed yet
                 to_track["puck"] = puck
                 to_track.pop("accessory", None)
-                if kind == "uwb" and self.source == "live" and self.rig_scale != 1.0:
-                    to_track["d_m"] = o["d_m"] * self.rig_scale
+                if kind == "uwb" and self.range_scale() != 1.0:
+                    to_track["d_m"] = o["d_m"] * self.range_scale()
                 if kind in ("uwb", "sos"):
                     ph.links[(puck, kind)] = to_track
                 if kind == "uwb":
@@ -935,7 +1057,7 @@ class BeaconSession:
                 best, best_t = ph, t
         if best is None:
             return
-        d = o["d_m"] * (self.rig_scale if self.source == "live" else 1.0)
+        d = o["d_m"] * self.range_scale()
         obs = {"kind": "uwb", "t": o["t"], "puck": puck, "eid": best.eid, "d_m": d, "reporter": "puck"}
         best.links[(puck, "uwb")] = obs
         best.last_seen = max(best.last_seen, o["t"])
@@ -1007,8 +1129,7 @@ class BeaconSession:
                 if spatial.get("geometry") != "candidates":
                     break
                 try:
-                    from . import prune
-                    spatial = prune.apply_statement(spatial, st[0], st[1], st[2], st[3])
+                    spatial = _prune.apply_statement(spatial, st[0], st[1], st[2], st[3])
                 except Exception:
                     log.exception("prune.apply_statement failed")
             if spatial.get("geometry") not in (None, "none"):
@@ -1179,14 +1300,13 @@ class BeaconSession:
                 item["d_m"] = round(d, 1)
                 item["sigma_m"] = round((hi - lo) / 2.0, 1)
                 item["rssi"] = round(rssi, 1)
+            # One entry per puck (ph.links holds at most one UWB and one Bluetooth link per puck). Unchanged rule, written
+            # out: a UWB link replaces a Bluetooth one; a Bluetooth link replaces a UWB one only when the UWB link is
+            # older than LINK_STALE_S and the Bluetooth link is not. (Which link is seen first follows the order the
+            # links were first heard, so a UWB link heard after the Bluetooth one always wins.)
             prev = out.get(puck)
-            if prev is None or (item["kind"] == "uwb" and (prev["kind"] != "uwb" or item["age_s"] <= LINK_STALE_S)):
-                if prev is not None and prev["kind"] == "uwb" and prev["age_s"] <= LINK_STALE_S and item["kind"] == "ble":
-                    continue
-                if prev is not None and prev["kind"] == "uwb" and item["kind"] == "ble":
-                    continue
-                out[puck] = item
-            elif prev["kind"] == "uwb" and prev["age_s"] > LINK_STALE_S and item["kind"] == "ble" and item["age_s"] <= LINK_STALE_S:
+            if (prev is None or item["kind"] == "uwb"
+                    or (prev["age_s"] > LINK_STALE_S and item["age_s"] <= LINK_STALE_S)):
                 out[puck] = item
         return [out[k] for k in sorted(out)]
 
@@ -1323,7 +1443,7 @@ class BeaconSession:
                 cx, cy = puck["x"], puck["y"]
             lat, lon = self.twin.to_geo(cx, cy)
             where = f" in {label}" if label else ""
-            reach = _mid_reach_m(self.noise)
+            reach = self._reach_m
             best = min(max(count, lo), hi)        # the published count is never below the opt-in phones known in the room
             k = optin_in_room.get(room, 0)
             phones_txt = f"{k} opt-in phone{'s' if k != 1 else ''} known in this room"
@@ -1386,15 +1506,14 @@ class BeaconSession:
              "rig": {"scale": self.rig_scale}, "search_room": self.search_room_obj(), "pucks": pucks, "unplaced_pucks": unplaced,
              "phones": sorted(phones, key=lambda p: int(p["id"][1:]) if p["id"][1:].isdigit() else 0),
              "presence": presence, "limits": limits,
+             "baselines": self.baselines(), "warnings": self._baseline_warnings(),
              "privacy": {"opt_in_only": True, "cold_identities_kept": False, "retention_s": self.retention_s,
                          "text": PRIVACY_TEXT.format(m=self.retention_s / 60)}}
         if self.agent_status is not None:
             try:
-                try:
-                    ag = self.agent_status(b)
-                except TypeError:
-                    ag = self.agent_status()
+                ag = self.agent_status(b)
             except Exception:
+                log.exception("agent status")
                 ag = None
             if ag:
                 b["agent"] = ag

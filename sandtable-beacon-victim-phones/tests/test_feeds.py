@@ -125,7 +125,7 @@ def test_cot_items(sample):
             assert abs(float(ev.find("point").attrib["lat"]) - pk["geo"]["lat"]) < 1e-6
             assert ev.attrib["type"] == "b-m-p-s-m"
             assert ev.find("detail/contact").attrib["callsign"] == f"{p['id']} RANGE ONLY"
-            assert ev.find("detail/remarks").text.startswith(f"RANGE ONLY: within ")
+            assert ev.find("detail/remarks").text.startswith("RANGE ONLY: within ")
             assert f"of puck {r['puck']}, no position" in ev.find("detail/remarks").text
         elif p["geometry"] == "candidates":
             n = len(p["candidates"])

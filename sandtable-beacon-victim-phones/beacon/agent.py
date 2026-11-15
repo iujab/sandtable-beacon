@@ -192,7 +192,7 @@ def _where(view: dict) -> str:
         return f"{'Two' if n == 2 else n} possible spots in {view.get('room_label') or 'the room'}, not a position: check {'both' if n == 2 else 'all'}"
     if g == "ring":
         top = ((view.get("ring") or {}).get("arc_crosses") or [{}])[0].get("room_label")
-        return f"Range only, no position: search along the arc" + (f", mostly in {top}" if top else "")
+        return "Range only, no position: search along the arc" + (f", mostly in {top}" if top else "")
     if g == "zone":
         return f"In {view.get('room_label') or 'the room'} by Bluetooth only: search the room"
     return "Heard, not located"
@@ -341,13 +341,15 @@ class BeaconAgent:
         suites = self.twin._suite_room
         summary = " ".join(str(final.get("summary") or "").split()) or "No summary was returned."
         priorities, src = [], "agent"
-        for p in final.get("priorities") or []:
+        stated_pri = final.get("priorities")
+        for p in stated_pri if isinstance(stated_pri, list) else []:
             if not isinstance(p, dict):
                 continue
             suite = str(p.get("suite") or "").replace("Suite", "").strip()
             if suite not in suites:
                 continue
-            target = p.get("target") if p.get("target") in phone_ids else None
+            target = p.get("target")                      # model output: may be a list or an object, never trusted
+            target = target if isinstance(target, str) and target in phone_ids else None
             action = p.get("action") if p.get("action") in ("rescue", "search", "scan") else ("rescue" if target else "search")
             priorities.append({"rank": len(priorities) + 1, "suite": suite, "target": target, "action": action,
                                "why": " ".join(str(p.get("why") or "").split())[:300]})
@@ -363,7 +365,9 @@ class BeaconAgent:
         elif np is None and acc.get("next_puck") and src == "roster":
             r = acc["next_puck"]
             next_puck = {"suite": r.get("suite"), "room": r.get("room"), "why": r.get("text")}
-        limits = [" ".join(str(x).split())[:240] for x in (final.get("limits_acknowledged") or []) if str(x).strip()][:10]
+        stated = final.get("limits_acknowledged") or []
+        stated = [stated] if isinstance(stated, str) else stated if isinstance(stated, list) else []
+        limits = [" ".join(str(x).split())[:240] for x in stated if str(x).strip()][:10]
         return {"type": "agent_plan", "run": run, "backend": backend, "data": data_label(brief),
                 "simulated": bool(brief.get("simulated")), "sample": bool(brief.get("sample")),
                 "summary": summary,

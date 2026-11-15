@@ -33,6 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import baseline as _bl
 from . import config, feeds
 from .twin import Twin, _pip
 
@@ -166,6 +167,10 @@ class FakeEngine:
         if self.notice:
             lim.insert(0, self.notice)
         b["limits"] = lim + [x for x in (b.get("limits") or []) if not x.startswith("SAMPLE")]
+        b.setdefault("baselines", [])
+        b.setdefault("warnings", [])
+        for pk in b.get("pucks") or []:
+            pk.setdefault("placed_by", "sim")
         for coll in ("pucks", "phones", "presence"):
             for item in b.get(coll) or []:
                 item["sample"] = True
@@ -605,16 +610,31 @@ class AppState:
                 world.throw_pucks(room, n=n, seed=seed)
                 pucks = [dict(p) for p in world.pucks]
         floor = self.twin.room(room)["floor"]
-        self.session.set_pucks(pucks, room=room, floor=floor)
+        layout_used = strategy is not None or n == 2
+        self.session.set_pucks(pucks, room=room, floor=floor, placed_by="layout" if layout_used else "sim")
         return pucks
 
     def set_pucks(self, pucks: list[dict], room: str | None, floor: str | None, merge: bool) -> dict:
         session = self.require_session()
         res = session.set_pucks(pucks, room=room, floor=floor, merge=merge)
+        self._sync_world_pucks()
+        return res
+
+    def anchor_pucks(self, body: dict) -> dict:
+        """POST /api/pucks/anchor (BEACON_FEED A12): place a pair from its measured baseline."""
+        session = self.require_session()
+        room, floor = body.get("room"), body.get("floor")
+        res = session.anchor(body.get("anchor"), body.get("x"), body.get("y"), body.get("toward"), body.get("other"),
+                             room=room, floor=floor)
+        self._sync_world_pucks()
+        return res
+
+    def _sync_world_pucks(self) -> None:
+        """The simulator's pucks follow the session's (a puck placed on the board is where the simulated puck is)."""
         if self.world is not None:
             with self._lock:
-                self.world.set_pucks([{k: p.get(k) for k in ("id", "x", "y", "sigma_m") if p.get(k) is not None} for p in session.pucks])
-        return res
+                self.world.set_pucks([{k: p.get(k) for k in ("id", "x", "y", "sigma_m") if p.get(k) is not None}
+                                      for p in self.session.pucks])
 
     def load_scenario(self, name: str) -> dict:
         world = self.require_sim()
@@ -640,7 +660,7 @@ class AppState:
             pucks = [dict(p) for p in world.pucks]
         room = data.get("room") or (self.twin.locate(pucks[0]["x"], pucks[0]["y"])["room"] if pucks else None)
         if pucks:
-            self.session.set_pucks(pucks, room=room, floor=data.get("floor"))
+            self.session.set_pucks(pucks, room=room, floor=data.get("floor"), placed_by="sim")
         return {"name": name, "room": room, "pucks": len(pucks), "title": data.get("title")}
 
     def start_story(self, script: str | None) -> dict:
@@ -699,6 +719,15 @@ async def _json_body(request: Request) -> Any:
         return await request.json()
     except Exception:
         raise HTTPException(400, "the body must be JSON")
+
+
+def _whole(v: Any, name: str) -> int:
+    """A whole number from JSON (3, 3.0 or "3"), else ValueError (answered as 400)."""
+    if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+        return int(v)
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v != int(v):
+        raise ValueError(f"{name} must be a whole number")
+    return int(v)
 
 
 def _obj(body: Any) -> dict:
@@ -805,27 +834,60 @@ async def api_pucks(request: Request):
     body = _obj(await _json_body(request))
     room, floor = body.get("room"), body.get("floor")
     try:
-        if room is not None:
-            s.twin.room(room)
+        if room is not None and (not isinstance(room, str) or room not in s.twin._rooms):
+            raise ValueError(f"unknown room {room!r}")
         if "pucks" in body:
             if not isinstance(body["pucks"], list):
                 raise ValueError("pucks must be a list")
+            for p in body["pucks"]:
+                how = p.get("placed_by") if isinstance(p, dict) else None
+                if how is not None and how not in _bl.PLACED_BY_API:
+                    raise ValueError(f"placed_by must be one of {', '.join(_bl.PLACED_BY_API)}, got {how!r}")
             res = s.set_pucks(body["pucks"], room, floor, bool(body.get("merge")))
             return {"ok": True, **res}
         if "n" in body:
-            n = int(body["n"])
+            n = _whole(body["n"], "n")
             if not 1 <= n <= 5:
                 raise ValueError("n must be between 1 and 5 pucks")
-            seed = body.get("seed")
+            seed = None if body.get("seed") is None else _whole(body["seed"], "seed")
             strategy = body.get("strategy")
             if strategy is not None and strategy not in ("door-wall", "exterior-wall", "careless"):
                 raise ValueError("strategy must be door-wall, exterior-wall or careless")
-            pucks = s.throw_pucks(room or s.session_room() or config.default_room(s.twin), n, int(seed) if seed is not None else None, strategy)
+            pucks = s.throw_pucks(room or s.session_room() or config.default_room(s.twin), n, seed, strategy)
             return {"ok": True, "pucks": s.session.pucks, "thrown": len(pucks), "room": room or s.session_room() or config.default_room(s.twin),
                     "strategy": strategy or ("door-wall" if n == 2 else "throw")}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     raise HTTPException(400, "send {'pucks': [...]} or {'n': 1..5}")
+
+
+@router.post("/api/pucks/baseline")
+async def api_pucks_baseline(request: Request):
+    """The measured spacing of two pucks (BEACON_FEED A12): {"pair": ["P1", "P2"], "d_m", "sigma_m"?, "samples"?,
+    "source": "twr" | "manual"}; the latest per unordered pair is kept and published in `baselines`."""
+    s = await get_state()
+    session = s.require_session()
+    body = _obj(await _json_body(request))
+    if body.get("dry_run"):
+        raise HTTPException(400, "a dry-run baseline is built from sample lines, not a measurement: not accepted")
+    try:
+        b = session.set_baseline(body.get("pair"), body.get("d_m"), sigma_m=body.get("sigma_m"), samples=body.get("samples"),
+                                 source=body.get("source", "manual"))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "baseline": b}
+
+
+@router.post("/api/pucks/anchor")
+async def api_pucks_anchor(request: Request):
+    """On-landing calibration (BEACON_FEED A12): {"anchor": "P1", "x", "y", "toward": {"x", "y"}, "other": "P2",
+    "room"?, "floor"?}. 400 when the pair has no baseline or `toward` is the anchor's own position."""
+    s = await get_state()
+    body = _obj(await _json_body(request))
+    try:
+        return {"ok": True, **s.anchor_pucks(body)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @router.post("/api/reset")

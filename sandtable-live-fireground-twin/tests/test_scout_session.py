@@ -246,6 +246,7 @@ def _run_scout_script(monkeypatch, engine, cache_dir):
     monkeypatch.setenv("SANDTABLE_SCOUT_PACE", "0.1")
     monkeypatch.setenv("SANDTABLE_BEACON", "sample")                 # tests never talk to a Beacon server that may be running on 1885
     monkeypatch.setattr(config, "REPLAY_PACE_S", 0.0)
+    monkeypatch.setattr(config, "SCRIPT_PACE", 0.1)                  # the script's pauses for people watching
     monkeypatch.setattr(config, "STATE_HZ", 40.0)
     monkeypatch.setattr(config, "AGENT_FALLBACK_AFTER_S", 3.0)
     monkeypatch.setattr(config, "LLM_CACHE_DIR", cache_dir)

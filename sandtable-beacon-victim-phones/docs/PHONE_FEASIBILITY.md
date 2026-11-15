@@ -54,7 +54,7 @@ The locator never publishes `x`, `y` unless the measurements support a single po
 - **Android phone: a power source, not a host.** It can power puck B over USB-OTG, which is what the owner chose. It cannot read the stock firmware, which prints nothing on a serial port. What can go wrong: some phones switch the 5 V off when no USB device shows up, or after an idle timeout, so use the board's J-Link port (its chip enumerates as a USB device); keep a second battery bank as the fallback. The same phone can also be the Wi-Fi hotspot that the laptop and both iPhones join.
 - **Where the server runs tonight:** on the laptop, on a phone hotspot (venue Wi-Fi usually blocks device-to-device traffic). The iPhones post to it over plain HTTP; the app's Info.plist carries the App Transport Security exception, and the board shows a QR code that fills in the address.
 - Placement matters more than the host: board upright, 15 cm or more off the floor, component-free side toward the phone. A board lying flat on the floor is the worst case.
-- The pucks cannot measure their own positions tonight: the stock firmware does not range board to board. Their positions are measured with a tape and clicked onto the plan.
+- The stock firmware does not range board to board, so a board that ranges phones cannot measure its distance to the other puck. Our SS-TWR firmware does range board to board (measured 2026-11-15, `hardware/twr_firmware/README.md`) but not phones, and a board runs one firmware at a time: the spacing is measured at setup (or taped), then the pair is anchored on the plan from it (`hardware/BOARD_TO_BOARD.md`). Positions can still be clicked onto the plan by hand.
 
 ## 6. Two boards on one thrown device, or two separate pucks? (the owner's two questions)
 

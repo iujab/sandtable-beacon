@@ -8,7 +8,13 @@ observations (docs/BEACON_FEED.md, addition A7):
     {"kind": "cold", "t", "puck", "window_s", "near", "mid", "far"}                           every cold window (optional)
 
 Extra fields this host adds (additive; servers ignore unknown fields): on `host`: `reader`, `reader_ok`, `lines_seen`,
-`ranges_sent`, `serial`; on `uwb_puck`: `peer` (when the line names one); on everything during `--dry-run`: `"dry_run": true`.
+`ranges_sent`, `serial`, `twr` (our TWR firmware's counters, when its lines are seen); on `uwb_puck`: `peer` (when the
+line names one); on everything during `--dry-run`: `"dry_run": true`.
+
+Board-to-board mode (`--baseline-to P2`, docs/BEACON_FEED.md A12): lines of our SS-TWR firmware (beacon/host/twr.py) feed
+a robust baseline estimator, and the spacing is posted to `POST /api/pucks/baseline` when it is first ready, when it
+changes, and once a minute. A board-to-board range is never sent as `uwb_puck` (that would be taken for a phone's range).
+In `--dry-run` the baseline is printed and never posted (sample lines are not a measurement).
 """
 from __future__ import annotations
 
@@ -22,8 +28,38 @@ import urllib.request
 
 from . import __version__
 from .parse import parse_line
+from .twr import BaselineEstimator, TwrError, TwrIdent, TwrPoll, TwrRange, TwrTimeout, parse_twr_line
 
-__all__ = ["Poster", "RangeThrottle", "heartbeat_obs", "uwb_puck_obs", "Host"]
+__all__ = ["Poster", "RangeThrottle", "heartbeat_obs", "uwb_puck_obs", "baseline_body", "post_json", "Host"]
+
+USER_AGENT = f"beacon-host/{__version__}"
+
+
+def post_json(url: str, body, timeout_s: float = 3.0) -> tuple[bool, str | None]:
+    """POST `body` as JSON. (True, None) on a 2xx answer, else (False, a short reason). Never raises on network trouble."""
+    data = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST",
+                                 headers={"Content-Type": "application/json", "User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            resp.read(65536)
+            if 200 <= resp.status < 300:
+                return True, None
+            return False, f"server answered HTTP {resp.status}"
+    except urllib.error.HTTPError as e:
+        text = ""
+        try:
+            text = e.read(300).decode("utf-8", "replace")
+        except Exception:       # noqa: BLE001
+            pass
+        return False, f"server refused it: HTTP {e.code} {text[:200]}"
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return False, f"server {url} unreachable ({getattr(e, 'reason', e)})"
+
+
+def baseline_body(puck: str, other: str, est: dict) -> dict:
+    """The POST /api/pucks/baseline body for an estimate of BaselineEstimator."""
+    return {"pair": [puck, other], "d_m": est["d_m"], "sigma_m": est["sigma_m"], "samples": est["samples"], "source": "twr"}
 
 
 def heartbeat_obs(puck: str, host: str, uptime_s: float, *, rtt: bool, cold_scan: bool, now: float | None = None,
@@ -106,30 +142,10 @@ class Poster(threading.Thread):
             self.dropped += 1
 
     def _send(self, batch: list[dict]) -> bool:
-        data = json.dumps(batch, separators=(",", ":")).encode("utf-8")
-        req = urllib.request.Request(self.url, data=data, method="POST",
-                                     headers={"Content-Type": "application/json", "User-Agent": f"beacon-host/{__version__}"})
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
-                resp.read(65536)
-                ok = 200 <= resp.status < 300
-                if not ok:
-                    self.log(f"server answered HTTP {resp.status}")
-                return ok
-        except urllib.error.HTTPError as e:
-            body = ""
-            try:
-                body = e.read(300).decode("utf-8", "replace")
-            except Exception:       # noqa: BLE001
-                pass
-            if self.server_up is not False:
-                self.log(f"server refused the batch: HTTP {e.code} {body[:200]}")
-            return False
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            if self.server_up is not False:
-                reason = getattr(e, "reason", e)
-                self.log(f"server {self.url} unreachable ({reason}); retrying quietly every few seconds")
-            return False
+        ok, why = post_json(self.url, batch, self.timeout_s)
+        if not ok and self.server_up is not False:          # say it once per outage, not per batch
+            self.log(why + ("; retrying quietly every few seconds" if "unreachable" in why else ""))
+        return ok
 
     def flush_once(self, block_s: float | None = None) -> int:
         """Collect what is queued (waiting up to block_s for the first item) and post it. Returns the batch size."""
@@ -181,11 +197,14 @@ class Poster(threading.Thread):
 
 
 class Host:
-    """Wires sources -> parser -> throttle -> poster, plus the heartbeat and the optional cold scan."""
+    """Wires sources -> parser -> throttle -> poster, plus the heartbeat, the optional cold scan and, with `baseline_to`,
+    the board-to-board baseline of our TWR firmware."""
 
     def __init__(self, *, server: str, puck: str, name: str, poster: Poster, log=print, learn_out=None,
                  dry_run: bool = False, heartbeat_s: float = 5.0, max_hz: float = 5.0,
-                 min_m: float = 0.05, max_m: float = 30.0, unitless: str = "auto", cold_scan: bool = False):
+                 min_m: float = 0.05, max_m: float = 30.0, unitless: str = "auto", cold_scan: bool = False,
+                 baseline_to: str | None = None, estimator: BaselineEstimator | None = None,
+                 baseline_every_s: float = 2.0, baseline_refresh_s: float = 60.0, twr_offset_m: float = 0.0):
         self.server, self.puck, self.name = server, puck, name
         self.poster = poster
         self.log = log
@@ -201,9 +220,23 @@ class Host:
         self.ranges_sent = 0
         self.stop_event = threading.Event()
         self._lock = threading.Lock()
+        # board-to-board (our TWR firmware)
+        self.baseline_to = baseline_to
+        self.estimator = estimator if estimator is not None else BaselineEstimator()
+        self.baseline_every_s, self.baseline_refresh_s = baseline_every_s, baseline_refresh_s
+        self.twr_offset_m = float(twr_offset_m)         # a measured constant bias (uncalibrated antenna delays), or 0
+        self.twr = {"role": None, "ranges": 0, "timeouts": 0, "errors": 0, "polls": 0}
+        self.baseline_last: dict | None = None          # the last baseline sent (or printed in a dry run)
+        self.baselines_sent = 0
+        self._baseline_last_t = 0.0
+        self._baseline_next_check = 0.0
 
     # --- lines -> ranges --------------------------------------------------------------------------------------------
     def on_line(self, text: str, source: str = "") -> None:
+        rec = parse_twr_line(text)
+        if rec is not None:
+            self._on_twr(rec, text, source)
+            return
         res = parse_line(text, min_m=self.min_m, max_m=self.max_m, unitless=self.unitless)
         with self._lock:
             self.lines_seen += 1
@@ -215,6 +248,66 @@ class Host:
                 d = self.throttle.offer(r.peer, r.d_m, now)
             if d is not None:
                 self._send_range(d, r.peer, now)
+
+    def _on_twr(self, rec, text: str, source: str) -> None:
+        """A line of our board-to-board firmware: counted, and with `baseline_to` a range feeds the baseline. Never a
+        `uwb_puck` observation."""
+        now = time.time()
+        with self._lock:
+            self.lines_seen += 1
+            if isinstance(rec, TwrRange):
+                self.twr["ranges"] += 1
+                if self.baseline_to:
+                    self.estimator.add(rec.d_m - self.twr_offset_m, now)
+            elif isinstance(rec, TwrTimeout):
+                self.twr["timeouts"] += 1
+            elif isinstance(rec, TwrError):
+                self.twr["errors"] += 1
+            elif isinstance(rec, TwrPoll):
+                self.twr["polls"] += 1
+            elif isinstance(rec, TwrIdent):
+                self.twr["role"] = rec.role
+        if self.learn_out is not None:
+            if isinstance(rec, TwrRange):
+                what = (f"TWR board-to-board range {rec.d_m:.3f} m (seq {rec.seq}); not a phone range"
+                        + ("; feeds the baseline" if self.baseline_to else "; add --baseline-to P2 to post the spacing"))
+            else:
+                what = f"TWR firmware line: {type(rec).__name__[3:]}"
+            self.learn_out(f"[{source or 'line'}] {text!r}\n    -> {what}")
+
+    def baseline_tick(self, now: float) -> dict | None:
+        """Every `baseline_every_s`: post the estimate when it is first ready, when it moved by more than
+        max(2 cm, half its sigma), and every `baseline_refresh_s`. Returns the body sent (or printed), else None."""
+        if not self.baseline_to or now < self._baseline_next_check:
+            return None
+        self._baseline_next_check = now + self.baseline_every_s
+        with self._lock:
+            est = self.estimator.estimate(now)
+        if est is None:
+            return None
+        last = self.baseline_last
+        moved = last is None or abs(est["d_m"] - last["d_m"]) > max(0.02, (last.get("sigma_m") or 0.0) / 2)
+        if not moved and now - self._baseline_last_t < self.baseline_refresh_s:
+            return None
+        body = baseline_body(self.puck, self.baseline_to, est)
+        self.baseline_last, self._baseline_last_t = body, now
+        line = (f"baseline {self.puck}-{self.baseline_to}: {est['d_m']:.3f} m, sigma {est['sigma_m']:.3f} m, "
+                f"{est['samples']} ranges ({est['rejected']} outliers dropped)")
+        if self.dry_run:
+            self.log("DRY RUN " + line + ": sample lines, not a measurement; not posted")
+            return body
+        if not self.poster.do_post:
+            if self.poster.echo is not None:
+                self.poster.echo([body])
+            return body
+        ok, why = post_json(self.server.rstrip("/") + "/api/pucks/baseline", body, self.poster.timeout_s)
+        if ok:
+            self.baselines_sent += 1
+            self.log(line + " -> posted")
+        else:
+            self.baseline_last = last                      # try again at the next check
+            self.log(f"{line}: not posted ({why})")
+        return body if ok else None
 
     def _send_range(self, d_m: float, peer: str | None, now: float) -> None:
         self.poster.put(uwb_puck_obs(self.puck, d_m, now=now, peer=peer, dry_run=self.dry_run))
@@ -233,11 +326,15 @@ class Host:
         rtt_src = [s for s in self.sources if s.kind in ("rtt", "rtt-log")]
         ser_src = [s for s in self.sources if s.kind == "serial"]
         reader = self.sources[0].kind if self.sources else None
-        return heartbeat_obs(self.puck, self.name, now - self.t0, now=now,
-                             rtt=any(s.connected for s in rtt_src), cold_scan=self.cold_scan,
-                             reader=reader, reader_ok=any(s.connected for s in self.sources),
-                             lines_seen=self.lines_seen, ranges_sent=self.ranges_sent,
-                             serial=any(s.connected for s in ser_src), dry_run=self.dry_run)
+        hb = heartbeat_obs(self.puck, self.name, now - self.t0, now=now,
+                           rtt=any(s.connected for s in rtt_src), cold_scan=self.cold_scan,
+                           reader=reader, reader_ok=any(s.connected for s in self.sources),
+                           lines_seen=self.lines_seen, ranges_sent=self.ranges_sent,
+                           serial=any(s.connected for s in ser_src), dry_run=self.dry_run)
+        if self.twr["role"] is not None or any(self.twr[k] for k in ("ranges", "timeouts", "errors", "polls")):
+            with self._lock:
+                hb["twr"] = dict(self.twr, baselines_sent=self.baselines_sent)
+        return hb
 
     def add_source(self, src) -> None:
         self.sources.append(src)
@@ -259,6 +356,7 @@ class Host:
                     self.poster.put(self.heartbeat(now))
                     next_hb = now + self.heartbeat_s
                 self.tick(now)
+                self.baseline_tick(now)
                 if t_end is not None and now >= t_end:
                     break
                 self.stop_event.wait(0.1)

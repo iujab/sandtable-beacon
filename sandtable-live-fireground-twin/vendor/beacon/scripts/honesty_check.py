@@ -155,7 +155,7 @@ class Run:
     # ---- the clock
     def run(self, seconds: float, during=None):
         n = int(round(seconds * SIM_HZ))
-        every = int(round(SIM_HZ / STEP_HZ * 10)) / 10.0
+        step_every = int(round(SIM_HZ / STEP_HZ))          # world steps per session step
         for _ in range(n):
             self.k += 1
             self.t = T0 + self.k / SIM_HZ
@@ -167,9 +167,8 @@ class Run:
                     self.session.ingest(o)
                 except ValueError as exc:
                     self._violate("observation rejected", str(exc))
-            if self.k % int(round(SIM_HZ / STEP_HZ)) == 0:
+            if self.k % step_every == 0:
                 self.check(self.session.step(self.t))
-        _ = every
 
     # ---- checks
     def _violate(self, kind: str, detail: str):

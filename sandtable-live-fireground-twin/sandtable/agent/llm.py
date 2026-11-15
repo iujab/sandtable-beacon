@@ -53,6 +53,7 @@ class LLM:
         self._cache_dir = cache_dir
         self.refresh = os.environ.get("LLM_REFRESH") == "1"
         self.calls = {"replay": 0, "live": 0, "miss": 0}
+        self._client: tuple | None = None        # (event loop, Anthropic SDK client): one connection pool per loop, kept between calls
 
     @property
     def cache_dir(self) -> Path:
@@ -128,13 +129,16 @@ class LLM:
             out, err = await asyncio.wait_for(proc.communicate(), CLI_TIMEOUT_S)
         except asyncio.TimeoutError:
             proc.kill()
-            raise LLMError(f"claude CLI timed out after {CLI_TIMEOUT_S:.0f} s")
+            raise LLMError(f"claude CLI timed out after {CLI_TIMEOUT_S:.0f} s") from None
+        except asyncio.CancelledError:           # the turn was given up (the agent's own time limit, a reset): end the CLI with it
+            proc.kill()
+            raise
         if proc.returncode != 0:
             raise LLMError(f"claude CLI exited {proc.returncode}: {err.decode(errors='replace')[:300]}")
         try:
             data = json.loads(out.decode())
         except json.JSONDecodeError:
-            raise LLMError("claude CLI returned non-JSON output")
+            raise LLMError("claude CLI returned non-JSON output") from None
         if data.get("is_error") or "result" not in data:
             raise LLMError(f"claude CLI error: {str(data.get('result'))[:300]}")
         model = next(iter(data.get("modelUsage") or {}), CLI_MODEL[tier])
@@ -155,9 +159,11 @@ class LLM:
             media = "image/png" if str(image_path).lower().endswith(".png") else "image/jpeg"
             msgs[0] = {"role": "user", "content": [{"type": "image", "source": {"type": "base64", "media_type": media, "data": data}},
                                                    {"type": "text", "text": messages[0]["content"]}]}
-        client = anthropic.AsyncAnthropic()
+        loop = asyncio.get_running_loop()
+        if self._client is None or self._client[0] is not loop:     # its connections belong to the loop that opened them
+            self._client = (loop, anthropic.AsyncAnthropic())
         try:
-            resp = await client.messages.create(model=model, max_tokens=3000, system=system, messages=msgs)
+            resp = await self._client[1].messages.create(model=model, max_tokens=3000, system=system, messages=msgs)
         except Exception as exc:
             raise LLMError(f"anthropic API error: {type(exc).__name__}: {exc}") from exc
         return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text"), model

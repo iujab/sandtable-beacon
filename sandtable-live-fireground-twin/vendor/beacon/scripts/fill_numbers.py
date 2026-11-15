@@ -54,8 +54,8 @@ def two_puck_block() -> str:
         if ts:
             lines += ["", ts]
         lines += ["",
-                  f"\"Ring or less\" is mostly a phone that only one puck reached (a blocked link in the simulation). "
-                  f"A wrong position is one more than three sigma or 1.5 m from the truth.",
+                  "\"Ring or less\" is mostly a phone that only one puck reached (a blocked link in the simulation). "
+                  "A wrong position is one more than three sigma or 1.5 m from the truth.",
                   "",
                   f"When the occupant's stated suite is false (the phone is really in a neighbouring room, {fs['n']} trials): with the door-wall layout the board mostly shows a ring, "
                   f"but it shows a position in {pct1(fs['all_fixes']['share_of_trials'])} of trials and {pct(fs['all_fixes'].get('wrong_fix_rate_of_fixes'))} of those positions are wrong "

@@ -186,3 +186,27 @@ def test_button_event_and_manual_mayday(rig):
     assert rig.inc.mayday["unit"] == "RIT" and rig.inc.mayday["reason"] == "button"
     rig.inc.reset()
     assert rig.inc.phase == "standby" and rig.inc.mayday is None and rig.inc.hazards == []
+
+
+def test_a_reset_forgets_the_resolved_mayday_of_the_previous_incident(rig):
+    """Bug: the resolved mayday was kept across a reset, so the next incident's report listed the old mayday crew."""
+    start_operations(rig)
+    rig.inc.declare_mayday("E1", "manual", "command")
+    rig.inc.resolve_mayday("E1")
+    assert rig.inc.mayday is None and rig.inc.last_mayday["unit"] == "E1"
+    rig.inc.reset()
+    assert rig.inc.last_mayday is None
+
+
+def test_hazard_ids_stay_unique_when_one_is_cleared(rig):
+    """Bug: ids were numbered from the current count, so clearing a hazard made the next one reuse a live id."""
+    start_operations(rig)
+    corridors = [r["id"] for r in rig.twin.rooms("corridor")]
+    first = rig.inc.mark_hazard(corridors[0], source="inject")
+    second = rig.inc.mark_hazard(corridors[1], source="inject")
+    rig.inc.clear_hazard(first["id"])
+    third = rig.inc.mark_hazard(corridors[0], source="inject")
+    ids = [h["id"] for h in rig.inc.hazards]
+    assert len(set(ids)) == len(ids) == 2 and third["id"] not in (first["id"], second["id"])
+    rig.inc.reset()
+    assert rig.inc.mark_hazard(corridors[0], source="inject")["id"] == "hz1"           # a new incident numbers from 1 again

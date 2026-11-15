@@ -230,3 +230,25 @@ Tools offered to the model (prompted JSON, one object per reply: `{"thought", "t
 ## 4. Report at the end, concisely
 
 What exists, what you ran and its outcome, what is unverified, deviations from this contract, requests for other builders.
+
+### 3.8 Puck-to-puck baselines (lead, Sun Nov 15 2026, 02:00 CST; feed contract `docs/BEACON_FEED.md` A12)
+
+```python
+from beacon import baseline                       # pure, standard library only
+baseline.make_baseline(pair, d_m, *, sigma_m=None, samples=None, source="manual", t) -> dict   # ValueError when invalid
+baseline.anchor_point(ax, ay, tx, ty, d_plan_m) -> (x, y)      # ValueError when (tx, ty) is within 1 cm of the anchor
+baseline.spacing_check(baseline, puck_a, puck_b, scale=1.0) -> warning dict | None   # 3 sigma + 0.2 m, physical metres
+baseline.PLACED_BY == ("hand", "baseline", "layout", "sim");  baseline.PLACED_BY_API == ("hand", "baseline")
+
+s = BeaconSession(...)
+s.set_pucks(pucks, room=None, floor=None, merge=False, placed_by="hand")   # default for entries without "placed_by"
+s.set_baseline(pair, d_m, *, sigma_m=None, samples=None, source="manual", now=None) -> baseline dict
+s.anchor(anchor, x, y, toward={"x", "y"}, other, room=None, floor=None) -> {"pucks", "room", "floor", "baseline", "spacing_plan_m"}
+s.baselines() -> list;  s.range_scale() -> float   # the exercise scale in live mode, else 1
+
+from beacon.host.twr import parse_twr_line, BaselineEstimator   # the TWR firmware's RTT lines; robust spacing (stdlib only)
+```
+
+Who sets `placed_by`: `POST /api/pucks` entries ("hand" unless they say "baseline"), `/api/pucks/anchor` ("baseline"),
+`POST /api/pucks {"n": 2}` ("layout"), other simulated throws, scenarios and the walk-through ("sim"). Baselines and
+warnings never enter `brief()` or `limits` (recorded agent runs replay by prompt hash).

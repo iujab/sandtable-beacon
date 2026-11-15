@@ -259,3 +259,18 @@ def test_no_person_names_anywhere(twin, site):
             assert not name or name.endswith("(name withheld)")
     for d in roster.app_directory(site, twin):
         assert "(name withheld)" not in d["label"]           # the pick-list shows the kind of business, not a name
+
+
+def test_walking_distances_are_computed_once_per_twin(monkeypatch):
+    from beacon import config, roster
+    from beacon.twin import Twin
+    tw = Twin(config.twin_raw())
+    rooms = [r["id"] for r in tw.rooms("suite") if r.get("floor") == tw.exercise_floor][:3]
+    calls = []
+    real = tw.route
+    monkeypatch.setattr(tw, "route", lambda a, b: calls.append((a, b)) or real(a, b))
+    first = [roster._walk_m(tw, rooms[0], r) for r in rooms]
+    again = [roster._walk_m(tw, rooms[0], r) for r in rooms]
+    assert first == again and len(calls) == len(rooms)
+    assert roster._walk_m(tw, None, rooms[0]) == 0.0
+    assert roster._walk_m(Twin(config.twin_raw()), rooms[0], rooms[1]) == first[1]      # a fresh twin has its own cache

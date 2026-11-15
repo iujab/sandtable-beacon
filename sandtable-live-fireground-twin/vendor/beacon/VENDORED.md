@@ -1,8 +1,8 @@
 # Vendored: the Beacon module (lane L16)
 
-A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-14T17:17:02-0600.
+A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-15T03:17:42-0600.
 
-Source: commit `b5d424bfd72d7e3ec9bce4b2937ab84fb5268c2f` (2026-11-14T17:17:02-06:00): "UNO Q: simulated walk-through and test results from the owner's board (257 of 261 pass, time limits fail); the attached boards carry other firmware; OpenOCD is on the board". Copied with `git archive`, so only committed files are here.
+Source: commit `0fa2d55793296d9bb77d82a8ad901b13bce19002` (2026-11-15T03:16:32-06:00): "Honesty check re-run after the name-retention fix: all scenes pass". Copied with `git archive`, so only committed files are here.
 
 It is that team's work, credited to them; it is copied (not linked) so this repository stands alone. Do not edit it here: change the sibling project and re-run `python scripts/vendor_beacon.py`. This file is generated from the copy.
 
@@ -10,18 +10,18 @@ It is that team's work, credited to them; it is copied (not linked) so this repo
 
 | Directory | Files | Bytes |
 |---|---|---|
-| top level | 4 | 26,651 |
+| top level | 4 | 28,803 |
 | `apps/` | 18 | 160,498 |
-| `beacon/` | 28 | 614,158 |
-| `docs/` | 9 | 272,930 |
-| `figures/` | 22 | 5,240,561 |
+| `beacon/` | 30 | 652,927 |
+| `docs/` | 11 | 287,723 |
+| `figures/` | 24 | 5,875,388 |
 | `fixtures/` | 26 | 582,526 |
-| `hardware/` | 10 | 116,156 |
-| `results/` | 4 | 398,088 |
-| `scripts/` | 6 | 163,387 |
-| `tests/` | 16 | 209,004 |
-| `web/` | 16 | 315,325 |
-| **total** | **159** | **8,099,284** |
+| `hardware/` | 18 | 277,307 |
+| `results/` | 5 | 401,468 |
+| `scripts/` | 6 | 163,382 |
+| `tests/` | 19 | 251,628 |
+| `web/` | 16 | 320,290 |
+| **total** | **177** | **9,001,940** |
 
 Skipped: nothing among the committed files of the copied directories. Never copied: `data/`, virtualenvs, caches, build outputs, `.env*`, keys and signing material, any `live` directory.
 
@@ -33,7 +33,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 
 | File | Bytes |
 |---|---|
-| `README.md` | 21,665 |
+| `README.md` | 23,817 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.pbxproj` | 11,924 |
 | `apps/ios/SandtableBeacon.xcodeproj/project.xcworkspace/contents.xcworkspacedata` | 135 |
 | `apps/ios/SandtableBeacon.xcodeproj/xcshareddata/xcschemes/SandtableBeacon.xcscheme` | 2,912 |
@@ -53,39 +53,43 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `apps/ios/tools/syntax_check.log` | 594 |
 | `apps/ios/tools/syntax_check.py` | 3,027 |
 | `beacon/__init__.py` | 0 |
-| `beacon/agent.py` | 28,813 |
+| `beacon/agent.py` | 29,127 |
 | `beacon/agent_routes.py` | 4,222 |
-| `beacon/autoscene.py` | 7,548 |
+| `beacon/autoscene.py` | 7,080 |
+| `beacon/baseline.py` | 6,560 |
 | `beacon/config.py` | 8,923 |
-| `beacon/demo.py` | 5,511 |
-| `beacon/feeds.py` | 16,606 |
-| `beacon/host/__init__.py` | 676 |
+| `beacon/demo.py` | 5,500 |
+| `beacon/feeds.py` | 16,980 |
+| `beacon/host/__init__.py` | 1,091 |
 | `beacon/host/__main__.py` | 48 |
-| `beacon/host/cli.py` | 8,106 |
+| `beacon/host/cli.py` | 10,526 |
 | `beacon/host/cold.py` | 8,841 |
-| `beacon/host/core.py` | 12,040 |
+| `beacon/host/core.py` | 17,606 |
 | `beacon/host/parse.py` | 10,824 |
 | `beacon/host/sources.py` | 11,174 |
-| `beacon/layout.py` | 9,470 |
+| `beacon/host/twr.py` | 8,205 |
+| `beacon/layout.py` | 9,474 |
 | `beacon/llm.py` | 9,048 |
-| `beacon/locate.py` | 59,391 |
-| `beacon/models.py` | 12,389 |
+| `beacon/locate.py` | 62,890 |
+| `beacon/models.py` | 12,377 |
 | `beacon/prune.py` | 3,805 |
-| `beacon/report.py` | 51,506 |
-| `beacon/roster.py` | 21,172 |
-| `beacon/server.py` | 51,276 |
-| `beacon/session.py` | 89,032 |
-| `beacon/sim.py` | 65,059 |
-| `beacon/story.py` | 20,464 |
-| `beacon/tools.py` | 44,818 |
-| `beacon/track.py` | 24,602 |
+| `beacon/report.py` | 52,484 |
+| `beacon/roster.py` | 21,550 |
+| `beacon/server.py` | 54,444 |
+| `beacon/session.py` | 96,849 |
+| `beacon/sim.py` | 66,402 |
+| `beacon/story.py` | 20,720 |
+| `beacon/tools.py` | 42,869 |
+| `beacon/track.py` | 24,514 |
 | `beacon/twin.py` | 28,794 |
-| `docs/BEACON_FEED.md` | 33,665 |
-| `docs/CONTRACTS.md` | 27,889 |
+| `docs/BEACON_FEED.md` | 38,163 |
+| `docs/CONTRACTS.md` | 29,479 |
 | `docs/COSTAR_TIE_IN.md` | 10,003 |
 | `docs/IOS_BUILD.md` | 32,558 |
-| `docs/PHONE_FEASIBILITY.md` | 16,901 |
+| `docs/IOS_HANDOFF.md` | 3,991 |
+| `docs/PHONE_FEASIBILITY.md` | 17,193 |
 | `docs/PRIVACY.md` | 3,018 |
+| `docs/ROOM_LOCATION.md` | 4,422 |
 | `docs/research/android_ble_models.md` | 52,784 |
 | `docs/research/ios_ni.md` | 64,314 |
 | `docs/research/puck_hardware.md` | 31,798 |
@@ -110,6 +114,8 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `figures/ui_07_floor.png` | 429,966 |
 | `figures/ui_08_1280x720.png` | 265,250 |
 | `figures/ui_09_layout.png` | 375,591 |
+| `figures/ui_10_baseline_mismatch.png` | 317,695 |
+| `figures/ui_11_baseline_anchored.png` | 317,132 |
 | `figures/ui_report.png` | 272,676 |
 | `fixtures/beacon/ingest_example.json` | 739 |
 | `fixtures/beacon/ios_batch_examples.json` | 6,768 |
@@ -137,54 +143,66 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `fixtures/llm_cache/f4ff09d1b0f6a7fce38767a4a89e3288e51f92e5271f8524d0991634973d2a43.json` | 8,761 |
 | `fixtures/llm_cache/fb1ccfd360ac53c3eebcd5824da69045e60222dedba60feb7b57878da0a974ca.json` | 29,277 |
 | `fixtures/llm_cache/ff4c47da6132cbc2c6e82968ab2695a8c915231e08d6ebb61287f44122f720d4.json` | 32,543 |
-| `hardware/BRINGUP.md` | 39,498 |
+| `hardware/BOARD_TO_BOARD.md` | 8,901 |
+| `hardware/BRINGUP.md` | 40,241 |
 | `hardware/FLASH.md` | 10,319 |
 | `hardware/LAYOUT.md` | 5,994 |
-| `hardware/PUCK.md` | 16,432 |
-| `hardware/UNO_Q.md` | 14,413 |
+| `hardware/PUCK.md` | 16,947 |
+| `hardware/UNO_Q.md` | 15,046 |
 | `hardware/jlink/.gitignore` | 119 |
 | `hardware/jlink/flash_qani.jlink` | 1,425 |
 | `hardware/layout_table.py` | 14,336 |
 | `hardware/puck_sketch.svg` | 5,593 |
 | `hardware/two_puck_layout.svg` | 8,027 |
+| `hardware/twr_firmware/Makefile.twr` | 4,239 |
+| `hardware/twr_firmware/README.md` | 13,862 |
+| `hardware/twr_firmware/app.c.ed` | 10,312 |
+| `hardware/twr_firmware/build_logs/build_INITIATOR.log` | 57,697 |
+| `hardware/twr_firmware/build_logs/build_RESPONDER.log` | 57,697 |
+| `hardware/twr_firmware/dwm3001c.ld` | 1,177 |
+| `hardware/twr_firmware/prepare.py` | 5,375 |
 | `requirements.txt` | 309 |
 | `results/eval_beacon.json` | 119,984 |
 | `results/eval_layouts.json` | 240,559 |
 | `results/eval_two_puck.json` | 22,485 |
-| `results/honesty_check.json` | 15,060 |
+| `results/honesty_check.json` | 15,059 |
+| `results/twr_measured_2026-11-15.json` | 3,381 |
 | `run_demo.sh` | 2,945 |
 | `run_tests.sh` | 1,732 |
 | `scripts/eval_beacon.py` | 104,553 |
-| `scripts/fill_numbers.py` | 11,950 |
-| `scripts/honesty_check.py` | 21,097 |
+| `scripts/fill_numbers.py` | 11,948 |
+| `scripts/honesty_check.py` | 21,094 |
 | `scripts/record_agent.py` | 13,481 |
 | `scripts/shots.cjs` | 11,318 |
 | `scripts/stop_demo.sh` | 988 |
 | `tests/conftest.py` | 1,458 |
 | `tests/test_agent.py` | 15,702 |
+| `tests/test_baseline.py` | 18,528 |
 | `tests/test_eval_smoke.py` | 2,647 |
 | `tests/test_external_bundle.py` | 8,031 |
-| `tests/test_feeds.py` | 9,035 |
+| `tests/test_feeds.py` | 9,034 |
 | `tests/test_honesty_check.py` | 1,935 |
-| `tests/test_host.py` | 14,980 |
+| `tests/test_host.py` | 21,861 |
 | `tests/test_ios_wire.py` | 13,503 |
 | `tests/test_locate.py` | 27,521 |
 | `tests/test_models.py` | 5,261 |
+| `tests/test_quality_locator.py` | 8,342 |
+| `tests/test_quality_misc.py` | 6,690 |
 | `tests/test_report.py` | 7,376 |
-| `tests/test_roster.py` | 12,441 |
-| `tests/test_server.py` | 21,495 |
+| `tests/test_roster.py` | 13,179 |
+| `tests/test_server.py` | 22,941 |
 | `tests/test_session.py` | 25,126 |
 | `tests/test_sim.py` | 23,056 |
 | `tests/test_track.py` | 19,437 |
 | `web/app.html` | 6,663 |
-| `web/app.js` | 46,158 |
+| `web/app.js` | 47,340 |
 | `web/common.js` | 6,000 |
-| `web/index.html` | 9,271 |
+| `web/index.html` | 9,323 |
 | `web/phone.css` | 9,620 |
 | `web/phone.html` | 5,363 |
 | `web/phone.js` | 18,461 |
-| `web/plan.js` | 49,714 |
-| `web/style.css` | 35,858 |
+| `web/plan.js` | 52,466 |
+| `web/style.css` | 36,837 |
 | `web/vendor/README.md` | 437 |
 | `web/vendor/fonts/barlow-400.woff2` | 21,144 |
 | `web/vendor/fonts/barlow-500.woff2` | 20,960 |

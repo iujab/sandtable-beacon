@@ -87,6 +87,18 @@ def test_fixture_writes_go_to_local_files_with_deterministic_ids(p):
     assert not any(str(t["id"]).startswith("obs-") for t in p.matterport.list_tags())
 
 
+
+def test_labels_are_worked_out_once_and_every_caller_gets_its_own_copy(p, monkeypatch):
+    first = p.labels()
+    first["costar"]["text"] = "changed by a caller"
+
+    def no_reads():
+        raise AssertionError("the labels read the twin again")
+    monkeypatch.setattr(p.matterport, "get_model", no_reads)             # the board asks on every state tick: no file read each time
+    again = p.labels()
+    assert again["costar"]["text"] != "changed by a caller" and again["matterport"]["real_sponsor_data"] is False
+    assert again == build_provider().labels()
+
 def test_live_mode_without_keys_fails_loudly(monkeypatch, tmp_path):
     for k in ("VEXCEL_API_KEY", "MATTERPORT_TOKEN_ID", "MATTERPORT_TOKEN_SECRET", "MATTERPORT_MODEL_ID", "COSTAR_PROPERTY_ID", "COSTAR_PROPERTY_ADDRESS"):
         monkeypatch.delenv(k, raising=False)
@@ -431,6 +443,21 @@ def test_matterport_add_tag_is_a_dry_run_unless_enabled(tmp_path):
     q, v = calls[-1]
     assert "addMattertag(modelId: $modelId, field: id" in q and out["id"] == "written-tag" and "written to the Matterport model" in out["status"]
 
+
+
+def test_matterport_dry_run_pins_are_cleared_for_a_new_incident_but_real_writes_are_not(tmp_path):
+    m = MatterportLive("id", "secret", "invented-model", transport=mp_transport([]), cache_dir=tmp_path)
+    m.get_model()
+    m.add_tag("flA", [3.0, 2.0, 1.2], "Ceiling collapse")
+    log = tmp_path / "tags_dryrun_invented-model.json"
+    assert log.exists() and any(t["id"] == "dryrun-1" for t in m.list_tags())
+    m.clear_overlay()
+    assert not log.exists() and not any(str(t["id"]).startswith("dryrun-") for t in m.list_tags())
+    assert m.add_tag("flA", [3.0, 2.0, 1.2], "Again")["id"] == "dryrun-1"                       # numbering starts again
+    w = MatterportLive("id", "secret", "invented-model", transport=mp_transport([]), cache_dir=tmp_path, dry_run=False)
+    w.get_model()["tags"].append({"id": "written-tag"})
+    w.clear_overlay()
+    assert [t["id"] for t in w.list_tags()][-1] == "written-tag"
 
 def test_matterport_live_from_env_never_writes_tags_by_default(monkeypatch):
     for k, val in (("MATTERPORT_TOKEN_ID", "x"), ("MATTERPORT_TOKEN_SECRET", "y"), ("MATTERPORT_MODEL_ID", "invented-model")):

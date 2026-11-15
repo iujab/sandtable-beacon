@@ -176,6 +176,17 @@ class MatterportLive:
     def _dryrun_log(self) -> Path | None:
         return self.live_dir / f"tags_dryrun_{self.model_id}{config.INSTANCE}.json" if self.live_dir else None   # one log per board (config.set_instance)
 
+    def clear_overlay(self) -> None:
+        """Each incident starts clean: in a dry run, forget the pins the agent would have written (the log and the twin's dryrun-
+        tags), so no run's prompts carry the pins of the runs before it. Tags really written to the model are left alone."""
+        if not self.dry_run:
+            return
+        log = self._dryrun_log()
+        if log is not None and log.exists():
+            log.unlink()
+        if isinstance(self._twin, dict):
+            self._twin["tags"] = [t for t in self._twin.get("tags", []) if not str(t.get("id", "")).startswith("dryrun-")]
+
     def _dryrun_tags(self) -> list[dict]:
         p = self._dryrun_log()
         if not p or not p.exists():

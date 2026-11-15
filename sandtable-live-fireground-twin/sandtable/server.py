@@ -12,11 +12,11 @@ import math
 import os
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
+from typing import Callable
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
@@ -31,6 +31,15 @@ from .spatial import Twin
 
 log = logging.getLogger("sandtable.server")
 BACKLOG_TYPES = {"agent", "radio", "timeline", "alert", "tag"}
+BACKLOG_MAX = 600                       # messages kept for a board that connects mid-incident (the oldest 200 go when it is full)
+
+
+def _offer(q: asyncio.Queue, item) -> None:
+    """Non-blocking put: a subscriber that has stopped reading loses messages, never stalls the incident."""
+    try:
+        q.put_nowait(item)
+    except asyncio.QueueFull:
+        pass
 
 
 class AppState:
@@ -39,7 +48,8 @@ class AppState:
         self.provider = get_provider()
         self._clear_local_writes()
         self.twin = Twin(self.provider.twin_raw())
-        self.clients: set[asyncio.Queue] = set()
+        self.clients: set[asyncio.Queue] = set()              # in-process listeners: every emitted message, as the dict
+        self.sockets: set[asyncio.Queue] = set()              # WebSocket boards: every emitted message, JSON-encoded once for all
         self.backlog: list[dict] = []
         self.preplan: dict | None = None
         self.aar: dict | None = None
@@ -59,57 +69,57 @@ class AppState:
         self.beacon = BeaconLink(self.emit, self.incident)    # the Beacon module (phones), live on BEACON_URL or the labelled sample
         self.beacons_msg: dict | None = None
         self.accountability_msg: dict | None = None
-        self._acc_key: str | None = None
+        self._acc_last: dict | None = None
         self._acc_t = 0.0
         self.director = Director(self)
         self.situations: asyncio.Queue = asyncio.Queue()
         self._tasks: list[asyncio.Task] = []
         self._agent_running = False
-        self._last_hello: str | None = None
+        self._preplan_task: asyncio.Task | None = None         # the pre-plan of the current incident, while it runs
+        self._turn_task: asyncio.Task | None = None            # the agent's turn on a situation, while it runs
+        self._last_hello: dict | None = None
 
     def _clear_local_writes(self) -> None:
-        """Each incident starts clean: tags and corrections written by the previous one are cleared. Fixture mode: local files.
-        Live Matterport in dry run: the private log of pins the agent would have written (otherwise every run's twin, and so every
-        prompt, would carry the pins of the runs before it and recorded turns could never replay)."""
-        mp = self.provider.matterport
-        if hasattr(mp, "clear_overlay"):
-            mp.clear_overlay()
-        elif getattr(mp, "dry_run", False) and hasattr(mp, "_dryrun_log"):
-            log_path = mp._dryrun_log()
-            if log_path is not None and log_path.exists():
-                log_path.unlink()
-            if isinstance(getattr(mp, "_twin", None), dict):
-                mp._twin["tags"] = [t for t in mp._twin.get("tags", []) if not str(t.get("id", "")).startswith("dryrun-")]
-        if hasattr(self.provider.costar, "clear_corrections"):
-            self.provider.costar.clear_corrections()
+        """Each incident starts clean: tags and corrections written by the previous one are cleared (fixture mode: the local files;
+        live Matterport in a dry run: the private log of pins the agent would have written). Otherwise every run's twin, and so
+        every prompt, would carry the pins of the runs before it and recorded turns could never replay."""
+        for clear in (getattr(self.provider.matterport, "clear_overlay", None), getattr(self.provider.costar, "clear_corrections", None)):
+            if clear is not None:
+                clear()
 
     # ---- broadcasting (safe to call from any sync code running on the event loop)
     def emit(self, msg: dict) -> None:
-        if msg.get("type") in BACKLOG_TYPES:
+        kind = msg.get("type")
+        if kind in BACKLOG_TYPES:
             self.backlog.append(msg)
-            if len(self.backlog) > 600:
+            if len(self.backlog) > BACKLOG_MAX:
                 del self.backlog[:200]
-        elif msg.get("type") == "preplan":
+        elif kind == "preplan":
             self.preplan = msg
-        elif msg.get("type") == "aar":
+        elif kind == "aar":
             self.aar = msg
-        elif msg.get("type") == "scan":
+        elif kind == "scan":
             self.scan_msg = msg
             self._forward_scan_pucks(msg)
-        elif msg.get("type") == "beacons":
+        elif kind == "beacons":
             self.beacons_msg = msg
-        elif msg.get("type") == "accountability":
+        elif kind == "accountability":
             self.accountability_msg = msg
-        elif msg.get("type") == "scout":
+        elif kind == "scout":
             self.scout_msg = msg
-        elif msg.get("type") == "reset":
+        elif kind == "reset":
             self.backlog.clear()
             self.scan_msg, self.scout_msg = None, None
         for q in list(self.clients):
+            _offer(q, msg)
+        if self.sockets:
             try:
-                q.put_nowait(msg)
-            except asyncio.QueueFull:
-                pass
+                text = json.dumps(msg)                          # once for every board, as it was when it happened
+            except (TypeError, ValueError):                     # never into the code that emitted it
+                log.exception("could not encode a %s message for the boards", kind)
+                return
+            for q in list(self.sockets):
+                _offer(q, text)
 
     def hello(self) -> dict:
         inc, reg = self.incident, self.incident.registration
@@ -136,8 +146,9 @@ class AppState:
 
     async def shutdown(self) -> None:
         self.director.stop()
-        for t in self._tasks:
-            t.cancel()
+        for t in (*self._tasks, self._preplan_task, self._turn_task):
+            if t is not None:
+                t.cancel()
 
     async def _state_loop(self) -> None:
         period = 1.0 / config.STATE_HZ
@@ -145,9 +156,8 @@ class AppState:
             try:
                 self.incident.tick()
                 h = self.hello()
-                key = json.dumps(h, sort_keys=True, default=str)
-                if key != self._last_hello:
-                    self._last_hello = key
+                if h != self._last_hello:                         # hello goes out when any of it changes
+                    self._last_hello = h
                     self.emit(h)
                 self.emit(self.state())
                 self._feed_tick()
@@ -176,9 +186,8 @@ class AppState:
             return
         self._acc_t = now
         acc = self.accountability()
-        key = json.dumps(acc, sort_keys=True, default=str)
-        if key != self._acc_key:
-            self._acc_key = key
+        if acc != self._acc_last:
+            self._acc_last = acc
             self.emit(acc)
 
     def report(self) -> dict:
@@ -239,7 +248,7 @@ class AppState:
                            "located_t_rel": rel(v.get("located_t")), "assigned": v.get("rescuer"), "assigned_t_rel": rel(v.get("assigned_t")),
                            "reached_t_rel": rel(v.get("reached_t")), "out_t_rel": rel(v.get("out_t")),
                            "simulated": bool((inc.scan or {}).get("simulated", True)), "sample": bool((inc.scan or {}).get("sample"))})
-        md = inc.mayday or getattr(inc, "_last_mayday", None)
+        md = inc.mayday or inc.last_mayday
         if md:
             u = inc.units[md["unit"]]
             people.append({"id": md["unit"], "source": "crew", "status": u["status"], "how_found": f"tagged crew: {md.get('reason')} mayday", "state": "out" if u["status"] == "out" else "reached" if inc.contact_done else "located",
@@ -284,7 +293,6 @@ class AppState:
                     "anthropic": "live model (Anthropic API)", "claude-cli": "live model (Claude CLI)"}.get(backend, backend)
         out_people = [p for p in people if p["state"] == "out"]
         left = [p for p in people if p["state"] != "out" and p["source"] != "crew"]
-        rows = acc["rows"]
         summary = (f"{'Simulated exercise' if inc.simulated else 'Incident'} at {prop.get('address')}, {prop.get('city')}: phase {inc.phase}, {elapsed:.0f} s. "
                    f"{len([p for p in people if p['source'] != 'crew'])} located ({', '.join(p['id'] for p in people if p['source'] != 'crew') or 'none'}); "
                    f"{len(out_people)} brought out ({', '.join(p['id'] for p in out_people) or 'none'}); "
@@ -330,10 +338,11 @@ class AppState:
     def feed_units(self) -> list[dict]:
         return list(self.incident.units.values())
 
-    def cot_now(self) -> list[tuple[str, str]]:
+    def cot_now(self, only: Callable[[str], bool] | None = None) -> list[tuple[str, str]]:
+        """The current picture as CoT events (uid, xml); `only` keeps the uids it accepts (the others are not serialised)."""
         inc = self.incident
         return feeds.cot_events(inc.scan, self.feed_units(), self.twin, time.time(), units_simulated=inc.simulated, victims=inc.victims,
-                                beacons=self.beacon.beacons, phones=inc.phones)
+                                beacons=self.beacon.beacons, phones=inc.phones, only=only)
 
     def _feed_tick(self) -> None:
         """Pushes CoT events to the SSE subscribers when a unit changes room, a scan lands or a located person's status changes."""
@@ -349,7 +358,7 @@ class AppState:
         if not changed or not self.cot_clients:
             return
         sid = keys["scan"]
-        want = set()
+        want = set()                                    # uids, and uid prefixes ending in "." (a scan's items, a phone's candidates)
         if "scan" in changed and sid:
             want.add(f"sandtable.{sid}.")
         for k in changed:
@@ -360,51 +369,76 @@ class AppState:
             elif k.startswith("phone."):
                 want.add(f"sandtable.beacon.{k[6:]}")
                 want.add(f"sandtable.beacon.{k[6:]}.")
-        for uid, xml in self.cot_now():
-            if any(uid == w or (w.endswith(".") and uid.startswith(w)) for w in want):
-                for q in list(self.cot_clients):
-                    try:
-                        q.put_nowait(xml)
-                    except asyncio.QueueFull:
-                        pass
+        prefixes = tuple(w for w in want if w.endswith("."))
+        for _uid, xml in self.cot_now(lambda uid: uid in want or uid.startswith(prefixes)):
+            for q in list(self.cot_clients):
+                _offer(q, xml)
 
     def _on_situation(self, situation: dict) -> None:
         self.situations.put_nowait(situation)
 
     async def _agent_loop(self) -> None:
+        """Situations go to the agent one at a time. Each turn runs as a task of its own, so a reset can end it."""
         while True:
             s = await self.situations.get()
-            self._agent_running = True
+            self._agent_running = True                          # busy from the moment the situation leaves the queue
+            self._turn_task = asyncio.create_task(self._agent_turn(s))
             try:
-                if s["kind"] == "all_out":
-                    await self.agent.run_after_action()
-                else:
-                    await self.agent.handle(s)
-            except Exception:
-                log.exception("agent failed on %s", s.get("kind"))
+                await asyncio.wait({self._turn_task})
+            except asyncio.CancelledError:
+                self._turn_task.cancel()
+                raise
             finally:
-                self._agent_running = False
+                self._turn_task = None
+
+    async def _agent_turn(self, s: dict) -> None:
+        try:
+            if s["kind"] == "all_out":
+                await self.agent.run_after_action()
+            else:
+                await self.agent.handle(s)
+        except Exception:
+            log.exception("agent failed on %s", s.get("kind"))
+        finally:
+            self._agent_running = False
 
     # ---- operations
     async def alarm(self) -> None:
         if self.incident.phase != "standby":
             return
         self.incident.start()
+        self._agent_running = True
+        self._preplan_task = asyncio.create_task(self._preplan())
 
-        async def run():
-            self._agent_running = True
-            try:
-                await self.agent.run_preplan()
-            except Exception:
-                log.exception("pre-plan failed")
-            finally:
-                self._agent_running = False
-                self.incident.begin_operations()
-        self._tasks.append(asyncio.create_task(run()))
+    async def _preplan(self) -> None:
+        try:
+            await self.agent.run_preplan()
+        except asyncio.CancelledError:                          # a reset ended this incident: no plan, no operations
+            raise
+        except Exception:
+            log.exception("pre-plan failed")
+        finally:
+            self._agent_running = False
+            self._preplan_task = None
+        self.incident.begin_operations()
+
+    async def _stop_agent_work(self) -> None:
+        """A reset ends whatever the agent is still doing for the old incident (its pre-plan, its turn on a situation, the queued
+        situations), so nothing it finishes later lands on the new incident. Repeated until nothing is left, since the old incident
+        may still raise a situation while a turn is being cancelled."""
+        while True:
+            while not self.situations.empty():
+                self.situations.get_nowait()
+            running = [t for t in (self._preplan_task, self._turn_task) if t is not None and not t.done()]
+            if not running:
+                break
+            for t in running:
+                t.cancel()
+            await asyncio.wait(running)
+        self._agent_running = False
 
     async def reset(self) -> None:
-        while not self.situations.empty():
-            self.situations.get_nowait()
+        await self._stop_agent_work()
         self.preplan, self.aar = None, None
         self._clear_local_writes()
         self.twin.data["tags"] = [t for t in self.twin.data.get("tags", []) if not str(t.get("id", "")).startswith(("obs-", "dryrun-"))]
@@ -461,7 +495,6 @@ async def preplan():
 @app.get("/api/vision/{image_id}.png")
 async def vision_image(image_id: str):
     """The exact picture the agent's vision tool sent to the model (aerial + footprint, side letters, hydrants, engine)."""
-    from fastapi.responses import FileResponse
     if not image_id.replace("_", "").isalnum():
         raise HTTPException(400, "bad image id")
     path = config.DATA_DIR / f"annotated_{image_id}.png"
@@ -469,7 +502,7 @@ async def vision_image(image_id: str):
         try:
             S().agent.tools.annotate_aerial(image_id)
         except ValueError as exc:
-            raise HTTPException(404, str(exc))
+            raise HTTPException(404, str(exc)) from exc
     return FileResponse(path, media_type="image/png")
 
 
@@ -537,7 +570,7 @@ async def scout_deploy(request: Request):
         n = int(body.get("n") or 5)
         seed = int(body["seed"]) if body.get("seed") is not None else None      # None: the build-time demo seed
     except (TypeError, ValueError) as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     if not 1 <= n <= 8:
         raise HTTPException(400, "n must be between 1 and 8 pucks")
     s.scout.start(room, n, seed)
@@ -594,7 +627,6 @@ async def report():
 
 @app.get("/api/report.md")
 async def report_md():
-    from fastapi.responses import PlainTextResponse
     return PlainTextResponse(report_markdown(S().report()), media_type="text/markdown; charset=utf-8")
 
 
@@ -696,7 +728,7 @@ async def inject(body: dict):
     try:
         hz = S().incident.mark_hazard(body["ref"], body.get("kind", "blocked"), body.get("note", ""), source="inject")
     except (KeyError, ValueError) as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     return {"ok": True, "hazard": hz}
 
 
@@ -714,9 +746,9 @@ async def unit_move(body: dict):
     try:
         S().incident.move_unit(body["unit"], float(body["x"]), float(body["y"]))
     except PermissionError as exc:
-        raise HTTPException(409, str(exc))
+        raise HTTPException(409, str(exc)) from exc
     except (KeyError, ValueError) as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     return {"ok": True}
 
 
@@ -726,7 +758,7 @@ async def unit_assign(body: dict):
     try:
         return S().incident.assign(body["unit"], body.get("task", "search"), body.get("target"), source="command")
     except (KeyError, ValueError) as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/registration")
@@ -734,7 +766,7 @@ async def registration(body: dict):
     try:
         reg = S().incident.set_registration(body.get("pairs"), body.get("scale"))
     except ValueError as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, str(exc)) from exc
     return {"ok": True, "registration": reg}
 
 
@@ -750,25 +782,24 @@ async def ws(sock: WebSocket):
     s = S()
     await sock.accept()
     q: asyncio.Queue = asyncio.Queue(maxsize=2000)
+    # hello, the latest objects and the backlog of this incident, then live traffic. The catch-up is taken and the queue joins in
+    # one step (no await in between): whatever happens while the catch-up is being sent waits in the queue, nothing is lost or
+    # sent twice.
+    catch_up = [s.hello(), *(obj for obj in (s.preplan, s.aar, s.scout_msg, s.scan_msg, s.beacons_msg, s.accountability_msg) if obj), *s.backlog]
+    s.sockets.add(q)
     try:
-        await sock.send_text(json.dumps(s.hello()))
-        for obj in (s.preplan, s.aar, s.scout_msg, s.scan_msg, s.beacons_msg, s.accountability_msg):
-            if obj:
-                await sock.send_text(json.dumps(obj))
-        for msg in list(s.backlog):
-            await sock.send_text(json.dumps(msg))
-        s.clients.add(q)
+        for obj in catch_up:
+            await sock.send_text(json.dumps(obj))
         while True:
-            msg = await q.get()
-            await sock.send_text(json.dumps(msg))
+            await sock.send_text(await q.get())
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
-        s.clients.discard(q)
+        s.sockets.discard(q)
 
 
 app.mount("/fixtures", StaticFiles(directory=str(config.FIXTURES)), name="fixtures")
-LIVE_VEXCEL = getattr(config, "LIVE_DIR", config.DATA_DIR / "live") / "vexcel"   # live Vexcel images (private: under data/live/), served read-only
+LIVE_VEXCEL = config.LIVE_DIR / "vexcel"          # live Vexcel images (private: under data/live/), served read-only
 LIVE_VEXCEL.mkdir(parents=True, exist_ok=True)
 app.mount("/live/vexcel", StaticFiles(directory=str(LIVE_VEXCEL)), name="live-vexcel")
 if (config.WEB_DIR / "index.html").exists():

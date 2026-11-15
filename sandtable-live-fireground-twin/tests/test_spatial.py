@@ -116,7 +116,6 @@ def test_walls_block_and_doors_do_not(twin):
     suite = twin.rooms("suite")[0]
     door = next(d for d in twin.data["doors"] if d["rooms"][0] == suite["id"])
     inside, outside = twin.room_centre(suite["id"]), twin.node(door["node"])["at"]
-    corridor_side = [2 * outside[0] - (inside[0] + outside[0]) / 2, 2 * outside[1] - (inside[1] + outside[1]) / 2]
     other = next(r for r in twin.rooms("suite") if r["id"] != suite["id"])
     assert twin.crosses_wall(inside, twin.room_centre(other["id"]))
     assert twin.walls_crossed(inside, twin.room_centre(other["id"])) >= 1
@@ -137,3 +136,35 @@ def test_anchor_plan_and_hose_stretch(twin, site):
 def test_describe_is_deterministic_and_free_of_coordinates(twin):
     a, b = json.dumps(twin.describe(), sort_keys=True), json.dumps(twin.describe(), sort_keys=True)
     assert a == b and '"at"' not in a and '"polygon"' not in a
+
+
+def test_anchor_plan_is_computed_once_and_handed_out_as_copies(twin):
+    a = plan_anchor_drops(twin)
+    a["anchors"].clear()
+    a["coverage_pct"] = -1
+    b = plan_anchor_drops(twin)
+    assert b["anchors"] and b["coverage_pct"] >= 0 and b == plan_anchor_drops(Twin(twin.data))     # same as a fresh twin's plan
+
+
+def test_wall_tests_agree_with_a_brute_force_scan_over_every_wall_and_door(twin):
+    """The per-floor indexes and the bounding-box rejection must not change an answer: compare with the plain definition."""
+    import random
+    from sandtable.spatial import _seg_intersection
+
+    def brute(p0, p1, margin=0.15):
+        floor, hits = twin.exercise_floor, []
+        for w in twin.data["walls"]:
+            hit = _seg_intersection(p0, p1, w["a"], w["b"]) if w["floor"] == floor else None
+            if hit is None or any(math.dist(hit, d["at"]) <= d.get("width_m", 0.9) / 2 + margin for d in twin.data["doors"] if d["floor"] == floor):
+                continue
+            if not any(math.dist(hit, h) < 0.08 for h in hits):
+                hits.append(hit)
+        return len(hits)
+    rnd = random.Random(3)
+    xs = [p[0] for p in twin.floor()["outline"]]
+    ys = [p[1] for p in twin.floor()["outline"]]
+    for _ in range(400):
+        p0 = (rnd.uniform(min(xs), max(xs)), rnd.uniform(min(ys), max(ys)))
+        p1 = (p0[0] + rnd.uniform(-8, 8), p0[1] + rnd.uniform(-8, 8))
+        n = brute(p0, p1)
+        assert twin.walls_crossed(p0, p1) == n and twin.crosses_wall(p0, p1) == (n > 0)

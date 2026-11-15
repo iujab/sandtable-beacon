@@ -373,3 +373,136 @@ def test_layout_table_numbers_match_the_documents():
     docs = (ROOT / "hardware" / "BRINGUP.md").read_text(encoding="utf-8") + (ROOT / "hardware" / "LAYOUT.md").read_text(encoding="utf-8")
     for n in ("3.17 m by 2.88 m", "2.23 m", "0.90 m", "1.33 m", "0.12 m", "2.40 m"):
         assert n in docs, n
+
+
+# --- board to board: our SS-TWR firmware's RTT lines and the baseline (docs/BEACON_FEED.md A12) ----------------------
+
+from beacon.host.twr import (TWR_SAMPLE, BaselineEstimator, TwrError, TwrHeartbeat, TwrIdent, TwrPoll, TwrRange,  # noqa: E402
+                             TwrTimeout, TwrFail, parse_twr_line)
+
+
+def test_twr_lines_in_the_firmware_format():
+    assert parse_twr_line("R,12,1.572,-3.21,-78.9,977") == TwrRange(12, 1.572, -3.21, -78.9, 977)
+    assert parse_twr_line("R,7,0.237,1.05") == TwrRange(7, 0.237, 1.05)            # the 4-field form of the old header
+    assert parse_twr_line("T,13") == TwrTimeout(13)
+    assert parse_twr_line("E,14,0000a000") == TwrError(14, "0000A000")
+    assert parse_twr_line("P,200,7522") == TwrPoll(200, 7522)
+    assert parse_twr_line("H,7522,11,0,0") == TwrHeartbeat(7522, 11, 0, 0)
+    assert parse_twr_line("BOOT,RESP,DECA0302,1A2B3C4D5E6F7081") == TwrIdent("BOOT", "RESP", "DECA0302", "1A2B3C4D5E6F7081")
+    assert parse_twr_line("ID,INIT,DECA0302,1A2B3C4D5E6F7081,35") == TwrIdent("ID", "INIT", "DECA0302", "1A2B3C4D5E6F7081", 35)
+    assert parse_twr_line("FAIL,INIT,config") == TwrFail("INIT", "config")
+    assert parse_twr_line(b"R,1,2.000,0.00,-80.0,1000\r\n") == TwrRange(1, 2.0, 0.0, -80.0, 1000)
+
+
+@pytest.mark.parametrize("line", ["", "R,12", "R,x,1.5,0", "R,1,1.5,0,-80", "Range 1.5 m", "T,", "H,1,2,3",
+                                  '{"TWR": {"R":6614,"a16":"0x0001","S":"OK","D cm":231}}', "distance: 1.23 m",
+                                  "BOOT,TAG,DECA,00", "\x00\xff garbage"])
+def test_twr_parser_ignores_everything_else(line):
+    assert parse_twr_line(line) is None
+
+
+def test_research_lines_are_not_twr_and_twr_lines_are_not_phone_ranges():
+    for line in LEARN_SAMPLE:
+        assert parse_twr_line(line) is None
+    for line in TWR_SAMPLE:
+        assert parse_line(line).readings == []
+
+
+def _noisy(n, mean=1.572, sd=0.04, seed=3):
+    import random
+    rng = random.Random(seed)
+    return [rng.gauss(mean, sd) for _ in range(n)]
+
+
+def test_baseline_estimator_is_robust():
+    est = BaselineEstimator(window=60, min_samples=20)
+    vals = _noisy(50) + [4.95, 0.31, 9.9]                       # three wild multipath readings
+    for i, v in enumerate(vals):
+        est.add(v, 100.0 + i * 0.2)
+    e = est.estimate(100.0 + len(vals) * 0.2)
+    assert abs(e["d_m"] - 1.572) < 0.02 and 0.025 < e["sigma_m"] < 0.06
+    assert e["rejected"] >= 3 and e["samples"] == e["window"] - e["rejected"]
+
+
+def test_baseline_estimator_needs_enough_fresh_samples():
+    est = BaselineEstimator(window=50, min_samples=20, max_age_s=30.0)
+    for i, v in enumerate(_noisy(19)):
+        est.add(v, 100.0 + i)
+    assert est.estimate(120.0) is None                           # 19 < 20
+    est.add(1.57, 119.0)
+    assert est.estimate(120.0)["samples"] == 20
+    assert est.estimate(160.0) is None                           # all older than 30 s
+    assert est.add(0.01, 161.0) is False and est.add(200.0, 161.0) is False and est.implausible == 2
+    with pytest.raises(ValueError):
+        BaselineEstimator(window=10, min_samples=11)
+
+
+def test_baseline_estimator_constant_window_keeps_everything():
+    est = BaselineEstimator(window=30, min_samples=10)
+    for i in range(30):
+        est.add(2.0, float(i))
+    e = est.estimate(30.0)
+    assert e == {"d_m": 2.0, "sigma_m": 0.01, "samples": 30, "rejected": 0, "window": 30}
+
+
+def test_host_never_sends_a_board_to_board_range_as_a_phone_range():
+    poster = Poster("http://127.0.0.1:9", post=False)
+    h = Host(server="x", puck="P1", name="test", poster=poster, log=lambda m: None, baseline_to="P2")
+    for line in TWR_SAMPLE * 3:
+        h.on_line(line, "rtt")
+    h.tick(time.time() + 10)
+    kinds = []
+    while not poster.q.empty():
+        kinds.append(poster.q.get_nowait()["kind"])
+    assert "uwb_puck" not in kinds
+    hb = h.heartbeat()
+    assert hb["twr"]["role"] == "INIT" and hb["twr"]["ranges"] == 15 and hb["twr"]["timeouts"] == 3
+    assert hb["ranges_sent"] == 0 and hb["lines_seen"] == len(TWR_SAMPLE) * 3
+
+
+def test_host_posts_the_baseline_to_the_server(stub_server):
+    from beacon.baseline import make_baseline
+    poster = Poster(f"http://127.0.0.1:{STUB_PORT}", post=True)
+    logs = []
+    h = Host(server=f"http://127.0.0.1:{STUB_PORT}", puck="P1", name="test", poster=poster, log=logs.append,
+             baseline_to="P2", estimator=BaselineEstimator(window=50, min_samples=20))
+    t0 = time.time()
+    for i, v in enumerate(_noisy(40)):
+        h.on_line(f"R,{i},{v:.3f},-3.21,-78.9,977", "rtt")
+    sent = h.baseline_tick(t0 + 1)
+    assert sent is not None and h.baselines_sent == 1
+    assert h.baseline_tick(t0 + 4) is None                       # unchanged and not yet a minute: not re-posted
+    paths = [p for p, _ in stub_server]
+    assert paths == ["/api/pucks/baseline"]
+    body = stub_server[0][1]
+    assert body["pair"] == ["P1", "P2"] and body["source"] == "twr" and body["samples"] >= 20
+    assert abs(body["d_m"] - 1.572) < 0.03
+    make_baseline(body["pair"], body["d_m"], sigma_m=body["sigma_m"], samples=body["samples"], source=body["source"], t=t0)
+
+
+def test_dry_run_baseline_is_printed_never_posted(stub_server):
+    p = _run_host(["--server", f"http://127.0.0.1:{STUB_PORT}", "--puck", "P1", "--baseline-to", "P2", "--baseline-min", "3",
+                   "--dry-run", "--seconds", "4.5"])
+    assert p.returncode == 0, p.stderr
+    assert all(path == "/api/ingest" for path, _ in stub_server)    # never /api/pucks/baseline
+    assert "DRY RUN baseline P1-P2" in p.stderr and "not posted" in p.stderr
+    assert not [o for _, body in stub_server for o in body if o["kind"] == "uwb_puck" and not o.get("dry_run")]
+
+
+def test_baseline_arguments_are_checked():
+    assert _run_host(["--puck", "P1", "--baseline-to", "P1", "--dry-run", "--no-post"]).returncode == 2
+    assert _run_host(["--puck", "uno", "--baseline-to", "P2", "--dry-run", "--no-post"]).returncode == 2
+    assert _run_host(["--puck", "P1", "--baseline-to", "P9", "--dry-run", "--no-post"]).returncode == 2
+    assert _run_host(["--puck", "P1", "--baseline-to", "P2", "--baseline-min", "60", "--dry-run", "--no-post"]).returncode == 2
+    p = _run_host(["--puck", "P1", "--rtt", "127.0.0.1:jlink", "--no-post", "--seconds", "1"])
+    assert p.returncode == 2 and "Traceback" not in p.stderr and "HOST:PORT" in p.stderr
+
+
+def test_twr_offset_is_subtracted_before_the_baseline():
+    poster = Poster("http://127.0.0.1:9", post=False, echo=lambda b: None)
+    h = Host(server="x", puck="P1", name="test", poster=poster, log=lambda m: None, baseline_to="P2",
+             estimator=BaselineEstimator(window=30, min_samples=10), twr_offset_m=0.05)
+    for i in range(20):
+        h.on_line(f"R,{i},1.620,0.00,-80.0,977", "rtt")
+    body = h.baseline_tick(time.time())
+    assert body["d_m"] == 1.57 and body["pair"] == ["P1", "P2"]

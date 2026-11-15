@@ -40,13 +40,18 @@ Not seen, or not run:
 - The Beacon server in **live** mode, the puck host against a server, and reading a board's log (RTT) with this
   project's host were not run on the UNO Q.
 - **The two boards on the UNO Q do not carry the Nearby Interaction firmware.** From about 5 pm that day they run a
-  board-to-board ranging firmware the owner is developing separately, so an iPhone cannot range them until they are
-  flashed again (`hardware/FLASH.md`). Before that, two Bluetooth scans had found no advertiser offering the Nearby
+  board-to-board ranging firmware (now in this repository as `hardware/twr_firmware/`; on 15 November the two boards
+  ranged each other through it at about 4.9 Hz, `results/twr_measured_2026-11-15.json`), so an iPhone cannot range them
+  until they are flashed with Nearby Interaction again (`hardware/FLASH.md`). Board to board and phones need different
+  firmware: `hardware/BOARD_TO_BOARD.md`. Before that, two Bluetooth scans had found no advertiser offering the Nearby
   Interaction services and neither serial port answered `help`. Whether the owner's other boards carry the Nearby
   Interaction firmware is still unknown; the check with Qorvo's iPhone app (`hardware/BRINGUP.md`) is the test.
 - **OpenOCD is already installed on the UNO Q** (0.12.0, with the J-Link driver and the nRF52 target), so SEGGER's tools
-  are not needed there to read a board's RTT log or to flash a `.hex`. It needs `root` to open the J-Link. This project's
-  guides were not tried with it.
+  are not needed there to read a board's RTT log or to flash a `.hex`. It needs `root` to open the J-Link. Flashing the
+  TWR firmware with it worked on 15 November in this form (one board per `adapter serial`; stop anything holding the
+  probe first): `openocd -c "adapter driver jlink" -c "adapter serial <JLINK_SERIAL>" -c "transport select swd" -f
+  target/nrf52.cfg -c init -c "program build/INITIATOR/app.hex verify reset exit"`. Reading RTT with OpenOCD for this
+  project's host is written in `hardware/twr_firmware/README.md`, not run.
 
 ## What the research says about the UNO Q
 

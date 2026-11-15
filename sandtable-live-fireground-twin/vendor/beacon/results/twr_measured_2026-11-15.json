@@ -1,0 +1,83 @@
+{
+ "schema": "sandtable.beacon.twr_measured/1",
+ "provenance": {
+  "kind": "hand-transcribed measurement summary",
+  "produced_by_repo_code": false,
+  "by": "the bench agent (an AI agent working on the owner's machine), not a person and not this repository's code",
+  "source": "the ranging dashboard running on the owner's Arduino UNO Q, endpoint /api/state (its summary over the last 50 ranges), read on 2026-11-15 between about 05:50 and 06:30 UTC",
+  "transcribed_into_repo": "2026-11-15 by the lead of this module, copied unchanged from the bench agent's notes (hardware/twr_firmware/README.md, 'Measured')",
+  "caveats": [
+   "The spacings '~0.24 m' and '~1.57 m' are the bench notes' descriptions; no independent tape-measure value was recorded, so the absolute accuracy (the constant bias) of these ranges is UNKNOWN.",
+   "Antenna delays were the uncalibrated default 16385 (TX and RX): every distance carries an unknown constant offset.",
+   "Two boards, one bench, one evening, line of sight, short range. Nothing here says anything about range through walls, at 10 m, or between boards on the floor.",
+   "The dashboard's RX-level number uses the generic formula constant -121.7 dB, not a per-board calibration."
+  ]
+ },
+ "hardware": {
+  "boards": "2 x Qorvo DWM3001CDK (nRF52833 + DW3110), on the owner's Arduino UNO Q through a USB-C hub",
+  "roles": [
+   "INITIATOR",
+   "RESPONDER"
+  ]
+ },
+ "firmware": {
+  "source": "hardware/twr_firmware (app.c rebuilt by prepare.py; sha256 e2e205e21f046bbdba2c4921bd95fff902857934c4459a947eebf2187b5be94a differs from the measured build's source only in its header comment)",
+  "method": "single-sided two-way ranging (SS-TWR), DW3000 API examples ex_06a/ex_06b lineage",
+  "profile": {
+   "channel": 5,
+   "preamble_length": 1024,
+   "pac": 32,
+   "data_rate": "850 kbps",
+   "preamble_code": 9,
+   "sfd": "non-standard 8 symbol",
+   "sts": "off",
+   "responder_turnaround_us": 2700,
+   "initiator_rx_timeout_us": 6000,
+   "initiator_rx_after_tx_delay_us": 650,
+   "range_period_ms": 200
+  },
+  "antenna_delay": {
+   "tx": 16385,
+   "rx": 16385,
+   "calibrated": false
+  }
+ },
+ "runs": [
+  {
+   "label": "boards about 0.24 m apart on the bench",
+   "window_ranges": 50,
+   "rate_hz": 4.9,
+   "recent_success_pct": 100,
+   "late_replies": 0,
+   "mean_m": 0.237,
+   "sd_m": 0.056,
+   "rx_level_dbm": -81.9,
+   "preamble_accumulated": 977,
+   "preamble_length": 1024,
+   "paired": "50/50"
+  },
+  {
+   "label": "boards separated by the owner, about 1.57 m",
+   "window_ranges": 50,
+   "rate_hz": 4.9,
+   "recent_success_pct": 100,
+   "ok_cumulative": 7522,
+   "timeouts_cumulative": 11,
+   "cumulative_success_pct": 99.85,
+   "cumulative_success_note": "derived: 100 x ok / (ok + timeouts), computed by hand from the two counts above",
+   "late_replies": 0,
+   "mean_m": 1.572,
+   "sd_m": 0.04,
+   "min_m": 1.479,
+   "max_m": 1.705,
+   "rx_level_dbm": -78.9,
+   "preamble_accumulated": 977,
+   "preamble_length": 1024,
+   "paired": "50/50"
+  }
+ ],
+ "failures_seen_while_tuning": [
+  "Responder turnaround 1100 us is shorter than the poll's air time (about 1.3 ms at 850 kbps with a 1024-symbol preamble): every reply was late (late_tx climbed) and the initiator saw 100% timeouts. Fixed at 2700 us.",
+  "Without dwt_configciadiag(DW_CIA_DIAG_LOG_ALL) the receive diagnostic registers read 0 (no RX level, no preamble count)."
+ ]
+}

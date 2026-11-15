@@ -1,163 +1,134 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="day">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sandtable Beacon — incident command</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sandtable Beacon command board</title>
+<meta name="description" content="Incident command board: the building before anyone enters, the phones the beacon hears, and the orders.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='%2313212e'/%3E%3Crect x='9' y='17' width='14' height='3' fill='%23f5d90a'/%3E%3Ccircle cx='16' cy='11' r='3.2' fill='%23f5d90a'/%3E%3C/svg%3E">
+<script>try { const t = localStorage.getItem("sandtable-theme"); if (t === "night" || t === "day") document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">{"imports": {"three": "./vendor/three.module.js"}}</script>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="mark" aria-hidden="true"></span>
-    <div>
-      <div class="name">SANDTABLE BEACON</div>
-      <div class="sub" id="address">loading the building…</div>
-    </div>
+<a class="skip" href="#story">Skip to the incident story</a>
+<header class="hd">
+  <a class="brand" href="/" title="Sandtable Beacon command board">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="6"/><rect class="m-y" x="8.5" y="17" width="15" height="3.2"/><circle class="m-y" cx="16" cy="10.8" r="3.3"/></svg>
+    <span class="brand-w">Sandtable Beacon</span>
+  </a>
+  <div class="bld">
+    <div class="addr" id="addr">Loading the building</div>
+    <div class="bld-sub" id="bld-sub"></div>
   </div>
-  <div class="status">
-    <div class="phase" id="phase">STANDBY</div>
-    <div class="clock" id="clock">00:00</div>
+  <div class="inc" aria-live="polite">
+    <span class="phase" id="phase">Standby</span>
+    <span class="clock" id="clock" aria-label="Incident clock">00:00</span>
   </div>
-  <div class="seg modeseg" id="mode-seg" role="tablist" aria-label="Sensing mode">
-    <button data-mode="beacon" class="on" title="Occupants located by their phones">Beacon</button>
-    <button data-mode="scout" title="Simulated radar: a person who breathes or moves">Scout</button>
-    <button data-mode="crews" title="Simulated tags on firefighters; the mayday drill">Crews</button>
+  <div class="modes seg" id="mode-seg" role="radiogroup" aria-label="What finds people">
+    <button role="radio" data-mode="beacon" aria-checked="true" title="Phones running the opt-in app answer the pucks">Beacon</button>
+    <button role="radio" data-mode="scout" aria-checked="false" title="Simulated radar: pucks listen for a person who breathes or moves">Scout</button>
+    <button role="radio" data-mode="crews" aria-checked="false" title="Simulated tags on firefighters, and the mayday drill">Crews</button>
   </div>
-  <div class="controls">
-    <button id="btn-alarm" class="primary">Dispatch alarm</button>
+  <div class="acts">
+    <button id="btn-primary" class="btn primary">Dispatch alarm</button>
     <div class="split" id="story-split">
-      <button id="btn-story" title="SIM only: plays the two-minute exercise hands-free">Run beacon drill</button>
-      <button id="btn-story-menu" class="caret" aria-label="Choose the exercise" aria-haspopup="true" aria-expanded="false"><span></span></button>
+      <button id="btn-story" class="btn">Run exercise</button>
+      <button id="btn-story-menu" class="btn caret" aria-label="Choose the exercise" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
       <div class="menu" id="story-menu" hidden>
-        <label><input type="radio" name="script" value="beacon" checked><span><b>Beacon</b><small>phones in the fire room answer the pucks</small></span></label>
-        <label><input type="radio" name="script" value="scout"><span><b>Scout scan</b><small>simulated radar finds a person through smoke</small></span></label>
-        <label><input type="radio" name="script" value="mayday"><span><b>Mayday</b><small>a crew stops moving; the rescue is re-planned</small></span></label>
-        <label class="sep"><input type="checkbox" id="opt-guided"><span><b>Guided</b><small>you move Engine 1 (shift-click does the same)</small></span></label>
+        <p class="menu-h">Hands-free exercise</p>
+        <label><input type="radio" name="script" value="beacon" checked><span><b>Beacon</b><small>Two pucks in the fire room; phones with the app answer</small></span></label>
+        <label><input type="radio" name="script" value="scout"><span><b>Scout scan</b><small>Simulated radar finds a person through smoke</small></span></label>
+        <label><input type="radio" name="script" value="mayday"><span><b>Mayday</b><small>A crew stops moving; the rescue is re-planned</small></span></label>
+        <label class="sep"><input type="checkbox" id="opt-guided"><span><b>Guided</b><small>You move Engine 1 on the plan; the script does the rest</small></span></label>
       </div>
     </div>
-    <button id="btn-throw" class="scout-btn" disabled title="Start an incident first">Throw pucks</button>
-    <button id="btn-inject" title="Then click a corridor, stair or suite on the plan">Inject hazard</button>
-    <button id="btn-mayday" class="danger-ghost">Mayday</button>
-    <button id="btn-reset">Reset</button>
+    <button id="btn-mayday" class="btn danger" title="Declare a mayday for the selected crew">Mayday</button>
+    <div class="more">
+      <button id="btn-more" class="btn icon" aria-label="More" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="13" cy="8" r="1.6"/></svg></button>
+      <div class="menu right" id="more-menu" hidden>
+        <a class="mi" id="lnk-report" href="/report.html" target="_blank" rel="noopener">Open the incident report<small>Printable: people, accountability, timeline</small></a>
+        <button class="mi" id="btn-sound" aria-pressed="false">Speak radio traffic<small id="sound-state">Off</small></button>
+        <button class="mi" id="btn-theme">Night colours<small id="theme-state">For a dark cab</small></button>
+        <button class="mi" id="btn-sources">Sources and data feeds<small>What is real here, feeds for other tools</small></button>
+        <button class="mi warn" id="btn-reset">Reset the board<small>Ends the incident and clears the exercise</small></button>
+      </div>
+    </div>
   </div>
 </header>
 
-<div class="modes"><div class="badges" id="badges"></div><div class="modes-note" id="modes-note"></div>
-  <div class="feeds">
-    <button id="btn-sound" class="ghost" title="Speak radio traffic" aria-pressed="false">Sound off</button>
-    <a class="ghost-btn" id="lnk-report" href="/report.html" target="_blank" rel="noopener" title="The incident report a command post keeps: people found, accountability, timeline (opens a printable page)">Report</a>
-    <button id="btn-feeds" class="ghost" aria-haspopup="true" aria-expanded="false">Feeds <span id="feeds-n"></span></button>
-    <div class="pop" id="feeds-pop" hidden>
-      <div class="pop-head">What other tools can read <small>polled from this server</small></div>
-      <div id="feeds-list"></div>
-      <p class="pop-note">Cursor-on-Target is the format TAK clients read; not tested against a TAK server.</p>
-    </div>
-  </div>
-</div>
-
-<div class="mayday-bar" id="mayday-bar" hidden>
-  <span class="mayday-word">MAYDAY</span>
-  <span id="mayday-text"></span>
+<div class="mayday-bar" id="mayday-bar" role="alert" hidden>
+  <span class="mayday-word">Mayday</span>
+  <span class="mayday-text" id="mayday-text"></span>
   <span class="mayday-timer" id="mayday-timer"></span>
 </div>
 
-<main class="grid">
-  <section class="col left">
-    <div class="panel aerial-panel">
-      <div class="panel-head">
-        <h2>Outside <small id="aerial-src"></small></h2>
-        <div class="seg" id="aerial-seg"></div>
+<main class="main">
+  <section class="table" id="table" aria-label="The building">
+    <div class="tbar">
+      <div class="tb-floor" id="tb-floor"></div>
+      <div class="exstep" id="exstep" role="status"></div>
+      <div class="seg" id="view-seg" role="tablist" aria-label="View">
+        <button role="tab" data-view="2d" aria-selected="false">Plan</button>
+        <button role="tab" data-view="3d" aria-selected="true">3D twin</button>
+        <button role="tab" data-view="aerial" aria-selected="false">Aerial</button>
+        <button role="tab" data-view="scan" id="btn-scan" aria-selected="false" hidden title="The Matterport scan itself (Showcase SDK)">Scan</button>
       </div>
-      <div class="aerial-wrap" id="aerial-wrap">
-        <img id="aerial-img" alt="Aerial image of the building">
+      <div class="tb-tools">
+        <div class="seg" id="focus-seg" hidden aria-label="Zoom">
+          <button data-focus="room" aria-pressed="true">Room</button>
+          <button data-focus="floor" aria-pressed="false">Floor</button>
+        </div>
+        <button id="btn-smoke" class="btn tool" aria-pressed="false" hidden title="Illustration: what smoke does to a camera, and what it does not do to the radio">Smoke view</button>
+        <button id="btn-inject" class="btn tool" aria-pressed="false" title="Then tap a corridor, a stair or a suite on the plan">Mark lost</button>
+        <button id="btn-place" class="btn tool" aria-pressed="false" title="Where did the beacon land? Pick the floor, tap P1, tap toward P2">Place pucks</button>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div id="twin3d" class="view"></div>
+      <svg id="plan" class="view" xmlns="http://www.w3.org/2000/svg" hidden role="img" aria-label="Floor plan"></svg>
+      <div id="aerialview" class="view" hidden>
+        <img id="aerial-img" alt="Aerial image of the building and its surroundings">
         <svg id="aerial-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="aerial-bar"><div class="seg" id="aerial-seg"></div><span class="aerial-src" id="aerial-src"></span></div>
       </div>
-      <div class="sides" id="aerial-sides" hidden></div>
-    </div>
-    <div class="panel record-panel">
-      <div class="panel-head tabs" role="tablist">
-        <button class="tab on" data-tab="acc" role="tab">Accountability <i class="tab-dot" id="acc-dot" hidden></i></button>
-        <button class="tab" data-tab="record" role="tab">Record</button>
-        <button class="tab" data-tab="scout" role="tab">Scout <i class="tab-dot" id="scout-dot" hidden></i></button>
-        <small id="record-src" class="tab-src"></small>
-      </div>
-      <div class="tabpane acc-pane" id="tab-acc"></div>
-      <div class="tabpane" id="tab-record" hidden>
-        <div class="record" id="record"></div>
-        <div class="tenants-head">Floor <span id="floor-no"></span> tenants <small id="tenants-note">(hover to find the suite)</small></div>
-        <div class="tenants" id="tenants"></div>
-      </div>
-      <div class="tabpane scout-card" id="tab-scout" hidden></div>
+      <div id="scanview" class="view" hidden></div>
+      <button class="ticker" id="ticker" hidden title="Open the radio log"></button>
+      <div class="cue" id="cue" role="status" hidden></div>
+      <div class="inject-hint" id="inject-hint" hidden>Tap a corridor, a stair or a suite door to mark it lost. Esc to cancel.</div>
+      <div class="smoke-claim" id="smoke-claim" hidden>Illustration, not a sensor model. Smoke particles are about the size of light and LiDAR wavelengths (under 2 µm) and scatter them; the pucks' 6.5 GHz radio, with a 4.6 cm wavelength, passes. The radio layer is drawn on top.</div>
+      <div class="smoke-inset" id="smoke-inset" hidden><span>What a camera or LiDAR sees (illustration)</span></div>
+      <div class="devbar" id="devbar" hidden></div>
+      <div class="place" id="place" hidden></div>
+      <div class="selcard" id="sel" hidden></div>
+      <div class="key" id="key"></div>
     </div>
   </section>
 
-  <section class="col centre">
-    <div class="panel twin-panel">
-      <div class="panel-head">
-        <h2>Inside <small id="twin-src"></small></h2>
-        <div class="head-tools">
-          <button id="btn-place" class="ghost" title="Put the pucks where they were tape-measured: click the plan once per puck, then send them to the Beacon module">Place pucks</button>
-          <button id="btn-smoke" class="ghost" aria-pressed="false" title="Illustration: what smoke does to a camera, and what it does not do to the radio">Smoke view</button>
-          <div class="seg" id="focus-seg" hidden>
-            <button data-focus="room" class="on">Room</button>
-            <button data-focus="floor">Floor</button>
-          </div>
-          <div class="seg" id="view-seg">
-            <button data-view="3d" class="on">3D twin</button>
-            <button data-view="2d">Plan</button>
-            <button data-view="scan" id="btn-scan" hidden title="The Matterport scan itself (Showcase SDK)">Scan</button>
-          </div>
-        </div>
-      </div>
-      <div class="scan-head" id="scan-head" hidden></div>
-      <div class="scan-head beacon-head" id="beacon-head" hidden></div>
-      <div class="twin-wrap">
-        <div id="twin3d"></div>
-        <svg id="plan" xmlns="http://www.w3.org/2000/svg" hidden></svg>
-        <div id="scanview" hidden></div>
-        <div class="smoke-claim" id="smoke-claim" hidden>Illustration, not a sensor model. Smoke particles are about the size of light and LiDAR wavelengths (under 2 µm) and scatter them; the pucks' 6.5 GHz radio, with a 4.6 cm wavelength, passes. The radio layer is drawn on top.</div>
-        <div class="smoke-inset" id="smoke-inset" hidden><span>What a camera or LiDAR sees (illustration)</span></div>
-        <div class="devbar" id="devbar" hidden></div>
-        <div class="place-panel" id="place-panel" hidden></div>
-        <div class="cue" id="cue" hidden></div>
-        <div class="inject-hint" id="inject-hint" hidden>Click a corridor, a stair or a suite door to mark it lost. Esc to cancel.</div>
-        <div class="legend" id="legend"></div>
-      </div>
-      <div class="here" id="here"></div>
-    </div>
-  </section>
-
-  <section class="col right">
-    <div class="panel board-panel">
-      <div class="panel-head"><h2>People and crews</h2><span class="par" id="par"></span></div>
-      <div id="board"></div>
-    </div>
-    <div class="panel agent-panel">
-      <div class="panel-head">
-        <h2>Command agent <small id="agent-state"></small></h2>
-        <div class="seg">
-          <button id="btn-preplan" disabled>Pre-plan</button>
-          <button id="btn-aar" disabled>After-action</button>
-        </div>
-      </div>
-      <div class="agent-log" id="agent-log"><div class="empty">Dispatch the alarm: the agent reads the record, the aerial and the twin, and writes the pre-plan.</div></div>
-    </div>
-    <div class="panel radio-panel">
-      <div class="panel-head"><h2>Radio</h2></div>
-      <div class="radio" id="radio"><div class="empty">No traffic.</div></div>
-    </div>
-  </section>
+  <aside class="story" id="story" aria-label="Incident story">
+    <section class="step" data-step="know">
+      <h2 class="step-h"><button class="step-btn" aria-expanded="true" aria-controls="step-know" data-step-btn="know"><span class="step-n">1</span><span class="step-t">Know before you go</span><span class="step-s" id="sum-know"></span></button></h2>
+      <div class="step-b" id="step-know"></div>
+    </section>
+    <section class="step" data-step="scene">
+      <h2 class="step-h"><button class="step-btn" aria-expanded="false" aria-controls="step-scene" data-step-btn="scene"><span class="step-n">2</span><span class="step-t" id="title-scene">Beacon on scene</span><span class="step-s" id="sum-scene"></span></button></h2>
+      <div class="step-b" id="step-scene" hidden></div>
+    </section>
+    <section class="step" data-step="command">
+      <h2 class="step-h"><button class="step-btn" aria-expanded="false" aria-controls="step-command" data-step-btn="command"><span class="step-n">3</span><span class="step-t">Command</span><span class="step-s" id="sum-command"></span></button></h2>
+      <div class="step-b" id="step-command" hidden></div>
+    </section>
+  </aside>
 </main>
 
-<aside class="doc" id="doc" hidden>
-  <div class="doc-head"><h2 id="doc-title"></h2><button id="doc-close" aria-label="Close">Close</button></div>
+<footer class="foot" id="foot"></footer>
+
+<div class="pop" id="sources-pop" role="dialog" aria-label="Sources and data feeds" hidden></div>
+<aside class="doc" id="doc" role="dialog" aria-labelledby="doc-title" hidden>
+  <div class="doc-head"><h2 id="doc-title"></h2><button id="doc-close" class="btn">Close</button></div>
   <div class="doc-body" id="doc-body"></div>
 </aside>
-
-<footer class="foot" id="foot"></footer>
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
 <script src="live_marker.js"></script>
 <script type="module" src="app.js"></script>
 </body>

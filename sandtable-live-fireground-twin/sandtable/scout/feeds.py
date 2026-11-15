@@ -40,6 +40,7 @@ from __future__ import annotations
 import math
 import time
 import xml.etree.ElementTree as ET
+from typing import Callable
 
 UNKNOWN = "9999999.0"
 CREW_STALE_S = 120.0
@@ -384,9 +385,10 @@ def _cot_elements(scan, units, twin, now, units_simulated, victims, beacons=None
 
 
 def cot_events(scan: dict | None, units: list[dict], twin, now: float, *, units_simulated: bool = True, victims: dict | None = None,
-               beacons: dict | None = None, phones: dict | None = None) -> list[tuple[str, str]]:
-    """Each CoT event as a one-line XML string, with its uid."""
-    return [(uid, ET.tostring(ev, encoding="unicode")) for uid, ev in _cot_elements(scan, units, twin, now, units_simulated, victims, beacons, phones)]
+               beacons: dict | None = None, phones: dict | None = None, only: Callable[[str], bool] | None = None) -> list[tuple[str, str]]:
+    """Each CoT event as a one-line XML string, with its uid. `only`: keep the events whose uid it accepts (the rest are not serialised)."""
+    return [(uid, ET.tostring(ev, encoding="unicode")) for uid, ev in _cot_elements(scan, units, twin, now, units_simulated, victims, beacons, phones)
+            if only is None or only(uid)]
 
 
 def scan_to_cot(scan: dict | None, units: list[dict], twin, now: float, *, units_simulated: bool = True, victims: dict | None = None,

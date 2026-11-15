@@ -14,7 +14,7 @@ run replays exactly.
 (and the agent emits them on the stream); `file_record_check` also appends to
 `data/record_checks.json` (git-ignored) with the status "filed locally (fixture mode)".
 
-Patterns (catalogue text, wall words, ring room shares) copied from Sandtable's command agent
+Patterns (catalogue text, ring room shares) copied from Sandtable's command agent
 (`sandtable-live-fireground-twin/sandtable/agent/tools.py`, sibling project, lane L01), with credit.
 """
 from __future__ import annotations
@@ -202,13 +202,6 @@ def tenth(v) -> float | None:
     return None if v is None else round(float(v), 1)
 
 
-def confidence_band(c) -> str | None:
-    if c is None:
-        return None
-    c = float(c)
-    return "high" if c >= 0.8 else "medium" if c >= 0.5 else "low"
-
-
 def devices_band(n) -> str:
     """Cold device counts change from one scan window to the next: the prompt says only whether any were heard."""
     return "some" if int(n or 0) > 0 else "none"
@@ -254,48 +247,6 @@ def part_of_room(twin: Twin, room_id: str | None, x, y) -> str | None:
     hy = _compass(b - 90.0) if float(y) >= cy else _compass(b + 90.0)    # +y points to compass b - 90
     ns, ew = (hx, hy) if hx in ("north", "south") else (hy, hx)
     return f"{ns}-{ew} quarter"
-
-
-def _ccw(poly) -> bool:
-    return sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly))) > 0
-
-
-def _seg_dist(p, a, b) -> float:
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    L2 = dx * dx + dy * dy
-    k = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
-    return math.hypot(p[0] - a[0] - k * dx, p[1] - a[1] - k * dy)
-
-
-def wall_words(twin: Twin, room_id: str | None, x, y) -> str | None:
-    """'about 2 m from the south wall and 3 m from the west wall' in whole metres, wall names from the twin's
-    georeference (the same compass naming as the session's text lines, beacon/session.py describe_point)."""
-    if not room_id or x is None or y is None or room_id not in twin._rooms:
-        return None
-    poly = twin.room(room_id)["polygon"]
-    b = float((twin.data.get("georef") or {}).get("bearing_deg", 90.0))
-    ccw = _ccw(poly)
-    best: dict[str, float] = {}
-    for i in range(len(poly)):
-        a, c = poly[i], poly[(i + 1) % len(poly)]
-        dx, dy = c[0] - a[0], c[1] - a[1]
-        nx, ny = (dy, -dx) if ccw else (-dy, dx)
-        compass = (b - math.degrees(math.atan2(ny, nx))) % 360.0
-        name = ("north", "east", "south", "west")[int(round(compass / 90.0)) % 4]
-        d = _seg_dist((float(x), float(y)), a, c)
-        best[name] = min(best.get(name, float("inf")), d)
-    if not best:
-        return None
-    first = min(best, key=best.get)
-    perp = {"north": ("east", "west"), "south": ("east", "west"), "east": ("north", "south"), "west": ("north", "south")}[first]
-    others = [n for n in perp if n in best]
-
-    def part(name):
-        m = int(round(best[name]))
-        return f"against the {name} wall" if m == 0 else f"{m} m from the {name} wall"
-    if not others:
-        return "about " + part(first)
-    return "about " + part(first) + " and " + part(min(others, key=best.get))
 
 
 def ring_rooms(twin: Twin, cx: float, cy: float, r: float, arcs, floor: str | None = None) -> list[tuple[str, int]]:
@@ -383,14 +334,22 @@ class ToolBox:
                 return f"from the {self._label(other)}"
         return None
 
+    def _ring_shares(self, ring: dict) -> list[tuple[str, int]] | None:
+        """(room id, percent) of the rooms the ring's possible arcs cross, most first; None when the ring's puck has no
+        position or the ring no radius. Room ids, not labels: one scanned suite often has several rooms labelled alike."""
+        puck = self._puck(ring.get("puck"))
+        if not puck or puck.get("x") is None or ring.get("r_m") is None:
+            return None
+        return ring_rooms(self.twin, float(puck["x"]), float(puck["y"]), float(ring["r_m"]), ring.get("arcs"), self.brief.get("floor"))
+
     def _ring_view(self, ring: dict) -> dict:
         puck = self._puck(ring.get("puck"))
         view = {"puck": ring.get("puck"), "puck_in": self._label((puck or {}).get("room")) if puck else None,
                 "radius_m": whole(ring.get("r_m")),
                 "band": "thin (UWB, about a hand's width)" if ring.get("kind") == "uwb" else "fat (Bluetooth signal strength, metres wide)",
                 "clipped_by_twin": (ring.get("arcs") or [[0, 360]]) not in ([[0, 360]], [[0.0, 360.0]])}
-        if puck and puck.get("x") is not None and ring.get("r_m") is not None:
-            shares = ring_rooms(self.twin, float(puck["x"]), float(puck["y"]), float(ring["r_m"]), ring.get("arcs"), self.brief.get("floor"))
+        shares = self._ring_shares(ring)
+        if shares is not None:
             view["arc_crosses"] = [{"room_label": self._label(r), "share_pct": p} for r, p in shares]
         return view
 
@@ -515,11 +474,9 @@ class ToolBox:
             rep = p.get("report") or {}
             if rep.get("safe_outside") or p.get("geometry") != "ring" or not p.get("ring"):
                 continue
-            view = self._ring_view(p["ring"])
-            top = (view.get("arc_crosses") or [None])[0]
-            if top and top["share_pct"] >= 50:
-                room = next((rid for rid, room in self.twin._rooms.items() if room.get("label") == top["room_label"]), None)
-                suite = (self.twin._rooms.get(room) or {}).get("suite")
+            shares = self._ring_shares(p["ring"]) or []
+            if shares and shares[0][1] >= 50:
+                suite = (self.twin._rooms.get(shares[0][0]) or {}).get("suite")
                 if suite in rows and rows[suite].get("vacant"):
                     out.setdefault(suite, []).append(f"phone {p['id']}'s range ring lies mostly in Suite {suite}, which the record lists as vacant")
         return [{"suite": s, "evidence": ev} for s, ev in sorted(out.items())]
@@ -621,9 +578,8 @@ class ToolBox:
                 return room, f"{self._label(room)}: {t} has {n} candidate spots in {where}, any of them may be right; check {'both' if n == 2 else 'all'}", room
             room = None
             if geom == "ring" and ph.get("ring"):
-                shares = self._ring_view(ph["ring"]).get("arc_crosses") or []
-                lab = shares[0]["room_label"] if shares else None
-                room = next((rid for rid, r in self.twin._rooms.items() if r.get("label") == lab), None)
+                shares = self._ring_shares(ph["ring"]) or []
+                room = shares[0][0] if shares else None
             if geom == "zone" and ph.get("zone"):
                 room = ph["zone"].get("room")
             if room is None and ph.get("stale") and ph.get("last_known"):

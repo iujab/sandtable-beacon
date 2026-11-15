@@ -1,19 +1,17 @@
 """Command agent: protocol parsing, tools, the deterministic fallback policy, and replay of the recorded real-model runs."""
 import asyncio
 import json
+import os
 import time
 
 import pytest
 
 from sandtable import config
-from sandtable.adapters import build_provider
 from sandtable.agent import CommandAgent
 from sandtable.agent.llm import LLM, ReplayMiss, extract_json, request_key
 from sandtable.agent.tools import ACTION_TOOLS, CATALOG, ToolBox
-from sandtable.incident import Incident
-from sandtable.spatial import Twin
 
-from test_incident import Rig, fire_room, run_to_mayday
+from test_incident import Rig, run_to_mayday
 
 
 def run(coro):
@@ -150,3 +148,26 @@ def test_recorded_preplan_replays_from_the_cache():
     assert len(plan["sections"]) >= 5 and plan["verify_on_site"] and plan["tactical"]["attack_stair"] != plan["tactical"]["evac_stair"]
     layers = {i["layer"] for s in plan["sections"] for i in s["items"]}
     assert {"costar", "vexcel", "matterport"} <= layers
+
+
+@pytest.mark.skipif(os.name == "nt", reason="uses a shell script as a stand-in for the CLI")
+def test_a_given_up_cli_turn_ends_the_cli_process(monkeypatch, tmp_path):
+    """Bug: when a turn was given up (the agent's time limit, a reset), the claude CLI subprocess it had started kept running."""
+    fake = tmp_path / "claude"
+    fake.write_text("#!/bin/sh\nsleep 30\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "claude" else None)
+    procs = []
+    real_exec = asyncio.create_subprocess_exec
+
+    async def spawn(*args, **kw):
+        procs.append(await real_exec(*args, **kw))
+        return procs[-1]
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+
+    async def scenario():
+        llm = LLM(backend="claude-cli", record=False, cache_dir=tmp_path / "cache")
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(llm.complete("system", [{"role": "user", "content": "hello"}]), 0.5)
+        return await asyncio.wait_for(procs[0].wait(), 5.0)
+    assert run(scenario()) is not None and procs[0].returncode is not None

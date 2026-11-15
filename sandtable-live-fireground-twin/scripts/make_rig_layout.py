@@ -32,7 +32,7 @@ pad = 0.35
 sx = lambda x: (x - min(ax) + pad) * K
 sy = lambda y: (max(ay) - y + pad) * K
 parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {(W + 2 * pad) * K:.0f} {(H + 2 * pad) * K:.0f}" font-family="Arial, sans-serif">',
-         f'<rect width="100%" height="100%" fill="#fff"/>',
+         '<rect width="100%" height="100%" fill="#fff"/>',
          f'<rect x="{sx(min(ax)):.1f}" y="{sy(max(ay)):.1f}" width="{W * K:.1f}" height="{H * K:.1f}" fill="none" stroke="#bbb" stroke-dasharray="6 5"/>']
 for r in twin.data["rooms"]:
     pts = " ".join(f"{sx(x):.1f},{sy(y):.1f}" for x, y in (to_rig(p) for p in r["polygon"]))

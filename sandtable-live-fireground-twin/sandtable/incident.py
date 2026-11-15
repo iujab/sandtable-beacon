@@ -34,8 +34,9 @@ class Incident:
         self.units: dict[str, dict] = {}
         self._tags: list[str] = []
         self._seq = 0
-        self._hz = 0
         self._last_tick: float | None = None
+        self._exits_cache: list[tuple[str | None, list]] | None = None       # the twin's way-out points (_exit_points)
+        self._stair_rooms = bool(self.twin.rooms("stair"))                     # the fixture has stairs; a scanned suite may not
         self._reset_state()
         self._make_units([])
 
@@ -50,7 +51,9 @@ class Incident:
         self.phase = "standby"
         self.started_t: float | None = None
         self.hazards: list[dict] = []
+        self._hz = 0                                        # hazards marked so far: ids stay unique when one is cleared
         self.mayday: dict | None = None
+        self.last_mayday: dict | None = None                # the mayday of this incident once it is resolved (the report keeps it)
         self.timeline: list[dict] = []
         self.contact_done = False
         self.stats = {"replans": 0}
@@ -204,7 +207,7 @@ class Incident:
 
     # ---- exits, for any twin (the fixture has stairs; a scanned suite may only have entrances)
     def _exit_points(self) -> list[tuple[str | None, list]]:
-        if getattr(self, "_exits_cache", None) is None:
+        if self._exits_cache is None:
             pts = [(e["node"], self.twin.node(e["node"])["at"]) for e in self.twin.exits() if e.get("node")]
             if not pts:
                 pts = [(d.get("node"), self.twin.node(d["node"])["at"] if d.get("node") else d["at"]) for d in self.twin.data.get("doors", []) if d.get("kind") == "exit"]
@@ -218,7 +221,7 @@ class Incident:
 
     def _in_exit(self, u: dict) -> bool:
         """In a stair (the fixture), or, in a twin with no stair rooms, at one of its exits."""
-        if self.twin.rooms("stair"):
+        if self._stair_rooms:
             return bool(u["room"]) and self.twin.room(u["room"])["kind"] == "stair"
         return u["x"] is not None and min(math.dist((u["x"], u["y"]), at) for _n, at in self._exit_points()) <= 2.0
 
@@ -374,7 +377,7 @@ class Incident:
                                      "dst": [float(v["x"]), float(v["y"])], "match": "point", "label": f"located person {v['id']} in {v.get('room_label')}",
                                      "located_t": self.clock(), "reached_t": None, "out_t": None}
         self.scout.update({"phase": "done", "room": scan.get("room")})
-        n_v, n_m = len(self.victims), len(scan.get("mismatches") or [])
+        n_m = len(scan.get("mismatches") or [])
         tag = "hand-made sample" if scan.get("sample") else "simulated" if scan.get("simulated") else "measured"
         where = {b["id"]: b.get("where") for b in (brief or {}).get("victims") or []}       # discrete (0.5 m) text: the timeline feeds the after-action prompt
         people = "; ".join(f"{v['id']} {v['what']}" + (f", {where[v['id']]}" if where.get(v["id"]) else "")
@@ -428,10 +431,7 @@ class Incident:
     # ------------------------------------------------------------------ beacon mode: opt-in phones
     def activate_beacon(self, on: bool = True) -> None:
         """Pucks are in for this incident: from now on the Beacon module's phones become targets (until reset)."""
-        if on and not self.beacon_active:
-            self.beacon_active = True
-        elif not on:
-            self.beacon_active = False
+        self.beacon_active = bool(on)
 
     def _phone_target(self, p: dict, pucks_room: str | None = None) -> dict | None:
         """Where a crew goes for a phone, as the geometry allows: a fix is a point; candidates: the most probable one (and it says so);
@@ -832,7 +832,8 @@ class Incident:
         if existing:
             return existing
         label, geometry = self._hazard_geometry(ref)
-        hz = {"id": f"hz{len(self.hazards) + 1}", "ref": ref, "kind": kind, "label": label, "note": note, "source": source, "geometry": geometry}
+        self._hz += 1
+        hz = {"id": f"hz{self._hz}", "ref": ref, "kind": kind, "label": label, "note": note, "source": source, "geometry": geometry}
         self.hazards.append(hz)
         self._log("hazard", f"Hazard ({kind}) at {label}" + (f": {note}" if note else "") + f" [reported by {source}]")
         affected = []
@@ -870,7 +871,7 @@ class Incident:
         if self.mayday and self.mayday["unit"] == unit_id:
             self.mayday["resolved_t"] = self.clock()
             self._log("mayday", f"Mayday cleared: {self.units[unit_id]['label']}", unit_id)
-            self._last_mayday, self.mayday = self.mayday, None
+            self.last_mayday, self.mayday = self.mayday, None
 
     def add_observation(self, text: str, unit_id: str | None = None, position: list[float] | None = None, kind: str = "observation") -> dict:
         u = self.units.get(unit_id) if unit_id else None

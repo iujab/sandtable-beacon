@@ -223,11 +223,8 @@ class PhoneTrack:
     # ---- state
     @property
     def moving(self) -> bool:
-        still = self.report.get("still")
-        if still is not None and self.report_t is not None and self.last_seen is not None \
-                and self.last_seen - self.report_t <= REPORT_FRESH_S:
-            return not bool(still)
-        return self._range_moving
+        """`_moving_now` as of the newest observation (the feed's `track.moving`)."""
+        return self._range_moving if self.last_seen is None else self._moving_now(self.last_seen)
 
     def report_age(self, now: float) -> float | None:
         return None if self.report_t is None else round(now - self.report_t, 2)
@@ -284,7 +281,7 @@ class PhoneTrack:
         elif _RANK.get(g, 0) < _RANK.get(self.published["geometry"], 0):
             self._up_run = []
             self._down_n += 1
-            held = not (not same_evidence or self._down_n >= HOLD_N)     # changed evidence: at once
+            held = same_evidence and self._down_n < HOLD_N               # changed evidence: at once
             if not held:
                 self._publish(est, sig)
         else:

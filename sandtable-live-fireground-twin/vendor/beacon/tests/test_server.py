@@ -429,3 +429,23 @@ def test_report_in_fake_mode_is_the_sample(make_client):
     if r.status_code == 404:
         pytest.skip("report routes not wired")
     assert r.status_code == 200 and "SAMPLE" in r.text
+
+
+def test_malformed_puck_bodies_are_400_not_500(tmp_path, monkeypatch):
+    """Found by fuzzing the POST routes: a non-string room or floor, an unknown floor on a puck entry, a non-numeric n
+    or seed used to raise inside the handler (HTTP 500)."""
+    from fastapi.testclient import TestClient
+    from beacon import server
+    monkeypatch.setattr(config, "PUCKS_LIVE_JSON", tmp_path / "pucks_live.json")
+    with TestClient(server.create_app(source="sim"), raise_server_exceptions=False) as c:
+        one = [{"id": "P1", "x": 9.0, "y": 6.0}]
+        bodies = [{"n": None}, {"n": []}, {"n": {"a": 1}}, {"n": 2, "seed": []}, {"n": 2.5},
+                  {"pucks": one, "room": []}, {"pucks": one, "room": {"a": 1}}, {"pucks": one, "floor": 3},
+                  {"pucks": one, "floor": "f99"}, {"pucks": [dict(one[0], floor="nowhere")]}]
+        for body in bodies:
+            assert c.post("/api/pucks", json=body).status_code == 400, body
+        c.post("/api/pucks/baseline", json={"pair": ["P1", "P2"], "d_m": 3.0})
+        for extra in ({"room": []}, {"floor": {"a": 1}}, {"toward": {"x": [], "y": 0}}, {"x": None}):
+            body = {"anchor": "P1", "x": 9.0, "y": 6.0, "toward": {"x": 9.0, "y": 0.0}, "other": "P2", **extra}
+            assert c.post("/api/pucks/anchor", json=body).status_code == 400, body
+        assert c.post("/api/pucks", json={"n": "3", "seed": "7"}).status_code == 200          # numeric strings still work

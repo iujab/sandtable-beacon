@@ -180,6 +180,20 @@ function renderTray(b) {
   };
 }
 
+// measured puck spacings and how each puck was placed (BEACON_FEED A12)
+const PLACED = { hand: "by hand", baseline: "from the measured spacing", layout: "recommended layout", sim: "simulated" };
+function renderBaselines(b) {
+  const box = $("bstrip"), list = (b && b.baselines) || [], warns = ((b && b.warnings) || []).filter((w) => w.kind === "baseline-mismatch");
+  if (!list.length && !warns.length) { box.hidden = true; return; }
+  const placed = Object.fromEntries(((b && b.pucks) || []).map((p) => [p.id, p.placed_by]));
+  box.hidden = false;
+  box.innerHTML = `<div class="k">Puck spacing</div>` + list.map((q) => {
+    const how = q.pair.map((id) => placed[id] ? `${id} ${PLACED[placed[id]] || placed[id]}` : `${id} not placed`).join(", ");
+    return `<span class="bl" title="${esc(how)}"><b>${esc(q.pair.join("–"))}</b> ${num(q.d_m, 2)} m${isNum(q.sigma_m) ? ` <i>±${num(q.sigma_m, 2)}</i>` : ""} ` +
+      `<em>${q.source === "twr" ? "UWB board to board" : "entered by hand"}${isNum(q.samples) ? `, ${q.samples} ranges` : ""}</em> · ${esc(how)}</span>`;
+  }).join("") + warns.map((w) => `<span class="bw">${esc(w.text)}</span>`).join("");
+}
+
 // ---------------------------------------------------------------- phone cards
 const SEV = { trapped: 0, injured: 1, sheltering: 2, unknown: 3, ok: 4 };
 const GEO_RANK = { fix: 0, candidates: 1, ring: 2, zone: 3, none: 4 };
@@ -460,6 +474,7 @@ function render() {
     renderPhones(b);
     renderAccountability(b);
     renderTray(b);
+    renderBaselines(b);
     renderSearchBanner(b);
     if (S.layoutOn) loadLayout();
   }

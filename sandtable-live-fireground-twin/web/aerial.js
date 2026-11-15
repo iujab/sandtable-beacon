@@ -14,8 +14,8 @@ export class Aerial {
     // map-projected images only (orthos and an ortho detail such as the roof); obliques go to the sides strip
     this.images = bundle.aerial.images.filter((i) => (i.kind === "ortho" || i.kind === "detail") && i.bbox);
     this.units = {};
-    seg.innerHTML = this.images.map((i, k) => `<button data-i="${k}" class="${k === 0 ? "on" : ""}">${i.id === "ortho" ? "Site" : i.kind === "detail" ? "Roof" : "Approach"}</button>`).join("");
-    for (const b of seg.querySelectorAll("button")) b.onclick = () => { for (const q of seg.querySelectorAll("button")) q.classList.toggle("on", q === b); this.show(Number(b.dataset.i)); };
+    seg.innerHTML = this.images.map((i, k) => `<button data-i="${k}" aria-pressed="${k === 0}">${i.id === "ortho" ? "Site" : i.kind === "detail" ? "Roof" : "Approach"}</button>`).join("");
+    for (const b of seg.querySelectorAll("button")) b.onclick = () => { for (const q of seg.querySelectorAll("button")) q.setAttribute("aria-pressed", String(q === b)); this.show(Number(b.dataset.i)); };
     if (this.images.length < 2) seg.hidden = true;
     this.offsite = this._checkGeoref();
     if (this.offsite) {
@@ -74,7 +74,7 @@ export class Aerial {
   show(k) {
     const im = this.im = this.images[k], site = this.bundle.site, twin = this.bundle.twin;
     this.img.src = im.hd_url || im.url || "/" + im.path;
-    this.srcLabel.textContent = `${im.synthetic ? "synthetic" : "real"} imagery: ${im.source}${im.capture_date ? ", " + im.capture_date : ""} · ${im.hd_gsd_m || im.gsd_m} m/px${/Vexcel/i.test(im.source || "") ? "" : " · not Vexcel"}`;
+    this.srcLabel.textContent = `${im.synthetic ? "Synthetic" : "Real"} imagery: ${im.source}${im.capture_date ? ", " + im.capture_date : ""}, ${im.hd_gsd_m || im.gsd_m} m per pixel${/Vexcel/i.test(im.source || "") ? "" : ". Not Vexcel"}`;
     const svg = this.svg;
     svg.setAttribute("viewBox", `0 0 ${im.width} ${im.height}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid slice");

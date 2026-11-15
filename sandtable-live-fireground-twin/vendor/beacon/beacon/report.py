@@ -24,6 +24,7 @@ import html
 import json
 import math
 import time
+from functools import lru_cache
 from pathlib import Path
 
 from . import config
@@ -32,6 +33,7 @@ from .twin import Twin
 
 SCHEMA = "sandtable.beacon.report/1"
 MAX_EVENTS = 400
+MAX_EVENT_KEYS = 4 * MAX_EVENTS     # dedup memory: longer than the timeline, so a re-sent old event is still recognised
 MAX_GEOMETRIES = 40
 
 
@@ -45,7 +47,7 @@ class Recorder:
     def clear(self) -> None:
         self.t0: float | None = None
         self.events: list[dict] = []
-        self._event_keys: set = set()
+        self._event_keys: dict[tuple, None] = {}      # insertion-ordered set, trimmed to MAX_EVENT_KEYS
         self.phones: dict[str, dict] = {}
         self.last: dict | None = None
         self.plan: dict | None = None
@@ -70,7 +72,9 @@ class Recorder:
             self.t0 = t
 
     def observe(self, b: dict) -> None:
-        if not isinstance(b, dict) or b.get("type", "beacons") != "beacons":
+        """One published Beacons object. The same object seen again (the poller, or a report built from the state the
+        stream already fed) is not a new observation: producers publish a new dict at every step."""
+        if not isinstance(b, dict) or b.get("type", "beacons") != "beacons" or b is self.last:
             return
         try:
             t = float(b.get("t") or time.time())
@@ -105,7 +109,9 @@ class Recorder:
         key = (round(t, 3), msg.get("name"), msg.get("id"), msg.get("text"))
         if key in self._event_keys:
             return
-        self._event_keys.add(key)
+        self._event_keys[key] = None
+        while len(self._event_keys) > MAX_EVENT_KEYS:
+            del self._event_keys[next(iter(self._event_keys))]
         self._start(t)
         self.events.append({"t": t, "name": msg.get("name"), "id": msg.get("id"), "text": str(msg.get("text") or "")})
         del self.events[:-MAX_EVENTS]
@@ -116,6 +122,10 @@ class Recorder:
             self.observe(beacons_of(source))
         except Exception:
             pass
+        self.pull_events(source)
+
+    def pull_events(self, source) -> None:
+        """The beacon_events the source keeps (the server's state has an `events` list), if any."""
         for e in list(getattr(source, "events", None) or []):
             if isinstance(e, dict) and e.get("type", "beacon_event") == "beacon_event":
                 self.event(e)
@@ -226,7 +236,7 @@ def build(session, agent_plan: dict | None = None, recorder: Recorder | None = N
     if b:
         rec.observe(b)
     if not isinstance(session, dict):
-        rec.pull(session)
+        rec.pull_events(session)            # its Beacons object was observed just above: once, not twice
     twin, site, labels = _twin_of(session), _site_of(session), _labels_of(session)
     plan = agent_plan if agent_plan is not None else rec.plan
     prop = site.get("property") or {}
@@ -303,8 +313,10 @@ def _e(v) -> str:
     return html.escape("" if v is None else str(v), quote=True)
 
 
+@lru_cache(maxsize=1)
 def _font_css() -> str:
-    fonts = [("Barlow Condensed", 700, "barlow-condensed-700"), ("Barlow Condensed", 600, "barlow-condensed-600"),
+    """The vendored fonts as data: URLs (read and encoded once per process; about a third of to_html's time otherwise)."""
+    fonts =[("Barlow Condensed", 700, "barlow-condensed-700"), ("Barlow Condensed", 600, "barlow-condensed-600"),
              ("Barlow", 400, "barlow-400"), ("Barlow", 600, "barlow-600"), ("JetBrains Mono", 400, "jetbrains-mono-400")]
     out = []
     for fam, w, name in fonts:

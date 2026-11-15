@@ -198,7 +198,6 @@ def _same_building(url: str):
     if not theirs.get("rooms"):
         return None
     try:
-        sys.path.insert(0, str(ROOT))
         from sandtable.adapters import get_provider
         ours = get_provider().twin_raw()
     except Exception:
@@ -216,7 +215,6 @@ def _free_port() -> int:
 def _modes() -> dict:
     """Per-layer data modes as the server will see them: the command line, then .env and the bench drop zone (sandtable.config
     loads those without overriding what is set). Imported only after UWBKIT_URL is known, since config reads it at import."""
-    sys.path.insert(0, str(ROOT))
     from sandtable import config
     return {"costar": config.COSTAR_MODE, "matterport": config.MATTERPORT_MODE, "vexcel": config.VEXCEL_MODE}
 
@@ -225,21 +223,19 @@ def _live_mode() -> bool:
     return any(m == "live" for m in _modes().values())
 
 
-def _live_beacon_bundle(vendored: Path | None = None):
+def _live_beacon_bundle():
     """In live mode the Beacon module must prune and join against the live twin and record. It reads them from an external bundle
     (BEACON_BUNDLE_DIR, honoured since lane L16's commit 26d0428): twin.json and site.json written from the live provider under
     data/live/beacon_bundle/ (private, git-ignored; no code is copied). Returns that directory, or None."""
     global _live_room
     try:
-        sys.path.insert(0, str(ROOT))
         from sandtable import config
         from sandtable.adapters import get_provider
         from sandtable.scout.session import fire_room
         from sandtable.spatial import Twin
         provider = get_provider()
         twin_raw, site = provider.twin_raw(), provider.site()
-        live_dir = getattr(config, "LIVE_DIR", config.DATA_DIR / "live")
-        bundle = live_dir / "beacon_bundle"
+        bundle = config.LIVE_DIR / "beacon_bundle"
         if bundle.exists() and (bundle / "beacon").is_dir():           # an older layout held a copy of the code: start clean
             import shutil
             shutil.rmtree(bundle)

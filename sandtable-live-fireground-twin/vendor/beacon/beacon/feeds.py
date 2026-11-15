@@ -134,6 +134,24 @@ def _last_known(p: dict) -> dict:
             "age_s": (p.get("track") or {}).get("last_seen_s")}
 
 
+def _has_xy(item: dict) -> bool:
+    return item.get("x") is not None and item.get("y") is not None
+
+
+def _stale_place(twin, p: dict) -> tuple[dict, list] | None:
+    """(last_known, room polygon) of a stale phone, which both feeds publish as its last room and never as a point;
+    None when nothing is published (no known room, or the occupant reported safe outside)."""
+    lk = _last_known(p)
+    poly = _room_polygon(twin, lk.get("room"))
+    if not poly or (p.get("report") or {}).get("safe_outside"):
+        return None
+    return lk, poly
+
+
+def _zone_polygon(twin, z: dict):
+    return z.get("polygon") or _room_polygon(twin, z.get("room"))
+
+
 def beacons_to_geojson(beacons: dict, twin=None) -> dict:
     tw = _twin(twin)
     b = beacons or {}
@@ -152,7 +170,7 @@ def beacons_to_geojson(beacons: dict, twin=None) -> dict:
         return {"type": "Feature", "geometry": geom, "properties": base}
 
     for pk in b.get("pucks") or []:
-        if pk.get("x") is None or pk.get("y") is None:
+        if not _has_xy(pk):
             continue
         features.append(feat({"type": "Point", "coordinates": _lonlat(tw, pk["x"], pk["y"])},
                              {"kind": "puck", "id": pk["id"], "radios": pk.get("radios") or [], "sigma_m": pk.get("sigma_m"),
@@ -164,14 +182,14 @@ def beacons_to_geojson(beacons: dict, twin=None) -> dict:
                   "stale": bool(p.get("stale")), **_report_props(p)}
         if p.get("stale"):
             # a phone not heard for a while is never drawn where it was: at most the room where it was last located
-            lk = _last_known(p)
-            poly = _room_polygon(tw, lk.get("room"))
-            if poly and not (p.get("report") or {}).get("safe_outside"):
+            place = _stale_place(tw, p)
+            if place:
+                lk, poly = place
                 features.append(feat({"type": "Polygon", "coordinates": [_ring_lonlat(tw, poly)]},
                                      {"kind": "phone-last-known", **common, "room": lk.get("room"),
                                       "last_known": {k: lk.get(k) for k in ("geometry", "room", "room_label", "age_s")}}, p))
             continue
-        if geom == "fix" and p.get("x") is not None and p.get("y") is not None:
+        if geom == "fix" and _has_xy(p):
             features.append(feat({"type": "Point", "coordinates": _lonlat(tw, p["x"], p["y"])},
                                  {"kind": "phone", **common, "sigma_m": p.get("sigma_m"), "confidence": p.get("confidence"),
                                   "room": p.get("room")}, p))
@@ -188,7 +206,7 @@ def beacons_to_geojson(beacons: dict, twin=None) -> dict:
                                       "weight": c.get("weight"), "sigma_m": c.get("sigma_m"), "room": c.get("room")}, p))
         elif geom == "zone" and p.get("zone"):
             z = p["zone"]
-            poly = z.get("polygon") or _room_polygon(tw, z.get("room"))
+            poly = _zone_polygon(tw, z)
             if poly:
                 features.append(feat({"type": "Polygon", "coordinates": [_ring_lonlat(tw, poly)]},
                                      {"kind": "phone-zone", **common, "band": z.get("band"), "prob": z.get("prob"),
@@ -246,7 +264,7 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
         out.append((uid, _event(uid, typ, how, lat, lon, ce, now, callsign, remarks), key))
 
     for pk in b.get("pucks") or []:
-        if pk.get("x") is None:
+        if not _has_xy(pk):
             continue
         add(f"sandtable.beacon.{pk['id']}", "a-f-G-E-S", pk["x"], pk["y"], pk.get("sigma_m"), f"Puck {pk['id']}",
             f"{tag}Beacon puck {pk['id']} ({', '.join(pk.get('radios') or [])})" + (f" in {pk['room']}" if pk.get("room") else "") + ".")
@@ -259,9 +277,9 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
         cs = f"{p['id']} phone ({status})"
         uid = f"sandtable.beacon.{p['id']}"
         if p.get("stale"):
-            lk = _last_known(p)
-            poly = _room_polygon(tw, lk.get("room"))
-            if poly and not rep.get("safe_outside"):
+            place = _stale_place(tw, p)
+            if place:
+                lk, poly = place
                 cx, cy = _centroid(poly)
                 age = (p.get("track") or {}).get("last_seen_s")
                 heard = f"not heard for {int(age)} s" if age is not None else "not heard recently"
@@ -271,9 +289,9 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
                 add(uid, "b-m-p-s-m", cx, cy, _bounding_radius(poly), f"{p['id']} LAST KNOWN",
                     f"LAST KNOWN: {heard}; {where}. No current position: the point is the room's centre. {tag}{text}.")
             continue
-        if geom == "fix" and p.get("x") is not None:
+        if geom == "fix" and _has_xy(p):
             sig = p.get("sigma_m")
-            add(f"sandtable.beacon.{p['id']}", "a-u-G", p["x"], p["y"], 2 * float(sig) if sig is not None else None, cs,
+            add(uid, "a-u-G", p["x"], p["y"], 2 * float(sig) if sig is not None else None, cs,
                 f"{tag}{text}. Method {p.get('method')}; ce is 2 sigma.")
         elif geom == "ring" and p.get("ring"):
             # A ring is not a position: a map-point marker at the PUCK, with a circular error that contains the whole ring.
@@ -293,7 +311,7 @@ def _elements(beacons: dict, now: float, twin) -> list[tuple[str, ET.Element, st
                     f"the phone is at one of them, the board cannot choose. {tag}{text}.")
         elif geom == "zone" and p.get("zone"):
             z = p["zone"]
-            poly = z.get("polygon") or _room_polygon(tw, z.get("room"))
+            poly = _zone_polygon(tw, z)
             if poly:
                 cx, cy = _centroid(poly)
                 add(uid, "b-m-p-s-m", cx, cy, _bounding_radius(poly), f"{p['id']} ROOM ONLY",

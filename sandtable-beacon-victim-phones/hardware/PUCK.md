@@ -27,9 +27,13 @@ Bluetooth antenna on the module; on-board J-Link) running Qorvo's **stock, unmod
   host can read that log (experimental, `python -m beacon.host --rtt`), but the format of its lines is not confirmed.
 - The DW3110 has a single antenna: no angle of arrival on the puck (DW3000 datasheet: "DW3110 ... PDoA support: No",
   [distributor mirror](https://atta.szlcsc.com/upload/public/pdf/source/20220621/2EAA42E8F3E2D83DDB8686FF8DCFAD44.pdf)).
-- It cannot range another board on the stock firmware ("two boards do not range each other on it without code changes",
-  [forum 12439](https://forum.qorvo.com/t/dwm3001cdk-what-should-i-do-to-start-ranging-between-the-two-boards/12439)),
-  so pucks cannot measure their own positions tonight: you measure them with a tape (BRINGUP step 7).
+- It cannot range another board **on the stock firmware** ("two boards do not range each other on it without code changes",
+  [forum 12439](https://forum.qorvo.com/t/dwm3001cdk-what-should-i-do-to-start-ranging-between-the-two-boards/12439)).
+  **With our SS-TWR firmware two boards do range each other** (measured on the owner's boards on 2026-11-15:
+  `hardware/twr_firmware/README.md`), but then they cannot range phones: a board runs one firmware at a time. So the
+  pucks' spacing can be measured at setup (or with a tape) and the pair anchored on the plan from it
+  (`hardware/BOARD_TO_BOARD.md`); a puck that ranges phones and its partner at once needs two boards or one firmware
+  that does both (not built).
 
 ## 2. Power options, compared honestly
 
@@ -90,7 +94,8 @@ From `docs/research/puck_hardware.md`, "What a real fire puck would need":
 - **Heat, water and shock:** high-temperature cells and enclosure, potting, a drop rating; the DW3000 is rated -40 to
   +85 C ambient.
 - **Firmware that streams** ranges, link quality and non-line-of-sight indicators over a radio link to command, not a
-  debug log; puck-to-puck ranging so thrown pucks can survey their own positions.
+  debug log; puck-to-puck ranging in the same firmware as the phone sessions (FiRa multi-session), so thrown pucks
+  measure their own spacing while they range phones (today: two firmwares, `hardware/BOARD_TO_BOARD.md`).
 - **Per-unit antenna-delay calibration** ("a one-nanosecond timestamping error corresponds to 30 cm in ranging error",
   [arXiv 2210.05888](https://arxiv.org/pdf/2210.05888)), wall and body bias models, and outlier rejection for the
   metre-level phone outliers seen in studies ([arXiv 2303.11220](https://arxiv.org/html/2303.11220v1)).

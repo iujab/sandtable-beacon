@@ -7,7 +7,6 @@ The brief is built here from the Beacon sample in the shape the feed contract de
 """
 import asyncio
 import copy
-import hashlib
 import json
 import re
 

@@ -73,6 +73,7 @@ def test_storyboard_replays_the_recorded_model_run_end_to_end(monkeypatch):
         pytest.skip("no recorded model responses in fixtures/llm_cache yet")
     import sandtable.server as server
     monkeypatch.setattr(config, "REPLAY_PACE_S", 0.0)
+    monkeypatch.setattr(config, "SCRIPT_PACE", 0.1)                  # the script's pauses for people watching
     monkeypatch.setattr(config, "STATE_HZ", 40.0)
 
     async def scenario():
@@ -118,6 +119,7 @@ def test_storyboard_replays_the_recorded_model_run_end_to_end(monkeypatch):
 def _run_exercise(monkeypatch, mode, nodes, cache_dir=None, human=False):
     import sandtable.server as server
     monkeypatch.setattr(config, "REPLAY_PACE_S", 0.0)
+    monkeypatch.setattr(config, "SCRIPT_PACE", 0.1)                  # the script's pauses for people watching
     monkeypatch.setattr(config, "STATE_HZ", 40.0)
     if cache_dir is not None:
         monkeypatch.setattr(config, "LLM_CACHE_DIR", cache_dir)
@@ -241,3 +243,181 @@ def test_scout_script_replays_the_recorded_model_run(monkeypatch):
     agent = [e for e in events if e.get("type") == "agent"]
     missed = sorted({e["run"] for e in agent if e["backend"] == "reflex-fallback"})
     assert agent and not missed, f"turns missed the recording: {missed} (re-record with scripts/record_all.sh)"
+
+
+# ---------------------------------------------------------------- resets, reconnects and races (each was a bug)
+
+def test_a_report_after_a_reset_does_not_list_the_previous_incidents_mayday_crew():
+    import sandtable.server as server
+
+    async def scenario():
+        s = server.AppState()
+        inc = s.incident
+        inc.start()
+        inc.begin_operations()
+        inc.declare_mayday("E1", "manual", "command")
+        inc.resolve_mayday("E1")
+        before = [p["source"] for p in s.report()["people"]]
+        await s.reset()
+        return before, [p["source"] for p in s.report()["people"]]
+    before, after = asyncio.run(scenario())
+    assert "crew" in before and "crew" not in after
+
+
+class _FakeSocket:
+    """A WebSocket that records what it is sent; `during(n)` runs while message n is being sent; it closes on `last`."""
+
+    def __init__(self, during, last):
+        self.sent, self.during, self.last = [], during, last
+
+    async def accept(self):
+        pass
+
+    async def send_text(self, text):
+        from fastapi import WebSocketDisconnect
+        self.sent.append(json.loads(text))
+        self.during(len(self.sent))
+        await asyncio.sleep(0)                                   # a real send yields to the loop
+        if self.sent[-1].get("entry", {}).get("text") == self.last:
+            raise WebSocketDisconnect()
+
+
+def test_a_board_connecting_mid_incident_gets_what_happens_while_it_catches_up_exactly_once():
+    """Bug: the board joined the live traffic only after the backlog had been sent, so anything emitted meanwhile was lost."""
+    import sandtable.server as server
+
+    async def scenario():
+        s = server.AppState()
+        server.STATE = s
+        s.emit({"type": "timeline", "entry": {"text": "before"}})
+
+        def during(n):
+            if s.backlog and n == 2:                             # while "before" (hello, then the backlog) goes out
+                s.emit({"type": "timeline", "entry": {"text": "during"}})
+                s.emit({"type": "timeline", "entry": {"text": "after"}})
+        sock = _FakeSocket(during, "after")
+        await asyncio.wait_for(server.ws(sock), 5.0)
+        return sock.sent, s.sockets
+    sent, sockets = asyncio.run(scenario())
+    texts = [m["entry"]["text"] for m in sent if m.get("type") == "timeline"]
+    assert sent[0]["type"] == "hello" and texts == ["before", "during", "after"] and not sockets
+
+
+def test_a_reset_ends_the_old_incidents_pre_plan():
+    """Bug: a pre-plan still running at a reset finished later on the new incident: a stale plan, and operations begun before
+    the new incident's own pre-plan was ready."""
+    import sandtable.server as server
+
+    async def scenario():
+        s = server.AppState()
+        calls = []
+
+        async def preplan():
+            calls.append(1)
+            await asyncio.sleep(0.3 if len(calls) == 1 else 2.0)       # the old pre-plan would finish while the new one still runs
+            s.emit({"type": "preplan", "address": "old" if len(calls) == 1 else "new"})
+        s.agent.run_preplan = preplan
+        await s.alarm()
+        await asyncio.sleep(0.05)
+        await s.reset()
+        await s.alarm()                                                # the new incident's pre-plan
+        await asyncio.sleep(0.5)
+        out = (s.incident.phase, s.preplan, s.agent_busy())
+        await s.reset()
+        return out
+    phase, preplan, busy = asyncio.run(scenario())
+    assert phase == "preplan" and preplan is None and busy
+
+
+def test_a_reset_ends_the_agents_turn_on_the_old_incident():
+    """Bug: an agent turn still running at a reset went on and gave its orders to the new incident's crews."""
+    import sandtable.server as server
+
+    async def scenario():
+        s = server.AppState()
+        acted = []
+
+        async def handle(situation):
+            await asyncio.sleep(0.3)
+            acted.append(situation["kind"])
+            s.incident.assign("RIT", "stage", "stairB", source="agent")
+        s.agent.handle = handle
+        loop_task = asyncio.create_task(s._agent_loop())
+        s.incident.start()
+        s.incident.begin_operations()
+        s._on_situation({"seq": 1, "kind": "mayday", "unit": "E1", "data": {}, "snapshot": s.incident.snapshot()})
+        await asyncio.sleep(0.05)
+        busy = s.agent_busy()
+        await s.reset()
+        await asyncio.sleep(0.5)
+        loop_task.cancel()
+        return busy, acted, s.incident.units["RIT"]["assignment"], s.agent_busy()
+    busy, acted, rit, busy_after = asyncio.run(scenario())
+    assert busy and acted == [] and rit is None and not busy_after
+
+
+def test_the_exercise_script_starts_once_and_a_stop_then_start_is_not_undone_by_the_old_run():
+    """Bugs: two starts before the first script ran started two scripts; the ending of a stopped run cleared the flags of a run
+    started right after it."""
+    from sandtable.director import Director
+
+    class Stub:
+        def __init__(self):
+            self.resets, self.incident = 0, None
+            self.agent = type("A", (), {"backend": "replay"})()
+
+        async def reset(self):
+            self.resets += 1
+            await asyncio.sleep(10)
+
+    async def scenario():
+        d = Director(Stub())
+        d.start(script="mayday")
+        first = d._task
+        d.start(script="mayday")
+        same = d._task is first
+        await asyncio.sleep(0.05)
+        d.stop()
+        d.start(script="mayday")                                 # at once, before the stopped run has wound down
+        await asyncio.sleep(0.05)
+        status = d.status()
+        d.stop()
+        await asyncio.sleep(0.05)
+        return same, d.s.resets, status, d.status()
+    same, resets, during, after = asyncio.run(scenario())
+    assert same and resets == 2
+    assert during["running"] is True and during["step"] == "reset"
+    assert after["running"] is False and after["step"] == "stopped"
+
+
+def test_a_teleport_requested_while_one_fails_is_still_sent():
+    """Bug: when a teleport to the hub failed, the newest target asked for in the meantime (a crew's last step, a staging
+    spot) was dropped until some later teleport."""
+    import threading
+    from sandtable.hubclient import HubLink
+
+    class Kit:
+        def __init__(self):
+            self.sent, self.release = [], threading.Event()
+
+        def teleport(self, tag, x, y):
+            if (x, y) == (1.0, 1.0):
+                self.release.wait(2.0)
+                raise OSError("hub hiccup")
+            self.sent.append((tag, x, y))
+
+    async def scenario():
+        link = HubLink(incident=None, url="ws://127.0.0.1:9/stream")
+        link.kit, link._loop = Kit(), asyncio.get_running_loop()
+        link.teleport("T1", 1.0, 1.0)                            # in flight, and it will fail
+        await asyncio.sleep(0.05)
+        link.teleport("T1", 2.0, 2.0)                            # superseded before it is sent
+        link.teleport("T1", 3.0, 3.0)                            # the newest target
+        link.kit.release.set()
+        for _ in range(100):
+            await asyncio.sleep(0.02)
+            if link.kit.sent:
+                break
+        await asyncio.sleep(0.1)
+        return link.kit.sent
+    assert asyncio.run(scenario()) == [("T1", 3.0, 3.0)]

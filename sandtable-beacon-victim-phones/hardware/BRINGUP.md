@@ -387,6 +387,15 @@ the line through them. A position far from the phone: x and y swapped, the wrong
 **Better if you have it:** a third puck well off the line through P1 and P2 (for example against the far wall) gives
 one position with no statement needed.
 
+### 7.3 Optional: the spacing measured, not clicked (board to board, 30 min)
+
+The pucks' positions above are measured with a tape and clicked. With the QANI firmware two boards cannot range each
+other; with our SS-TWR firmware they can (measured on the owner's boards, but then they do not range phones). If you
+want the "spacing is measured on landing" story: before this step, flash both boards with the TWR firmware, let the host
+post the spacing, anchor P1 and tap toward P2 (`POST /api/pucks/anchor`), then flash QANI back **without moving the
+boards**. Step by step, with what is measured and what is not: `hardware/BOARD_TO_BOARD.md`. Skip it if time is short:
+a tape measure posted as `"source": "manual"` gives the same anchor flow.
+
 ---
 
 ## 8. Two phones, two boards (10 min)

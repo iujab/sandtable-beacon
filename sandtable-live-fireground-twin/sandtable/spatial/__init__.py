@@ -10,14 +10,16 @@ Pure Python, no I/O, deterministic.
 """
 from __future__ import annotations
 
+import copy
 import heapq
 import math
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 __all__ = ["Twin", "Registration", "fit_similarity", "default_registration", "plan_anchor_drops", "hose_stretch", "geo_distance_m"]
 
 HOSE_PER_STOREY_M = 9.0        # assumption: hose laid per storey of a return stair
 HOSE_LENGTH_M = 15.24          # one 50 ft length
+_BBOX_SLACK_M = 1e-3           # a wall whose bounding box is farther than this from a segment's cannot be crossed by it
 
 
 # --- small geometry helpers -------------------------------------------------------
@@ -97,6 +99,27 @@ class Twin:
         g = data.get("georef") or {"origin": {"lat": 0.0, "lon": 0.0}, "bearing_deg": 90.0}
         self._lat0, self._lon0 = g["origin"]["lat"], g["origin"]["lon"]
         self._b = math.radians(g["bearing_deg"])
+        # Per-floor indexes for the hot paths (locate runs on every position fix, the wall tests in every route and anchor plan).
+        # The geometry of a twin never changes after load (only its tags do), and every list keeps the bundle's order, so the
+        # first match and the tie-breaks are exactly those of a scan over the whole bundle.
+        self._floor_rooms: dict[str, list[dict]] = {}
+        for r in data["rooms"]:
+            self._floor_rooms.setdefault(r.get("floor"), []).append(r)
+        self._floor_nodes: dict[str, list[str]] = {}
+        for nid, n in self._nodes.items():
+            self._floor_nodes.setdefault(n.get("floor"), []).append(nid)
+        self._floor_sweeps: dict[str, list[str]] = {}
+        for nid in self._sweep_of:
+            if nid in self._nodes:
+                self._floor_sweeps.setdefault(self._nodes[nid].get("floor"), []).append(nid)
+        self._floor_walls: dict[str, list[tuple[dict, tuple[float, float, float, float]]]] = {}
+        for w in data.get("walls", []):
+            (ax, ay), (bx, by) = w["a"][:2], w["b"][:2]
+            self._floor_walls.setdefault(w.get("floor"), []).append((w, (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))))
+        self._floor_doors: dict[str, list[dict]] = {}
+        for d in data["doors"]:
+            self._floor_doors.setdefault(d.get("floor"), []).append(d)
+        self._memo: dict = {}            # results that depend on the geometry only (plan_anchor_drops)
 
     # ---- lookups
     def floor(self, floor_id: str | None = None) -> dict:
@@ -156,20 +179,13 @@ class Twin:
         outline = self.floor(floor)["outline"]
         inside_floor = _pip((x, y), outline)
         off, snapped = (0.0, (x, y)) if inside_floor else _poly_dist((x, y), outline)
-        room = None
-        for r in self.data["rooms"]:
-            if r["floor"] == floor and _pip(snapped, r["polygon"]):
-                room = r
-                break
-        if room is None:                                  # on a wall line or just outside: nearest room
-            cands = [(r, _poly_dist(snapped, r["polygon"])[0]) for r in self.data["rooms"] if r["floor"] == floor]
-            if cands:
-                room = min(cands, key=lambda c: c[1])[0]
-        pool = self._room_nodes.get(room["id"], []) if room else []
-        if not pool:
-            pool = [nid for nid, n in self._nodes.items() if n["floor"] == floor]
+        rooms = self._floor_rooms.get(floor, [])
+        room = next((r for r in rooms if _pip(snapped, r["polygon"])), None)
+        if room is None and rooms:                        # on a wall line or just outside: nearest room
+            room = min(rooms, key=lambda r: _poly_dist(snapped, r["polygon"])[0])
+        pool = (self._room_nodes.get(room["id"]) if room else None) or self._floor_nodes.get(floor, [])
         node = min(pool, key=lambda nid: math.dist(self._nodes[nid]["at"], snapped)) if pool else None
-        sweeps = [nid for nid in self._sweep_of if self._nodes[nid]["floor"] == floor]
+        sweeps = self._floor_sweeps.get(floor, [])
         sweep_node = min(sweeps, key=lambda nid: math.dist(self._nodes[nid]["at"], snapped)) if sweeps else None
         return {"floor": floor, "room": room["id"] if room else None, "room_label": room["label"] if room else None,
                 "room_kind": room["kind"] if room else None, "suite": room.get("suite") if room else None,
@@ -234,7 +250,7 @@ class Twin:
             if d > dist.get(u, float("inf")):
                 continue
             for v, w, _via in self._adj[u]:
-                if v in bnodes or frozenset((u, v)) in bedges:
+                if v in bnodes or (bedges and frozenset((u, v)) in bedges):
                     continue
                 nd = d + w
                 if nd < dist.get(v, float("inf")) - 1e-9:
@@ -329,33 +345,30 @@ class Twin:
         return self.route(src, "exit", blocked)
 
     # ---- walls
+    def _wall_hits(self, p0: Sequence[float], p1: Sequence[float], floor: str | None, margin: float) -> Iterator[tuple[float, float]]:
+        """Where the segment p0-p1 crosses a wall of the floor away from every door opening, in the bundle's wall order."""
+        floor = floor or self.exercise_floor
+        doors = self._floor_doors.get(floor, [])
+        lo_x, hi_x = min(p0[0], p1[0]) - _BBOX_SLACK_M, max(p0[0], p1[0]) + _BBOX_SLACK_M
+        lo_y, hi_y = min(p0[1], p1[1]) - _BBOX_SLACK_M, max(p0[1], p1[1]) + _BBOX_SLACK_M
+        for w, (wx0, wy0, wx1, wy1) in self._floor_walls.get(floor, []):
+            if wx1 < lo_x or wx0 > hi_x or wy1 < lo_y or wy0 > hi_y:
+                continue                                  # bounding boxes apart: no crossing (cheap rejection of most walls)
+            hit = _seg_intersection(p0, p1, w["a"], w["b"])
+            if hit is None or any(math.dist(hit, d["at"]) <= d.get("width_m", 0.9) / 2 + margin for d in doors):
+                continue
+            yield hit
+
     def crosses_wall(self, p0: Sequence[float], p1: Sequence[float], floor: str | None = None, margin: float = 0.15) -> bool:
         """True when the segment passes through a wall away from every door opening."""
-        floor = floor or self.exercise_floor
-        for w in self.data.get("walls", []):
-            if w["floor"] != floor:
-                continue
-            hit = _seg_intersection(p0, p1, w["a"], w["b"])
-            if hit is None:
-                continue
-            if any(d["floor"] == floor and math.dist(hit, d["at"]) <= d.get("width_m", 0.9) / 2 + margin for d in self.data["doors"]):
-                continue
-            return True
-        return False
+        return next(self._wall_hits(p0, p1, floor, margin), None) is not None
 
     def walls_crossed(self, p0: Sequence[float], p1: Sequence[float], floor: str | None = None, margin: float = 0.15) -> int:
-        """How many walls the straight segment passes through (door openings do not count)."""
-        floor = floor or self.exercise_floor
+        """How many walls the straight segment passes through (door openings do not count; one crossing of two touching walls counts once)."""
         hits: list[tuple[float, float]] = []
-        for w in self.data.get("walls", []):
-            if w["floor"] != floor:
-                continue
-            hit = _seg_intersection(p0, p1, w["a"], w["b"])
-            if hit is None or any(math.dist(hit, h) < 0.08 for h in hits):
-                continue
-            if any(d["floor"] == floor and math.dist(hit, d["at"]) <= d.get("width_m", 0.9) / 2 + margin for d in self.data["doors"]):
-                continue
-            hits.append(hit)
+        for hit in self._wall_hits(p0, p1, floor, margin):
+            if not any(math.dist(hit, h) < 0.08 for h in hits):
+                hits.append(hit)
         return len(hits)
 
     def describe(self) -> dict:
@@ -472,8 +485,16 @@ def plan_anchor_drops(twin: Twin, floor: str | None = None, k: int = 4) -> dict:
     An anchor is "usable" from a point when the straight path crosses at most one interior wall
     (UWB ranges through one light partition with a known positive bias; more walls are not counted).
     Coverage = share of walkable graph nodes with 3 or more usable anchors, the minimum for a 2-D fix.
-    The strict line-of-sight share is reported as well. It is a planning aid, not a survey."""
+    The strict line-of-sight share is reported as well. It is a planning aid, not a survey.
+    The plan depends on the geometry only, so it is computed once per twin and floor (a copy is returned)."""
     floor = floor or twin.exercise_floor
+    key = ("anchor_drops", floor, k)
+    if key not in twin._memo:
+        twin._memo[key] = _plan_anchor_drops(twin, floor, k)
+    return copy.deepcopy(twin._memo[key])
+
+
+def _plan_anchor_drops(twin: Twin, floor: str, k: int) -> dict:
     nodes = [n for n in twin.data["graph"]["nodes"] if n["floor"] == floor]
     doors = {d["node"]: d for d in twin.data["doors"]}
     cands = []

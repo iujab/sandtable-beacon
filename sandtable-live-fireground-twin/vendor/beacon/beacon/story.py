@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import random
 import time
 
 from . import config
@@ -34,6 +36,12 @@ log = logging.getLogger("beacon.story")
 EXPECTED_S = 32.5
 EXPECTED_BASIS = ("measured: two runs of suite-310 on the simulator, 2 pucks, reflex-fallback agent, start request to 'done': "
                   "32.5 s and 32.4 s (Sat Nov 14, after the round-2 fixes)")
+
+
+def _scene_room(sc: dict) -> str | None:
+    """The fire room a scenario names: its `room`, else the room its pucks are thrown into."""
+    pk = sc.get("pucks")
+    return sc.get("room") or (((pk or {}).get("throw") or {}).get("room") if isinstance(pk, dict) else None)
 
 
 class Story:
@@ -62,15 +70,14 @@ class Story:
                 sc = autoscene.build(tw0)
             else:
                 sc = load_scenario_file(self.script)
-                named_room = sc.get("room") or (((sc.get("pucks") or {}).get("throw") or {}).get("room") if isinstance(sc.get("pucks"), dict) else None)
+                named_room = _scene_room(sc)
                 if named_room and named_room not in {r["id"] for r in tw0.data.get("rooms", [])}:
                     # a fixture scene on another twin (BEACON_TWIN_JSON): build the scene for the twin that is loaded
                     from . import autoscene
                     sc = autoscene.build(tw0)
         except Exception as exc:
             raise ValueError(f"unknown walk-through script {self.script!r}: {exc}")
-        pk = sc.get("pucks")
-        room = sc.get("room") or (((pk or {}).get("throw") or {}).get("room") if isinstance(pk, dict) else None)
+        room = _scene_room(sc)
         if not room:
             raise ValueError(f"scenario {self.script!r} names no fire room")
         tw = self.state.twin
@@ -99,7 +106,6 @@ class Story:
         """A mid-room landing spot for P2 that leaves the trapped phone with two in-room candidates (the teaching moment:
         nothing can choose). The director knows the scenario's truth, like any scripted demo; the locator decides what is
         shown. Falls back to the comparison layout's mid-room point."""
-        import math
         from . import locate
         from .twin import _pip, _poly_dist
         tw = self.state.twin
@@ -116,7 +122,6 @@ class Story:
                 y += 0.5
             x += 0.5
         pts.sort(key=lambda q: math.dist(q, (cx, cy)))
-        import random
         ctx = locate.Context(tw, floor=self.floor)
         ph = (float(self.trapped["x"]), float(self.trapped["y"]))
         rnd = random.Random(310)
@@ -257,7 +262,7 @@ class Story:
         with self.state._lock:
             self.state.world.set_pucks([{"id": p["id"], "x": p["x"], "y": p["y"]} for p in pucks])
             believed = [dict(p) for p in self.state.world.pucks]
-        self.state.session.set_pucks(believed, room=self.room, floor=self.floor)
+        self.state.session.set_pucks(believed, room=self.room, floor=self.floor, placed_by="sim")
 
     def _setup_world(self) -> None:
         st = self.state
@@ -370,4 +375,6 @@ class Story:
             self.error = f"{type(exc).__name__}: {exc}"
             log.exception("walk-through failed")
         finally:
-            self.running = False
+            # A run cancelled by start() (a restart) finishes after the new run began: only the current run clears the flag.
+            if self.task is None or self.task is asyncio.current_task():
+                self.running = False

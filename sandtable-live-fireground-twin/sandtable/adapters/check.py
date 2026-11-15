@@ -6,7 +6,6 @@ never values), and exactly what is missing and what to do. `--live` tries every 
 """
 from __future__ import annotations
 
-import json
 import os
 import re
 import sys

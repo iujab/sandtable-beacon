@@ -28,7 +28,8 @@
     "matplotlib",
     "Swift / SwiftUI (Core Bluetooth, Nearby Interaction)",
     "Qorvo DWM3001CDK with Qorvo's stock Nearby Interaction firmware",
-    "Claude Sonnet 5.5 through the Claude CLI (recorded, replayed)"
+    "Claude Sonnet 5.5 through the Claude CLI (recorded, replayed)",
+    "C: our SS-TWR firmware for the DWM3001CDK (nRF5 SDK 17.1.0, Qorvo DW3000 driver; Arm GNU Toolchain), OpenOCD"
   ],
   "sponsor_tech": {
     "costar": "tenant roster by suite (tenant, kind of business, area, vacancy, life hazards) joined to the phones inside: expected people with a stated basis, unaccounted band, search priorities, next puck, record checks. Fixture: public open data, not CoStar data; mapping to the live toolkit in docs/COSTAR_TIE_IN.md",
@@ -42,14 +43,19 @@
       "uno-q",
       "android (power only)"
     ],
-    "role": "thrown pucks range the occupants' iPhones over UWB (Apple Nearby Interaction accessory sessions); the UNO Q hosts and powers a puck",
+    "role": "thrown pucks range the occupants' iPhones over UWB (Apple Nearby Interaction accessory sessions); the UNO Q hosts and powers a puck; two boards also range each other with our SS-TWR firmware, which measures the pucks' spacing (a board runs one firmware at a time)",
     "mode_now": "simulated"
   },
   "status": "partial",
   "progress": {
     "percent": 92,
-    "phase": "complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's",
+    "phase": "Sun 15 Nov: the pucks' spacing is now measured, not guessed: our board-to-board SS-TWR firmware was measured on two of the owner's boards; the server takes the spacing (POST /api/pucks/baseline) and places a pair from it (POST /api/pucks/anchor), every puck says how it was placed, and the board flags a placement that disagrees with the measurement. Code-quality sweep with bug fixes. 334 tests pass. The host's baseline mode and the anchor flow have not run against the boards (the UNO Q was off). The demo left running on port 1885 was started on Saturday and runs that code until it is restarted.",
     "done": [
+      "Board to board (feed A12): our SS-TWR firmware for the DWM3001CDK, measured on the owner's two boards on 15 Nov (about 4.9 ranges a second, 4 to 6 cm spread, antenna delays uncalibrated; results/twr_measured_2026-11-15.json, hand-transcribed by the bench agent). Kept as a script of our changes against the public starter project, because the Decawave examples it derives from carry no redistribution licence; prepare.py rebuilds and hash-checks app.c; the build path compiles and links for both roles (hardware/twr_firmware/build_logs/)",
+      "Server: POST /api/pucks/baseline (latest spacing per pair), POST /api/pucks/anchor (anchor one puck, tap toward the other, the other snaps to the measured spacing), placed_by on every puck (hand | baseline | layout | sim), a warning when a placed pair disagrees with its measured spacing by more than 3 sigma + 0.2 m; none of it reaches the agent's prompts; documented in docs/BEACON_FEED.md A12 and docs/CONTRACTS.md 3.8; shown on the board",
+      "Puck host: --baseline-to P2 reads the TWR firmware's RTT lines, keeps a robust spacing (median, MAD sigma, outliers dropped, a minimum sample count) and posts it; a board-to-board range is never sent as a phone range; --twr-offset-m for a measured bias",
+      "hardware/BOARD_TO_BOARD.md (the procedure, the three design options, measured versus untested); docs/ROOM_LOCATION.md (where floor and room come from); BRINGUP 7.3, PUCK, UNO_Q and PHONE_FEASIBILITY corrected: board to board is impossible with QANI and possible with our firmware",
+      "Code-quality sweep: 14 genuine bugs fixed, each with a regression test (server: malformed room, floor, n or seed gave HTTP 500; session: the stub tracker could not forget a moved puck, one non-object observation rejected a whole batch, ingest de-duplication was cleared wholesale; locator: the wall cache could serve another puck's walls; simulator: a slowly dragged phone stayed still, battery drain depended on the clock origin; report counted one state twice and kept unbounded memory; agent lost its plan on a list-valued target; tools resolved ring rooms by label; CoT crashed on half a position; a restarted walk-through lost its running flag; host printed a traceback for a bad --rtt), ring estimates about 25% faster and the accountability table's routes cached (identical outputs); recorded agent runs still replay identically",
       "Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle",
       "Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885",
       "Independent review and fix round: a two-puck position is published only when its mirror spot is explained; ranges are forgotten when a puck moves; stale phones are never dots; the simulator gives only what a real iPhone gives (distance); scripts/honesty_check.py hunts for confident wrong positions (9 scenes, passes)",
@@ -65,10 +71,12 @@
       "Checked on the owner's UNO Q over SSH on 14 Nov: the requirements install without sudo in 83 s; the simulated walk-through runs to the end there (both simulated phones located; the server uses about half of one core); 257 of 261 tests pass there, the 4 failures being time limits written for a faster machine; a USB-C hub with two DWM3001CDK boards enumerates as two serial ports. Live mode and the puck host were not run there (hardware/UNO_Q.md, first section)"
     ],
     "left_software": [
+      "Run the host's baseline mode against the two TWR boards once (hardware/BOARD_TO_BOARD.md step 2) and record what it posts",
+      "Calibrate the TWR antenna delay at 1.000 m with a tape (hardware/twr_firmware/README.md); until then the spacing carries an unknown constant offset",
       "Your first Xcode build of apps/ios will tell us what the syntax check could not: paste the compiler errors back (docs/IOS_BUILD.md section 11 lists the likeliest places)",
       "After the first real ranges: replace the simulated noise model with what an iPhone 14 and 15 really measure against these boards, and re-run scripts/eval_beacon.py and scripts/honesty_check.py",
       "Decide at the table how two phones share two boards (take turns in the app, or two boards per puck position) and tell us which, so the walk-through and the pitch match",
-      "Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, pucks surveying their own positions, an Android occupant app"
+      "Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, one firmware that ranges phones and the other puck at once (FiRa multi-session), an Android occupant app"
     ],
     "left_hardware": [
       "1. (5 min) hardware/BRINGUP.md step 1: power one DWM3001CDK and see whether it already ranges with Qorvo's free App Store app 'Qorvo Nearby Interaction'. If yes, skip flashing for that board.",
@@ -80,7 +88,8 @@
       "7. (20 min) BRINGUP step 6: puck A on a battery bank beside the UNO Q; puck B on the Android phone through USB-OTG into port J9; run the 10-minute soak test (does the phone or the bank cut the power?).",
       "8. (10 min) BRINGUP step 7 and hardware/LAYOUT.md: tape the rectangle, stand both pucks just inside the door-wall edge, click them onto the plan, set the exercise scale: one position.",
       "9. (10 min) BRINGUP step 8: second victim on the iPhone 15: 'Take turns' on both phones, or two more boards so each puck position has one board per phone.",
-      "10. (15 min) BRINGUP steps 9 and 10: rehearse the run-through twice and read the fallback ladder."
+      "10. (15 min) BRINGUP steps 9 and 10: rehearse the run-through twice and read the fallback ladder.",
+      "11. (30 min, optional, after step 7) hardware/BOARD_TO_BOARD.md: flash the TWR firmware on both boards (OpenOCD form that worked on the UNO Q), post the spacing with the host, anchor P1 and tap toward P2 on the board, then flash QANI back WITHOUT moving the boards. No TWR boards: tape-measure the spacing and post it with source manual"
     ],
     "needs_from_owner": [
       "Qorvo Nearby Interaction firmware for the DWM3001CDK (step 2 above): only you can submit Qorvo's download form",
@@ -90,7 +99,7 @@
       "Tell us what Qorvo's App Store app shows with your boards as they are now (advertising or not, distance or not)",
       "CoStar extract and sponsor keys have arrived and stay private: Beacon uses them only through the command board's private live bundle (BEACON_BUNDLE_DIR); nothing to do for Beacon"
     ],
-    "updated": "2026-11-14T17:16:52-06:00"
+    "updated": "2026-11-15T02:31:25-06:00"
   },
   "owner_questions": [
     {
@@ -178,16 +187,24 @@
     {
       "path": "hardware/two_puck_layout.svg",
       "caption": "The two-puck layout for the demo table"
+    },
+    {
+      "path": "figures/ui_10_baseline_mismatch.png",
+      "caption": "Simulated (SIM badge): a hand placement 5 m apart against a 4 m spacing entered by hand; the board flags it"
+    },
+    {
+      "path": "figures/ui_11_baseline_anchored.png",
+      "caption": "Simulated: after POST /api/pucks/anchor the pair sits at the measured spacing and both pucks say placed from it"
     }
   ],
   "tests": {
     "command": "bash run_tests.sh",
-    "passed": 261,
+    "passed": 334,
     "failed": 0,
-    "last_run": "2026-11-14T14:20:11-06:00"
+    "last_run": "2026-11-15T02:31:25-06:00"
   },
   "limitations": [
-    "Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.",
+    "No phone has been ranged through our app yet: every phone result is simulated, with the noise model stated next to it. On the owner's UNO Q two boards have run Qorvo's phone firmware (advertising seen) and our board-to-board firmware (ranges measured).",
     "An independent review found two faults that drew confident wrong positions (ranges kept after a puck moved; a two-puck position published without accounting for its mirror image). Both are fixed and a self-check now hunts for such cases; real hardware may reveal others.",
     "The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.",
     "Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.",
@@ -199,7 +216,9 @@
     "Not a life-safety product.",
     "The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.",
     "The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.",
-    "UNO Q: simulation only so far. Live mode, the puck host and the RTT reader have not run on it, and 4 time-limit tests fail there. The two boards attached to it carry the owner's separate board-to-board ranging firmware, not the Nearby Interaction firmware, so an iPhone cannot range them until they are flashed again"
+    "UNO Q: the simulated walk-through and the tests ran there (4 time-limit tests fail); live mode, the puck host and RTT reading have not run there. Its two boards last carried our board-to-board firmware, so an iPhone cannot range them until they are flashed with Qorvo's firmware again",
+    "Board to board: our TWR firmware and Qorvo's phone firmware cannot run on one board at once, so the spacing is measured at setup (or taped) and the boards must not move afterwards; the measured ranges are uncalibrated (unknown constant offset); running a TWR board next to a phone-ranging board (two boards per puck) is untested; one firmware doing both is not built; the host's baseline mode and the anchor flow have not run against the boards",
+    "Room and floor come from the responder's placement first; the phone's barometric pressure is carried but not turned into a floor; GPS is not used; UWB wall sensing is a research idea, not built (docs/ROOM_LOCATION.md)"
   ],
   "team": {
     "lead_model": "claude-fable-5-2",
@@ -216,7 +235,8 @@
       "W8 (Opus): puck host and hardware guides",
       "Reviewer (Opus): independent compile-minded review of the iOS source",
       "Judge (Opus): independent skeptical review",
-      "Lead (Fable): feed contract, architecture, roster, stated-evidence pruning, two-puck layout, integration, documents"
+      "Lead (Fable): feed contract, architecture, roster, stated-evidence pruning, two-puck layout, integration, documents",
+      "Sunday round (Opus 5.5 lead with Opus builders): board-to-board baseline contract, host baseline mode, firmware packaging and build check, documents; quality sweeps of the locator and simulator, and of the agent, feeds and report"
     ]
   }
 }

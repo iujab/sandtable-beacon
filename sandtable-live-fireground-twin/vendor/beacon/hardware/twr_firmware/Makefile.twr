@@ -1,0 +1,87 @@
+# Our SS-TWR firmware for the Qorvo DWM3001CDK (hardware/twr_firmware/README.md). Run from the root of a checkout of
+# https://github.com/Uberi/DWM3001C-starter-firmware prepared by prepare.py (it writes Src/app.c and copies this file
+# and dwm3001c.ld there):
+#     make -f Makefile.twr ROLE=INITIATOR NRF5_SDK=/path/to/nRF5_SDK_17.1.0_ddde560
+#     make -f Makefile.twr ROLE=RESPONDER NRF5_SDK=/path/to/nRF5_SDK_17.1.0_ddde560
+# NRF5_SDK: Nordic's nRF5 SDK 17.1.0 (not in this repository); also read from the environment. CROSS: the toolchain
+# prefix (default arm-none-eabi-, e.g. Debian's gcc-arm-none-eabi). Output: build/<ROLE>/app.hex.
+NRF5_SDK ?= ../nRF5_SDK_17.1.0_ddde560
+SDK  := $(NRF5_SDK)
+ROLE ?= INITIATOR
+OUT  := build/$(ROLE)
+CROSS ?= arm-none-eabi-
+CC   := $(CROSS)gcc
+OBJCOPY := $(CROSS)objcopy
+SIZE := $(CROSS)size
+
+ifeq ($(wildcard $(SDK)/components/boards/boards.c),)
+$(error nRF5 SDK 17.1.0 not found at '$(SDK)': pass NRF5_SDK=/path/to/nRF5_SDK_17.1.0_ddde560)
+endif
+ifeq ($(filter $(ROLE),INITIATOR RESPONDER),)
+$(error ROLE must be INITIATOR or RESPONDER)
+endif
+
+ARCH := -mcpu=cortex-m4 -mthumb -mabi=aapcs -mfloat-abi=hard -mfpu=fpv4-sp-d16
+
+DEFS := -DROLE_$(ROLE) -DBOARD_CUSTOM -DCONFIG_GPIO_AS_PINRESET -DFLOAT_ABI_HARD \
+        -DNRF52833_XXAA -DNRF_LOG_ENABLED=0 -D__HEAP_SIZE=8192 -D__STACK_SIZE=8192
+
+INCS := -ISrc -ISrc/platform -ISrc/SEGGER -ISrc/examples/shared_data -IShared/dwt_uwb_driver/Inc \
+  -I$(SDK)/components/drivers_nrf/nrf_soc_nosd -I$(SDK)/components/boards \
+  -I$(SDK)/components/toolchain/cmsis/include -I$(SDK)/components/libraries/balloc \
+  -I$(SDK)/components/libraries/ringbuf -I$(SDK)/components/libraries/log \
+  -I$(SDK)/components/libraries/log/src -I$(SDK)/components/libraries/memobj \
+  -I$(SDK)/components/libraries/util -I$(SDK)/components/libraries/atomic \
+  -I$(SDK)/components/libraries/delay -I$(SDK)/components/libraries/experimental_section_vars \
+  -I$(SDK)/components/libraries/strerror -I$(SDK)/modules/nrfx -I$(SDK)/modules/nrfx/hal \
+  -I$(SDK)/modules/nrfx/mdk -I$(SDK)/modules/nrfx/drivers/include -I$(SDK)/integration/nrfx \
+  -I$(SDK)/integration/nrfx/legacy -I$(SDK)/external/fprintf
+
+SRCS := Src/app.c Src/config_options.c Src/examples/shared_data/shared_functions.c \
+  Src/platform/deca_mutex.c Src/platform/deca_probe_interface.c Src/platform/deca_sleep.c \
+  Src/platform/deca_spi.c Src/platform/port.c Src/SEGGER/SEGGER_RTT.c \
+  $(SDK)/components/boards/boards.c \
+  $(SDK)/components/libraries/atomic/nrf_atomic.c \
+  $(SDK)/components/libraries/util/app_error.c \
+  $(SDK)/components/libraries/util/app_error_weak.c \
+  $(SDK)/components/libraries/util/app_error_handler_gcc.c \
+  $(SDK)/components/libraries/util/app_util_platform.c \
+  $(SDK)/components/libraries/strerror/nrf_strerror.c \
+  $(SDK)/integration/nrfx/legacy/nrf_drv_spi.c \
+  $(SDK)/integration/nrfx/legacy/nrf_drv_clock.c \
+  $(SDK)/modules/nrfx/drivers/src/nrfx_spim.c \
+  $(SDK)/modules/nrfx/drivers/src/nrfx_spi.c \
+  $(SDK)/modules/nrfx/drivers/src/nrfx_gpiote.c \
+  $(SDK)/modules/nrfx/drivers/src/nrfx_clock.c \
+  $(SDK)/modules/nrfx/drivers/src/prs/nrfx_prs.c \
+  $(SDK)/modules/nrfx/mdk/system_nrf52833.c
+ASRCS := $(SDK)/modules/nrfx/mdk/gcc_startup_nrf52833.S
+
+CFLAGS := $(ARCH) $(DEFS) $(INCS) -O2 -g3 -std=gnu11 -Wall -Wno-unused -Wno-format \
+  -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
+LDFLAGS := $(ARCH) -L$(SDK)/modules/nrfx/mdk -Tdwm3001c.ld -Wl,--gc-sections -Wl,--no-enum-size-warning \
+  --specs=nano.specs -u _printf_float -Wl,-Map=$(OUT)/app.map
+LIBS := -Wl,--whole-archive Shared/dwt_uwb_driver/lib/libdwt_uwb_driver-m4-hfp-6.0.7.a -Wl,--no-whole-archive \
+  -lc -lnosys -lm
+
+OBJS := $(addprefix $(OUT)/,$(notdir $(SRCS:.c=.o))) $(addprefix $(OUT)/,$(notdir $(ASRCS:.S=.o)))
+vpath %.c $(sort $(dir $(SRCS)))
+vpath %.S $(sort $(dir $(ASRCS)))
+
+all: $(OUT)/app.hex
+
+$(OUT):
+	mkdir -p $@
+$(OUT)/%.o: %.c | $(OUT)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(OUT)/%.o: %.S | $(OUT)
+	$(CC) $(ARCH) $(DEFS) $(INCS) -x assembler-with-cpp -c $< -o $@
+$(OUT)/app.elf: $(OBJS) dwm3001c.ld
+	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
+	$(SIZE) $@
+$(OUT)/app.hex: $(OUT)/app.elf
+	$(OBJCOPY) -O ihex $< $@
+
+clean:
+	rm -rf build
+.PHONY: all clean

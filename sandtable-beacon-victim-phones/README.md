@@ -10,7 +10,7 @@ Beacon is the headline mode of Sandtable, an incident-command board for fire cre
 
 Built for HackPrinceton Fall 2026. Main track: **Education** (as Sandtable). Special tracks: **CoStar "Inside and Out: AI for the Built World"**, **Best Hardware Hack**, **Best Physical AI Hack**, **Amazon Best Practical AI Innovation**.
 
-> **Status: nothing has run on hardware yet.** The iOS app is uncompiled Swift source (written on a machine with no Mac). The guides in `hardware/` are written from documentation and forum reports. `project.json` carries the live task list.
+> **Status: no iPhone has ranged a board through our app yet.** On the owner's UNO Q, two DWM3001CDK boards have run Qorvo's Nearby Interaction firmware (advertising seen, `docs/IOS_HANDOFF.md`) and our board-to-board firmware (ranges measured, `results/twr_measured_2026-11-15.json`). The iOS app is uncompiled Swift source in this repository (written on a machine with no Mac). Most guides in `hardware/` are written from documentation and forum reports and say which steps were run. `project.json` carries the live task list.
 
 ## The problem
 
@@ -126,6 +126,7 @@ flowchart LR
 - **Layout** (`beacon/layout.py`): where two pucks go so that two rings give one answer.
 - **Roster** (`beacon/roster.py`): the join of record, twin and phones. Expected people are estimates with a stated basis (a record head count when there is one; otherwise floor area and building-code load factors).
 - **Agent** (`beacon/agent.py`): a plan-and-act loop over seven tools, built from discrete facts so that a recorded real model run replays exactly; a labelled deterministic fallback when no recording matches.
+- **Puck spacing** (`beacon/baseline.py`, feed A12): two pucks' measured spacing (from our board-to-board firmware through `python -m beacon.host --baseline-to`, or a tape measure) lets the responder anchor one puck and tap toward the other; the other snaps to the measured distance, every puck says how it was placed, and a hand placement that disagrees with the measurement is flagged.
 - **Live path**: with Qorvo's stock firmware the phone app reads each distance and posts it; the puck needs only power. `beacon/host` is a small puck host for the UNO Q (heartbeat, an experimental reader of the board's debug channel, an optional Bluetooth device count).
 
 ## How each judging criterion is met
@@ -175,6 +176,7 @@ Tests (offline): `bash run_tests.sh`. Evaluation: `python scripts/eval_beacon.py
 | Step | Guide |
 |---|---|
 | Flash Qorvo's stock firmware onto a DWM3001CDK | `hardware/FLASH.md` |
+| Measure the two pucks' spacing board to board (our SS-TWR firmware) and anchor the pair on the plan | `hardware/BOARD_TO_BOARD.md`, `hardware/twr_firmware/README.md` |
 | First power-up, the two-puck layout, networking, two phones, fallbacks | `hardware/BRINGUP.md`, `hardware/LAYOUT.md` |
 | What a puck needs (power, mounting) | `hardware/PUCK.md` |
 | The UNO Q as puck host or as the whole command post | `hardware/UNO_Q.md` |
@@ -191,6 +193,8 @@ bash run_demo.sh --source live --lan     # then scan the board's QR code with ea
 |---|---|
 | Ranges and positions | **Simulated** (`beacon/sim.py`; noise model with sources in `beacon/models.py`) until real iPhones report. The board shows SIM, or LIVE in live mode |
 | Puck firmware | Qorvo's stock Nearby Interaction image. Not in this repository; the owner downloads it from Qorvo. Never flashed by us |
+| Board-to-board firmware (`hardware/twr_firmware`) | Our SS-TWR changes to Qorvo's examples, kept as a script against the public starter project (the examples carry no redistribution licence). **Measured** on two boards on the UNO Q (hand-transcribed summary, `results/twr_measured_2026-11-15.json`); the build path in this repository is compile-verified (`build_logs/`); antenna delays uncalibrated |
+| Puck spacing (`POST /api/pucks/baseline`, `/api/pucks/anchor`, host `--baseline-to`) | Written and tested in software (`tests/test_baseline.py`, `tests/test_host.py`); not run against the boards |
 | iOS app (`apps/ios`) | **Uncompiled Swift source**, modelled on Apple's accessory sample; syntax-parsed, never compiled, never run |
 | Puck host (`beacon/host`) | Tested against stubs; on the owner's UNO Q only its `--help` has run; the debug-channel reader's input format is unconfirmed |
 | Server on the UNO Q | The simulated walk-through ran to the end there; 257 of 261 tests pass there, the 4 failures being time limits (`hardware/UNO_Q.md`, first section). Live mode not run there |
@@ -208,13 +212,14 @@ bash run_demo.sh --source live --lan     # then scan the board's QR code with ea
 - The twin's "two walls away" rule-out rests on an assumption of the range model (one wall at most) that the simulator shares; it has not been tested against real walls.
 - The simulation gives each puck position one board per phone; with two boards and two phones the phones must take turns, which slows every update.
 - A phone whose owner installed nothing cannot be ranged or identified. The cold Bluetooth count is weak (numbers above) and off by default on real hardware.
-- The pucks cannot find their own positions tonight (the stock firmware does not range board to board): they are placed and clicked onto the plan.
+- The stock firmware does not range board to board. Our SS-TWR firmware does (two boards measured on 2026-11-15: about 4.9 ranges a second, 4 to 6 cm spread, antenna delays uncalibrated so the absolute bias is unknown; `results/twr_measured_2026-11-15.json`), but a board runs one firmware at a time, so tonight the spacing is measured at setup (or taped) and the pair anchored from it; one puck doing both is not built (`hardware/BOARD_TO_BOARD.md`). The host's baseline mode and the anchor flow have not run against the boards.
+- Floor and room come from the responder's placement first; the phone's barometric pressure is carried but not turned into a floor, and GPS is not used (`docs/ROOM_LOCATION.md`).
 - One floor; no smoke or heat model; the twin and the record are fixtures.
 - Not a life-safety product.
 
 ## What's next
 
-Real iPhones against real boards; puck firmware that reports ranges and link quality itself, so a phone can go dark; pucks that survey their own positions; a dual-antenna radio for bearing from one puck; background ranging through a Live Activity; live CoStar and Matterport data; Android through Jetpack UWB.
+Real iPhones against real boards; puck firmware that reports ranges and link quality itself, so a phone can go dark; one firmware that ranges phones and the other puck at once (FiRa multi-session), so a thrown pair measures its own spacing on landing; a dual-antenna radio for bearing from one puck; background ranging through a Live Activity; live CoStar and Matterport data; Android through Jetpack UWB.
 
 ## Repository
 
@@ -222,8 +227,8 @@ Real iPhones against real boards; puck firmware that reports ranges and link qua
 beacon/        models, locate, track, prune, layout, sim, session, feeds, server, story, roster, tools, agent, report, host/
 web/           the board, the simulated phone, the app page
 apps/ios/      the occupant app (Swift / SwiftUI) and its Xcode project
-hardware/      FLASH, BRINGUP, LAYOUT, PUCK, UNO_Q
-docs/          BEACON_FEED (the contract with the command board), PHONE_FEASIBILITY, PRIVACY, COSTAR_TIE_IN, IOS_BUILD, research/
+hardware/      FLASH, BRINGUP, LAYOUT, PUCK, UNO_Q, BOARD_TO_BOARD, twr_firmware/
+docs/          BEACON_FEED (the contract with the command board), PHONE_FEASIBILITY, ROOM_LOCATION, PRIVACY, COSTAR_TIE_IN, IOS_BUILD, research/
 fixtures/      building record and twin (labelled fixtures), scenarios, recorded model runs
 scripts/       eval_beacon.py, fill_numbers.py, shots.cjs
 tests/ results/ figures/

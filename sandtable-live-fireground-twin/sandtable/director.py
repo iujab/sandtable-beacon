@@ -41,12 +41,35 @@ class Director:
         if self.running:
             return
         self.mode, self.script, self.steps, self.beacon, self.playing = mode, script, [], beacon, None
-        self._task = asyncio.create_task(self._run_scout() if script == "scout" else self._run_beacon() if script == "beacon" else self._run())
+        self.running = True                            # at once: a second start before the task runs must not start a second script
+        run = self._run_scout() if script == "scout" else self._run_beacon() if script == "beacon" else self._run()
+        self._task = asyncio.create_task(self._play(run, script))
 
     def stop(self) -> None:
         if self._task:
             self._task.cancel()
         self.running, self.step = False, "stopped"
+
+    def _current(self) -> bool:
+        """True inside the task of the run that is current (a stopped run may still be winding down after a new one started)."""
+        return self._task is asyncio.current_task()
+
+    async def _play(self, run, script: str) -> None:
+        """Plays one script and says how it ended: "done" (the script's last step), "stopped" or "failed". Only the current run
+        writes the step and the running flag, so a stop followed at once by a start cannot be undone by the old run's ending."""
+        try:
+            await run
+        except asyncio.CancelledError:
+            if self._current():
+                self.step = "stopped"
+            raise
+        except Exception:
+            log.exception("%s storyboard failed", script)
+            if self._current():
+                self.step = "failed"
+        finally:
+            if self._current():
+                self.running = False
 
     async def _wait(self, cond, timeout: float, what: str) -> bool:
         loop = asyncio.get_running_loop()
@@ -57,6 +80,24 @@ class Director:
             await asyncio.sleep(0.1)
         log.warning("storyboard: timed out waiting for %s", what)
         return False
+
+    def _paces(self) -> tuple[int, int]:
+        """(slow, human): how much longer to wait for a live model (the CLI in particular), and for a person moving a token."""
+        return (1 if self.s.agent.backend == "replay" else 6), (20 if self.mode == "assist" else 1)
+
+    async def _alarm_and_preplan(self, slow: int, say) -> None:
+        """The opening every script shares: the alarm, then wait for the pre-plan and the crews cleared to enter."""
+        s = self.s
+        say("alarm: the agent builds the pre-plan")
+        await s.alarm()
+        await self._wait(lambda: s.preplan is not None and s.incident.phase == "operations", 240 * slow, "the pre-plan")
+        await self._pause(1.0)
+
+    @staticmethod
+    async def _pause(seconds: float) -> None:
+        """A pause for the people watching, while nothing moves (config.SCRIPT_PACE scales it; the tests shrink it). Never a pause
+        the script needs for the state to settle: those are plain sleeps."""
+        await asyncio.sleep(seconds * config.SCRIPT_PACE)
 
     def _fire_room(self) -> str:
         """A suite whose tenant carries a life hazard, as far from Stair A as the floor allows (any twin: see scout.session.fire_room)."""
@@ -80,77 +121,63 @@ class Director:
 
     async def _run(self) -> None:
         s, inc = self.s, self.s.incident
-        self.running = True
-        slow = 1 if s.agent.backend == "replay" else 6          # a live model (and the CLI in particular) needs patience
-        human = 20 if self.mode == "assist" else 1               # a person moving a token needs patience too
-        try:
-            self.step = "reset"
-            await s.reset()
-            await asyncio.sleep(1.0)
-            self.step = "alarm: the agent builds the pre-plan"
-            await s.alarm()
-            await self._wait(lambda: s.preplan is not None and inc.phase == "operations", 240 * slow, "the pre-plan")
-            await asyncio.sleep(1.0)
+        slow, human = self._paces()
+        self.step = "reset"
+        await s.reset()
+        await asyncio.sleep(1.0)
+        await self._alarm_and_preplan(slow, lambda step: setattr(self, "step", step))
 
-            room = self._fire_room()
-            label = s.twin.room(room)["label"]
-            inc.assign("E1", "attack", room, source="director")
-            e1 = inc.units["E1"]
-            if self.mode == "assist":
-                self.step = f"YOUR MOVE: take the Engine 1 token along the yellow route into {label}, then hold it still"
+        room = self._fire_room()
+        label = s.twin.room(room)["label"]
+        inc.assign("E1", "attack", room, source="director")
+        e1 = inc.units["E1"]
+        if self.mode == "assist":
+            self.step = f"YOUR MOVE: take the Engine 1 token along the yellow route into {label}, then hold it still"
+        else:
+            self.step = "Engine 1 advances to the fire room"
+            inc.drive("E1")
+        await self._wait(lambda: e1["_follow"] is None and e1["room"] == room, 90 * human, "Engine 1 to arrive")
+
+        self.step = f"Engine 1 is in {label}: hold still for {config.NO_MOTION_S:g} s" if self.mode == "assist" else "Engine 1 stops moving"
+        if not await self._wait(lambda: inc.mayday is not None, (config.NO_MOTION_S + 20) * human, "the no-motion mayday"):
+            inc.declare_mayday("E1", "manual", "director")
+
+        self.step = "mayday: the agent sends the rescue team"
+        rit = inc.units["RIT"]
+        await self._wait(lambda: (rit["assignment"] or {}).get("task") == "rit_rescue" and rit["route"] is not None, (config.AGENT_FALLBACK_AFTER_S + 120) * slow, "the rescue assignment")
+        await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish the mayday turn")
+        f = rit["_follow"]
+        if f is None and rit["route"] and not rit["route"].get("done"):
+            self.step = "YOUR MOVE: a person carries the rescue team tag. Inject a hazard from the board if you want a re-plan"
+        if f:                                          # halt the team exactly at a graph node, about 40% of the way in
+            k = next((i for i, c in enumerate(f["cum"]) if c >= 0.4 * f["total"]), len(f["cum"]) - 1)
+            await self._wait(lambda: rit["_follow"] is None or rit["_follow"]["i"] >= k, 60 * slow, "the rescue team to get under way")
+            if rit["_follow"] is not None and f["nodes"]:
+                rit["_follow"] = None
+                rit["_logical"] = f["nodes"][min(k, len(f["nodes"]) - 1)]
+                inc.move_unit("RIT", *s.twin.node(rit["_logical"])["at"])
+
+        if f and rit["route"] and not rit["route"].get("done"):
+            self.step = "inject: a corridor is lost"
+            ref = self._hazard_edge(rit, e1)
+            if ref:
+                inc.mark_hazard(ref, "collapse", "ceiling collapse across the corridor (exercise inject)", source="inject")
+                await self._wait(lambda: (rit["route"] is not None and rit["route"].get("valid") and rit["_follow"] is not None) or inc.contact_done,
+                                 (config.AGENT_FALLBACK_AFTER_S + 120) * slow, "the re-plan")
+                await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish the re-plan turn")
             else:
-                self.step = "Engine 1 advances to the fire room"
-                inc.drive("E1")
-            await self._wait(lambda: e1["_follow"] is None and e1["room"] == room, 90 * human, "Engine 1 to arrive")
+                inc.drive("RIT")
 
-            self.step = f"Engine 1 is in {label}: hold still for {config.NO_MOTION_S:g} s" if self.mode == "assist" else "Engine 1 stops moving"
-            if not await self._wait(lambda: inc.mayday is not None, (config.NO_MOTION_S + 20) * human, "the no-motion mayday"):
-                inc.declare_mayday("E1", "manual", "director")
-
-            self.step = "mayday: the agent sends the rescue team"
-            rit = inc.units["RIT"]
-            await self._wait(lambda: (rit["assignment"] or {}).get("task") == "rit_rescue" and rit["route"] is not None, (config.AGENT_FALLBACK_AFTER_S + 120) * slow, "the rescue assignment")
-            await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish the mayday turn")
-            f = rit["_follow"]
-            if f is None and rit["route"] and not rit["route"].get("done"):
-                self.step = "YOUR MOVE: a person carries the rescue team tag. Inject a hazard from the board if you want a re-plan"
-            if f:                                          # halt the team exactly at a graph node, about 40% of the way in
-                k = next((i for i, c in enumerate(f["cum"]) if c >= 0.4 * f["total"]), len(f["cum"]) - 1)
-                await self._wait(lambda: rit["_follow"] is None or rit["_follow"]["i"] >= k, 60 * slow, "the rescue team to get under way")
-                if rit["_follow"] is not None and f["nodes"]:
-                    rit["_follow"] = None
-                    rit["_logical"] = f["nodes"][min(k, len(f["nodes"]) - 1)]
-                    inc.move_unit("RIT", *s.twin.node(rit["_logical"])["at"])
-
-            if f and rit["route"] and not rit["route"].get("done"):
-                self.step = "inject: a corridor is lost"
-                ref = self._hazard_edge(rit, e1)
-                if ref:
-                    inc.mark_hazard(ref, "collapse", "ceiling collapse across the corridor (exercise inject)", source="inject")
-                    await self._wait(lambda: rit["route"] is not None and rit["route"].get("valid") and rit["_follow"] is not None or inc.contact_done,
-                                     (config.AGENT_FALLBACK_AFTER_S + 120) * slow, "the re-plan")
-                    await self._wait(lambda: not s.agent_busy(), 120 * slow, "the agent to finish the re-plan turn")
-                else:
-                    inc.drive("RIT")
-
-            self.step = "rescue team re-routed"
-            await self._wait(lambda: inc.contact_done, 120 * human, "contact")
-            self.step = "contact: the agent plans the way out"
-            if self.mode == "assist" and e1["physical"] and not inc.drivable:
-                await self._wait(lambda: not s.agent_busy() and rit["assignment"] and rit["assignment"]["task"] == "exit", 120 * slow, "the exit order")
-                self.step = "YOUR MOVE: walk the Engine 1 token out with the rescue team to the stair shown"
-            await self._wait(lambda: inc.phase == "terminated", (config.AGENT_FALLBACK_AFTER_S + 180) * slow * human, "all crews out")
-            self.step = "after-action report"
-            await self._wait(lambda: s.aar is not None, 240 * slow, "the after-action report")
-            self.step = "done"
-        except asyncio.CancelledError:
-            self.step = "stopped"
-            raise
-        except Exception:
-            log.exception("storyboard failed")
-            self.step = "failed"
-        finally:
-            self.running = False
+        self.step = "rescue team re-routed"
+        await self._wait(lambda: inc.contact_done, 120 * human, "contact")
+        self.step = "contact: the agent plans the way out"
+        if self.mode == "assist" and e1["physical"] and not inc.drivable:
+            await self._wait(lambda: not s.agent_busy() and rit["assignment"] and rit["assignment"]["task"] == "exit", 120 * slow, "the exit order")
+            self.step = "YOUR MOVE: walk the Engine 1 token out with the rescue team to the stair shown"
+        await self._wait(lambda: inc.phase == "terminated", (config.AGENT_FALLBACK_AFTER_S + 180) * slow * human, "all crews out")
+        self.step = "after-action report"
+        await self._wait(lambda: s.aar is not None, 240 * slow, "the after-action report")
+        self.step = "done"
 
     # ------------------------------------------------------------------ the scout exercise
     def _say(self, step: str) -> None:
@@ -166,7 +193,6 @@ class Director:
         """Shared ending of the scout and beacon scripts: the agent's orders on `what` (else the labelled script fallback), the rescue team
         walks to the person `vid`, reached, the way out (agent, else fallback), everybody who went in comes out, all out."""
         s, inc = self.s, self.s.incident
-        e1 = inc.units["E1"]
 
         def person():
             return inc.victim_target(vid) or {}
@@ -284,9 +310,7 @@ class Director:
         beacon="live": drives the live module (POST /api/pucks, POST /api/sim/phone), for use with a live model."""
         s, inc = self.s, self.s.incident
         link = s.beacon
-        self.running = True
-        slow = 1 if s.agent.backend == "replay" else 6
-        human = 20 if self.mode == "assist" else 1
+        slow, human = self._paces()
         try:
             from .beacon_link import SCENE
             from .beacon_link import live_story_path
@@ -306,10 +330,7 @@ class Director:
             if not story:
                 await link.remote("POST", "/api/reset", {})
             await asyncio.sleep(1.0)
-            self._say("alarm: the agent builds the pre-plan")
-            await s.alarm()
-            await self._wait(lambda: s.preplan is not None and inc.phase == "operations", 240 * slow, "the pre-plan")
-            await asyncio.sleep(1.0)
+            await self._alarm_and_preplan(slow, self._say)
             room = scene.get("room") if scene.get("room") in s.twin._rooms else self._fire_room()
             label = s.twin.room(room)["label"]
             await self._e1_to_door(room, human)
@@ -328,7 +349,7 @@ class Director:
                 await link.story_step("pucks")
                 for step in [k for k in link.story["order"] if k.startswith("phone")]:
                     self._say(f"phones answer: {step.replace('_', ' ')}")
-                    await asyncio.sleep(1.0)
+                    await self._pause(1.0)
                     await link.story_step(step)
                     await self._wait(lambda: not s.agent_busy(), (config.AGENT_FALLBACK_AFTER_S + 120) * slow, f"the agent's turn on {step}")
                 inc.script_hold = False
@@ -359,16 +380,10 @@ class Director:
             await self._wait(lambda: s.aar is not None, 240 * slow, "the after-action report")
             self._say("report ready: /api/report")
             self._say("done")
-        except asyncio.CancelledError:
-            self.step = "stopped"
-            raise
-        except Exception:
-            log.exception("beacon storyboard failed")
-            self.step = "failed"
         finally:
-            inc.script_hold = False
-            inc.held_units = set()
-            self.running = False
+            if self._current():                         # a run stopped and already replaced leaves the new run's holds alone
+                inc.script_hold = False
+                inc.held_units = set()
 
     async def _two_phones(self, scene: dict, room: str, slow: float, human: float) -> None:
         """Two phones, two crews, one crew in the room at a time. The first (the priority, a fix) is rescued by the crew the agent sends
@@ -490,64 +505,37 @@ class Director:
         agent acts on it; the rescue team walks to the located person; victim_reached; the way out; all out; after-action.
         Condition-based like the mayday script; every wait has a timeout that logs and moves on."""
         s, inc = self.s, self.s.incident
-        self.running = True
-        slow = 1 if s.agent.backend == "replay" else 6
-        human = 20 if self.mode == "assist" else 1
-        try:
-            self._say("reset")
-            await s.reset()
-            await asyncio.sleep(1.0)
-            self._say("alarm: the agent builds the pre-plan")
-            await s.alarm()
-            await self._wait(lambda: s.preplan is not None and inc.phase == "operations", 240 * slow, "the pre-plan")
-            await asyncio.sleep(1.0)
+        slow, human = self._paces()
+        self._say("reset")
+        await s.reset()
+        await asyncio.sleep(1.0)
+        await self._alarm_and_preplan(slow, self._say)
 
-            from .scout.session import door_outside_node
-            room = self._fire_room()
-            label = s.twin.room(room)["label"]
-            door_node = door_outside_node(s.twin, room) or room
-            inc.assign("E1", "stage", door_node, source="director")
-            e1 = inc.units["E1"]
-            if self.mode == "assist":
-                inc.drive("E1", False)                         # a person moves Engine 1 (the stage order alone would walk a simulated tag)
-            if self.mode == "assist" and e1["physical"] and not inc.drivable:
-                self._say(f"YOUR MOVE: take the Engine 1 token along the yellow route to the door of {label} (corridor side)")
-            elif self.mode == "assist":
-                self._say(f"YOUR MOVE: drag Engine 1 along the yellow route to the door of {label} (corridor side)")
-            else:
-                self._say(f"Engine 1 goes to the door of {label}")
-                if e1["_follow"] is None:
-                    inc.drive("E1")
-            await self._wait(lambda: e1["_follow"] is None and bool(e1["route"] and e1["route"].get("done")), 90 * human, "Engine 1 at the door")
+        room = self._fire_room()
+        label = s.twin.room(room)["label"]
+        e1 = inc.units["E1"]
+        await self._e1_to_door(room, human)
 
-            self._say(f"smoke: {label} fills with smoke (a camera or LiDAR would see nothing)")
-            for k in range(10):
-                inc.scout["smoke"] = round(0.09 * (k + 1), 2)
-                await asyncio.sleep(0.3 * s.scout.pace)
+        self._say(f"smoke: {label} fills with smoke (a camera or LiDAR would see nothing)")
+        for k in range(10):
+            inc.scout["smoke"] = round(0.09 * (k + 1), 2)
+            await asyncio.sleep(0.3 * s.scout.pace)
 
-            if self.mode == "assist":
-                self._say(f"YOUR MOVE: throw the pucks into {label} (press Throw pucks)")
-                if not await self._wait(lambda: s.scout.phase != "idle", 30 * human, "the pucks to be thrown"):
-                    inc.log_scout("No throw within the cue time: the exercise script throws the pucks")
-            if s.scout.phase == "idle" or (not s.scout.running and s.scout.scan is None):
-                self._say(f"Engine 1 throws the pucks into {label}")
-                inc.log_scout(f"{e1['label']} throws the scout pucks into {label}", "E1")
-                s.scout.start(room)
-            self._say("scout: pucks self-locate, register into the twin and scan")
-            await self._wait(lambda: s.scout.scan is not None and inc.scan is not None, 90, "the scan")
-            victims = [v for v in inc.victims.values()]
-            if not victims:
-                self._say("the scan located nobody: crews withdraw")
-                inc.log_scout("The scan located nobody in the room; the exercise ends with the crews withdrawing")
-            await self._rescue_and_out(victims[0]["id"] if victims else None, "scan", slow, human)
-            self._say("after-action report")
-            await self._wait(lambda: s.aar is not None, 240 * slow, "the after-action report")
-            self._say("done")
-        except asyncio.CancelledError:
-            self.step = "stopped"
-            raise
-        except Exception:
-            log.exception("scout storyboard failed")
-            self.step = "failed"
-        finally:
-            self.running = False
+        if self.mode == "assist":
+            self._say(f"YOUR MOVE: throw the pucks into {label} (press Throw pucks)")
+            if not await self._wait(lambda: s.scout.phase != "idle", 30 * human, "the pucks to be thrown"):
+                inc.log_scout("No throw within the cue time: the exercise script throws the pucks")
+        if s.scout.phase == "idle" or (not s.scout.running and s.scout.scan is None):
+            self._say(f"Engine 1 throws the pucks into {label}")
+            inc.log_scout(f"{e1['label']} throws the scout pucks into {label}", "E1")
+            s.scout.start(room)
+        self._say("scout: pucks self-locate, register into the twin and scan")
+        await self._wait(lambda: s.scout.scan is not None and inc.scan is not None, 90, "the scan")
+        victims = [v for v in inc.victims.values()]
+        if not victims:
+            self._say("the scan located nobody: crews withdraw")
+            inc.log_scout("The scan located nobody in the room; the exercise ends with the crews withdrawing")
+        await self._rescue_and_out(victims[0]["id"] if victims else None, "scan", slow, human)
+        self._say("after-action report")
+        await self._wait(lambda: s.aar is not None, 240 * slow, "the after-action report")
+        self._say("done")

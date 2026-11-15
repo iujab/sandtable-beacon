@@ -1,58 +1,46 @@
 # Tasks and handoff
 
-Last synced from the build server: **Sun Nov 15 2026, 1:40 AM CST**. This file is regenerated on every sync from the two teams' own status files, so it stays current. Agents on the build server are still working; pull again before you start a task.
+Last synced from the build server: **Sun Nov 15 2026, 3:20 AM CST**. This file is regenerated on every sync from the two parts' own status files.
 
 Deadline: **Sunday Nov 15, 8:00 am Princeton time** (Devpost). Judging 9:30 am to 12:30 pm, in person, 2 minutes per judge.
+
+**How to run anything, at any level (laptop demo, live building data, real boards and phones): [RUNBOOK.md](RUNBOOK.md).**
 
 ## Where things stand
 
 | Part | Folder | Status | Demo-ready (simulated) | Being worked on |
 |---|---|---|---|---|
-| Command board | `sandtable-live-fireground-twin/` | partial | 92% | Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones. |
-| Phones and pucks | `sandtable-beacon-victim-phones/` | partial | 92% | complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's |
+| Command board | `sandtable-live-fireground-twin/` | partial | 95% | Software finished for the stand-in demo and the private live run, after a full sweep: the board was rebuilt around the responder's story (know before you go, beacon on scene, command), the backend cleaned up with 8 bugs fixed, and the puck spacing measured by the boards now positions the pucks on the plan. Hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks (stand-in), and the beacon exercise does on the live building too; 198 tests pass. Not done: no phone has been ranged by our app on real boards yet. |
+| Phones and pucks | `sandtable-beacon-victim-phones/` | partial | 92% | Sun 15 Nov: the pucks' spacing is now measured, not guessed: our board-to-board SS-TWR firmware was measured on two of the owner's boards; the server takes the spacing (POST /api/pucks/baseline) and places a pair from it (POST /api/pucks/anchor), every puck says how it was placed, and the board flags a placement that disagrees with the measurement. Code-quality sweep with bug fixes. 334 tests pass. The host's baseline mode and the anchor flow have not run against the boards (the UNO Q was off). The demo left running on port 1885 was started on Saturday and runs that code until it is restarted. |
 
-Everything in this repository runs on a simulator and labelled stand-in data. The command board has also run privately on live CoStar, Matterport and Vexcel data for one real building; the keys and that data stay off this repository (task 8). **Nothing has run on the real boards or phones yet.** That is the work below.
+The repository runs on a simulator and labelled stand-in data. The command board has also run privately on live CoStar, Matterport and Vexcel data for one real building; the keys and that data stay off this repository. On real hardware so far: two DWM3001CDK boards ranged each other with the board-to-board firmware, and the owner's iPhone connected to each board on Qorvo's phone firmware in Qorvo's app. No phone position from real boards has been measured yet.
 
-## Run it on your laptop first (no hardware)
+## Already done on the hardware
 
-```bash
-git clone https://github.com/iujab/sandtable-beacon.git
-cd sandtable-beacon/sandtable-live-fireground-twin
-bash run_demo.sh --storyboard      # command board on http://127.0.0.1:1810, plays the exercise hands-free
-```
-
-- macOS, Linux and WSL: the script creates `.venv` and installs the requirements on first run (Python 3.10 or newer).
-- Windows without WSL: `python -m venv .venv`, `.venv\Scripts\pip install -r requirements.txt`, `.venv\Scripts\python -m sandtable.demo --storyboard`. This path has not been run on Windows yet; tell the agent what breaks.
-- The phones part also runs alone: `cd sandtable-beacon-victim-phones && bash run_demo.sh --story` (board on http://127.0.0.1:1885).
-- Stop either one with `bash run_demo.sh --stop`.
+- The two boards on the UNO Q carry Qorvo's Nearby Interaction (phone) firmware; the owner's iPhone connected to both in Qorvo's app (2026-11-15).
+- Board-to-board ranging was measured on the same two boards before they were switched to the phone firmware (see the board-to-board guide below).
 
 ## Your tasks, in order
 
-These need hands, hardware or accounts, so only you can do them. Each links to the step-by-step guide when one exists.
+These need hands, hardware or accounts. Section numbers refer to [RUNBOOK.md](RUNBOOK.md).
 
-1. **Five-minute board check.** Install Qorvo's free "Qorvo Nearby Interaction" app from the App Store on an iPhone, power one DWM3001CDK over USB, and see whether the app finds it and shows a distance. If it does, the boards already carry the right firmware: skip step 2.
-2. **Flash the boards** with Qorvo's Nearby Interaction firmware if step 1 failed. The firmware file sits behind an email form on qorvo.com, so the agents could not fetch it for you. Guide: `sandtable-beacon-victim-phones/hardware/FLASH.md`.
-3. **Build the iPhone app in Xcode** and install it on the iPhone 14 and the iPhone 15 (switch on Developer Mode on both). It has never been compiled: the build server is Linux. Guide: `sandtable-beacon-victim-phones/docs/IOS_BUILD.md`. Paste any compiler errors back to the agent.
-4. **Set up the two pucks.** Puck A: a board on a battery bank beside the UNO Q. Puck B: a board powered from the Android phone through a USB-OTG adapter (keep a second battery bank as the fallback). A puck needs power only; the distance comes back through the iPhone app. Guides: `sandtable-beacon-victim-phones/hardware/PUCK.md` and `hardware/BRINGUP.md`.
-5. **Start the Beacon server where the phones can reach it** (laptop or UNO Q): `bash run_demo.sh --source live --lan` in `sandtable-beacon-victim-phones/`. Venue Wi-Fi may block device-to-device traffic; a phone hotspot is the usual answer. UNO Q guide: `sandtable-beacon-victim-phones/hardware/UNO_Q.md`. Its first section lists what was checked on the real UNO Q on Saturday afternoon: a USB-C hub with two boards works, and plain `python3 -m venv` fails there (the guide has the commands that work without `sudo`). A clone with the requirements installed is already on the UNO Q in `~/sandtable-beacon`; run `git pull` there first. The simulated walk-through ran to the end on the UNO Q; live mode has not run there yet.
-6. **Place the pucks and tell the board where they are.** The stock firmware cannot range board to board, so tape-measure each puck's position and click it onto the room plan. Put both pucks along the same wall so the room's walls can rule out the mirror-image answer.
-7. **First real range.** Open the app on one iPhone, walk the room, and check the ring, the two candidates and the fix on the board against where you actually stand. Write down what you measure: the write-ups currently say "simulated" everywhere and need real numbers.
-8. **Live sponsor data on your laptop** (about 15 minutes). The command board runs on your laptop; the UNO Q needs no keys. Two private files travel by hand from the build server, never through this repository: the private `.env` (keys and the demo building's ids) and `sandtable-live-bundle.zip` (that building's record, twin, imagery and recorded agent decisions). In `sandtable-live-fireground-twin/`:
-   - Create a virtual environment and `pip install -r requirements.txt`.
-   - Copy the private `.env` into this folder (git-ignored).
-   - `python scripts/pack_live_bundle.py unpack <path to sandtable-live-bundle.zip>`
-   - `python -m sandtable.adapters.check --live` should report all three layers read live.
-   - Start it. Mac or WSL: `SANDTABLE_DATA_MODE=live LLM_BACKEND=replay python -m sandtable.demo`. PowerShell: `$env:SANDTABLE_DATA_MODE="live"; $env:LLM_BACKEND="replay"; python -m sandtable.demo`.
-   - Open `http://localhost:1810` and press Exercise. The Matterport 3D view only works on `localhost`. Every page then carries the header "LIVE SPONSOR DATA, PRIVATE".
-   - If anything fails at the table, start it with no live variables: that is the stand-in demo.
-   - With the bundle you do not need to unzip the CoStar kit; the kit is only for choosing another building. Guide: `sandtable-live-fireground-twin/docs/TOOLKIT_SWAP.md`, section "Laptop setup". This has run on the build server only, not yet on Windows or a Mac.
-   - **Never commit keys, the bundle, or anything fetched with the keys.**
-9. **An Anthropic API key** in `.env` (`ANTHROPIC_API_KEY`), then `LLM_BACKEND=anthropic`, for live agent decisions. Without it the command agent replays recorded decisions, which cover only the recorded exercise: real phones at the table need the key, or the agent falls back to a labelled fixed policy.
-10. **Rehearse the 2-minute demo** from `sandtable-live-fireground-twin/PITCH.md`, on the real hardware, at least three times. Record a fallback video of it working.
-11. **Submit.** Devpost text is drafted in `sandtable-live-fireground-twin/DEVPOST.md`. Choose one main track, and tick CoStar, Best Hardware Hack, Best Physical AI and Amazon Practical AI. Add the video (2 minutes at most) and your Discord usernames. This repository must stay public.
+1. **Build the iPhone app** in Xcode and run it on both iPhones (Developer Mode on). A Mac-based agent is on it; what it needs is in `sandtable-beacon-victim-phones/docs/IOS_HANDOFF.md`. Paste compiler errors back. (Runbook 3.8)
+2. **Choose the beacon:** two boards (measure the spacing once with the board-to-board firmware, or tape-measure it, then flash the phone firmware) or four boards (each puck pairs a phone board with a spacing board). (Runbook 3.2)
+3. **Measure the spacing:** flash the board-to-board firmware on the spacing boards and send the measured spacing to the Beacon server. (Runbook 3.3 and 3.5)
+4. **Network and Beacon server:** a phone hotspot every device joins; the Beacon server in live mode on the laptop or the UNO Q. (Runbook 3.4 and 3.6)
+5. **Command board on your laptop**, pointed at that server, with the real building's data if you have the two private files. (Runbook 3.7 and Level 2)
+6. **Place the beacon and take the first real ranges.** Mark where it landed on the plan, open the app on a phone with SOS on, and compare the board's fix with where the phone actually is. **Write down the numbers**: every phone-position figure in the write-ups is simulated until then. (Runbook 3.9 and 3.10)
+7. **An Anthropic API key** in `.env` (`ANTHROPIC_API_KEY`) and `LLM_BACKEND=anthropic`, so the command agent decides live on real phones. Without it, only the recorded exercise has recorded turns; anything else runs on a labelled fallback policy.
+8. **Rehearse the 2-minute demo** from `sandtable-live-fireground-twin/PITCH.md` at least three times, and record a fallback video.
+9. **Submit.** The Devpost draft is `sandtable-live-fireground-twin/DEVPOST.md`. Choose one main track; tick CoStar, Best Hardware Hack, Best Physical AI and Amazon Practical AI; add the video (2 minutes at most) and your Discord usernames. This repository must stay public.
 
 ## Guides and documents
 
+- [Runbook: how to run everything, from the laptop demo to the real boards](RUNBOOK.md)
+- [Range the two boards to each other (spacing and on-landing calibration)](sandtable-beacon-victim-phones/hardware/BOARD_TO_BOARD.md)
+- [Board-to-board ranging firmware](sandtable-beacon-victim-phones/hardware/twr_firmware/README.md)
+- [How the board knows which room the beacon and the people are in](sandtable-beacon-victim-phones/docs/ROOM_LOCATION.md)
+- [iPhone app: build it against the real pucks](sandtable-beacon-victim-phones/docs/IOS_HANDOFF.md)
 - [Flash the boards](sandtable-beacon-victim-phones/hardware/FLASH.md)
 - [Build and install the iPhone app](sandtable-beacon-victim-phones/docs/IOS_BUILD.md)
 - [What a puck is and how to power it](sandtable-beacon-victim-phones/hardware/PUCK.md)
@@ -71,13 +59,13 @@ These need hands, hardware or accounts, so only you can do them. Each links to t
 - [Why one UWB board cannot scan a room (radar feasibility)](sandtable-live-fireground-twin/docs/RADAR_FEASIBILITY.md)
 - [How the idea was chosen](sandtable-live-fireground-twin/BRIEF.md)
 
-## What the two teams report
+## What the two parts report
 
 Taken from each part's `project.json` at sync time.
 
 ### Command board (`sandtable-live-fireground-twin/`)
 
-**Being worked on now:** Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones.
+**Being worked on now:** Software finished for the stand-in demo and the private live run, after a full sweep: the board was rebuilt around the responder's story (know before you go, beacon on scene, command), the backend cleaned up with 8 bugs fixed, and the puck spacing measured by the boards now positions the pucks on the plan. Hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks (stand-in), and the beacon exercise does on the live building too; 198 tests pass. Not done: no phone has been ranged by our app on real boards yet.
 
 **Left to build (agents):**
 
@@ -111,6 +99,11 @@ Taken from each part's `project.json` at sync time.
 - Live accountability: the record against the phones, the storey's other tenancies as not covered; private recorded hands-free live run, replayed four times with zero fallbacks; private laptop bundle and laptop steps (docs/TOOLKIT_SWAP.md)
 - Scout radar engine in simulation with ablation; radar feasibility write-up with sources; puck enclosure design
 - Independent judge review and fixes; README, PITCH, DEVPOST truth pass (what ran live, what is stand-in, what the hardware does and does not do)
+- Board rebuilt around the responder's story: know before you go (building facts, floor-by-floor tenant stack with life hazards and people on record, access, aerial, scanned interior), beacon on scene (where it landed, how each puck was placed, measured or hand spacing, every phone with its geometry as measured, the opt-in note, per-floor accountability), command (agent, radio, crews, report); the plan is the hero, every layer carries its source stamp, status by word and shape, tablet and phone widths, night theme
+- Place-the-beacon guide: pick the floor, tap where P1 landed, tap toward P2; P2 snaps to the spacing the pucks measured (Beacon feed A12)
+- Backend sweep: 8 bugs fixed with tests (a reset now ends the old incident's agent turn and pre-plan, a resolved mayday no longer leaks into the next report, lossless board catch-up, safe teleports and exercise starts, orphaned CLI turns killed, unique hazard ids); faster anchor plan, twin geometry and beacon polling
+- The relay to the Beacon module now forwards how each puck was placed and its Bluetooth name; the module keeps a board's name when its puck is re-placed by position (both bugs found while integrating, each with a test)
+- Final verification on the integrated tree: replay checks beacon, scout and mayday (stand-in) and beacon (live) all with zero fallback runs; privacy scan passes
 
 **Known limitations:**
 
@@ -126,14 +119,16 @@ Taken from each part's `project.json` at sync time.
 
 ### Phones and pucks (`sandtable-beacon-victim-phones/`)
 
-**Being worked on now:** complete in simulation and re-checked after an independent review (261 tests; an adversarial self-check over 9 scenes passes; the walk-through's command agent replays a recorded real model run); the demo is up on port 1885. The hardware path (stock Qorvo firmware, the iOS app, two pucks) is written and untested: the numbered steps below are the owner's
+**Being worked on now:** Sun 15 Nov: the pucks' spacing is now measured, not guessed: our board-to-board SS-TWR firmware was measured on two of the owner's boards; the server takes the spacing (POST /api/pucks/baseline) and places a pair from it (POST /api/pucks/anchor), every puck says how it was placed, and the board flags a placement that disagrees with the measurement. Code-quality sweep with bug fixes. 334 tests pass. The host's baseline mode and the anchor flow have not run against the boards (the UNO Q was off). The demo left running on port 1885 was started on Saturday and runs that code until it is restarted.
 
 **Left to build (agents):**
 
+- Run the host's baseline mode against the two TWR boards once (hardware/BOARD_TO_BOARD.md step 2) and record what it posts
+- Calibrate the TWR antenna delay at 1.000 m with a tape (hardware/twr_firmware/README.md); until then the spacing carries an unknown constant offset
 - Your first Xcode build of apps/ios will tell us what the syntax check could not: paste the compiler errors back (docs/IOS_BUILD.md section 11 lists the likeliest places)
 - After the first real ranges: replace the simulated noise model with what an iPhone 14 and 15 really measure against these boards, and re-run scripts/eval_beacon.py and scripts/honesty_check.py
 - Decide at the table how two phones share two boards (take turns in the app, or two boards per puck position) and tell us which, so the walk-through and the pitch match
-- Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, pucks surveying their own positions, an Android occupant app
+- Not built: background ranging (Live Activity or paired background session), puck firmware that reports ranges itself, one firmware that ranges phones and the other puck at once (FiRa multi-session), an Android occupant app
 
 **Left to do with real hardware (you):**
 
@@ -147,6 +142,7 @@ Taken from each part's `project.json` at sync time.
 8. 8. (10 min) BRINGUP step 7 and hardware/LAYOUT.md: tape the rectangle, stand both pucks just inside the door-wall edge, click them onto the plan, set the exercise scale: one position.
 9. 9. (10 min) BRINGUP step 8: second victim on the iPhone 15: 'Take turns' on both phones, or two more boards so each puck position has one board per phone.
 10. 10. (15 min) BRINGUP steps 9 and 10: rehearse the run-through twice and read the fallback ladder.
+11. 11. (30 min, optional, after step 7) hardware/BOARD_TO_BOARD.md: flash the TWR firmware on both boards (OpenOCD form that worked on the UNO Q), post the spacing with the host, anchor P1 and tap toward P2 on the board, then flash QANI back WITHOUT moving the boards. No TWR boards: tape-measure the spacing and post it with source manual
 
 **Needed from you:**
 
@@ -159,6 +155,11 @@ Taken from each part's `project.json` at sync time.
 
 **Finished:**
 
+- Board to board (feed A12): our SS-TWR firmware for the DWM3001CDK, measured on the owner's two boards on 15 Nov (about 4.9 ranges a second, 4 to 6 cm spread, antenna delays uncalibrated; results/twr_measured_2026-11-15.json, hand-transcribed by the bench agent). Kept as a script of our changes against the public starter project, because the Decawave examples it derives from carry no redistribution licence; prepare.py rebuilds and hash-checks app.c; the build path compiles and links for both roles (hardware/twr_firmware/build_logs/)
+- Server: POST /api/pucks/baseline (latest spacing per pair), POST /api/pucks/anchor (anchor one puck, tap toward the other, the other snaps to the measured spacing), placed_by on every puck (hand | baseline | layout | sim), a warning when a placed pair disagrees with its measured spacing by more than 3 sigma + 0.2 m; none of it reaches the agent's prompts; documented in docs/BEACON_FEED.md A12 and docs/CONTRACTS.md 3.8; shown on the board
+- Puck host: --baseline-to P2 reads the TWR firmware's RTT lines, keeps a robust spacing (median, MAD sigma, outliers dropped, a minimum sample count) and posts it; a board-to-board range is never sent as a phone range; --twr-offset-m for a measured bias
+- hardware/BOARD_TO_BOARD.md (the procedure, the three design options, measured versus untested); docs/ROOM_LOCATION.md (where floor and room come from); BRINGUP 7.3, PUCK, UNO_Q and PHONE_FEASIBILITY corrected: board to board is impossible with QANI and possible with our firmware
+- Code-quality sweep: 14 genuine bugs fixed, each with a regression test (server: malformed room, floor, n or seed gave HTTP 500; session: the stub tracker could not forget a moved puck, one non-object observation rejected a whole batch, ingest de-duplication was cleared wholesale; locator: the wall cache could serve another puck's walls; simulator: a slowly dragged phone stayed still, battery drain depended on the clock origin; report counted one state twice and kept unbounded memory; agent lost its plan on a list-valued target; tools resolved ring rooms by label; CoT crashed on half a position; a restarted walk-through lost its running flag; host printed a traceback for a bad --rtt), ring estimates about 25% faster and the accountability table's routes cached (identical outputs); recorded agent runs still replay identically
 - Runs unchanged on another building: BEACON_BUNDLE_DIR (or BEACON_TWIN_JSON / BEACON_SITE_JSON) points the module at a twin and record kept outside the repository; verified on the command board's private live bundle (structure only, no data copied) and by tests on a synthetic external bundle
 - Simulated end to end: `bash run_demo.sh --story` plays ring -> cannot choose -> puck slid to the door wall -> one position -> second phone -> accountability, on the board at port 1885
 - Independent review and fix round: a two-puck position is published only when its mirror spot is explained; ranges are forgotten when a puck moves; stale phones are never dots; the simulator gives only what a real iPhone gives (distance); scripts/honesty_check.py hunts for confident wrong positions (9 scenes, passes)
@@ -175,7 +176,7 @@ Taken from each part's `project.json` at sync time.
 
 **Known limitations:**
 
-- Nothing has run on hardware. Every result is simulated, with the noise model stated next to it.
+- No phone has been ranged through our app yet: every phone result is simulated, with the noise model stated next to it. On the owner's UNO Q two boards have run Qorvo's phone firmware (advertising seen) and our board-to-board firmware (ranges measured).
 - An independent review found two faults that drew confident wrong positions (ranges kept after a puck moved; a two-puck position published without accounting for its mirror image). Both are fixed and a self-check now hunts for such cases; real hardware may reveal others.
 - The iOS app is uncompiled Swift source (written on a machine with no Mac); expect compiler errors on the first build.
 - Qorvo's firmware is not in this repository and cannot be: the owner downloads it from Qorvo.
@@ -187,10 +188,12 @@ Taken from each part's `project.json` at sync time.
 - Not a life-safety product.
 - The twin's rule-out of a spot 'two walls away' rests on an assumption of the range model (ranging through one wall at most) that the simulator shares; it has not been tested against real walls.
 - The command agent's plan in the walk-through is a recorded real model run; any other situation without a live model gets a deterministic fallback, labelled as such.
-- UNO Q: simulation only so far. Live mode, the puck host and the RTT reader have not run on it, and 4 time-limit tests fail there. The two boards attached to it carry the owner's separate board-to-board ranging firmware, not the Nearby Interaction firmware, so an iPhone cannot range them until they are flashed again
+- UNO Q: the simulated walk-through and the tests ran there (4 time-limit tests fail); live mode, the puck host and RTT reading have not run there. Its two boards last carried our board-to-board firmware, so an iPhone cannot range them until they are flashed with Qorvo's firmware again
+- Board to board: our TWR firmware and Qorvo's phone firmware cannot run on one board at once, so the spacing is measured at setup (or taped) and the boards must not move afterwards; the measured ranges are uncalibrated (unknown constant offset); running a TWR board next to a phone-ranging board (two boards per puck) is untested; one firmware doing both is not built; the host's baseline mode and the anchor flow have not run against the boards
+- Room and floor come from the responder's placement first; the phone's barometric pressure is carried but not turned into a floor; GPS is not used; UWB wall sensing is a research idea, not built (docs/ROOM_LOCATION.md)
 
 
-## Your questions, answered by the teams
+## Your questions, answered
 
 **Can a UWB board range a victim's phone over UWB at all?**
 
@@ -299,6 +302,6 @@ All of the radar. No board has run it, and the reused echo-reading firmware targ
 
 ## Working alongside the agents
 
-- The build server re-syncs this repository every 15 minutes while the agents work. Each sync is one commit.
-- If you change files here, commit and push them, then tell the agent. A sync stops by itself when it sees commits it did not make, so that your changes are merged into the agents' trees and not overwritten.
-- Never commit keys, the CoStar toolkit, or `.env` files.
+- The build server publishes this repository from its own working copies, after its checks pass (no keys, no sponsor data, no machine addresses).
+- If you change files here, commit and push them, then tell the agent: a sync stops by itself when it sees commits it did not make, so your changes are merged rather than overwritten.
+- Never commit keys, the CoStar toolkit, the private bundle, or `.env` files.

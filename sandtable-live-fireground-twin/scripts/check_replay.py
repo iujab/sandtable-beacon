@@ -33,7 +33,6 @@ def call(path, body=None):
 async def main():
     events, hello = [], {}
     bundle = call("/api/bundle")
-    nodes = {n["id"]: n for n in bundle["twin"]["graph"]["nodes"]}
 
     async def listen():
         async with websockets.connect(BASE.replace("http", "ws") + "/ws", max_size=None) as ws:

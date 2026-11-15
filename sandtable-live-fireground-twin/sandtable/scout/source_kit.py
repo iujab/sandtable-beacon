@@ -526,7 +526,7 @@ def report(rec: dict) -> str:
         lines.append(f"  {p}: {xy}  sigma {rec['pucks_rel_sigma'].get(p)}")
     if rec["pucks_rel"]:
         res = shadow.locate(rec["ranges"], rec["pucks_rel"])
-        lines.append(f"link table (cross-link fit; a link with score >= 0.5 counts as shadowed):")
+        lines.append("link table (cross-link fit; a link with score >= 0.5 counts as shadowed):")
         for r in res["per_link"]:
             lines.append(f"  {r['a']}-{r['b']}  d {r['d_m']}  fp {r['fp_dbm']}  rssi {r['rssi_dbm']}  los {r['los']}  "
                          f"below fit {r['drop_db']} dB  score {r['score']}")

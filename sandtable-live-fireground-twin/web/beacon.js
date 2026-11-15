@@ -4,8 +4,6 @@
 // geometry improves to a fix. Honesty of the drawing: a ring is a ring, candidates are candidates, a point only for
 // geometry "fix", cold devices are a count per room, never people.
 // ?devbeacons=1 plays a hand-made sample story (marked SAMPLE everywhere) built from the twin, for development only.
-export const PHONE_COLOR = "#ff4fa3";
-export const STATUS_COLOR = { trapped: "#e0245e", injured: "#e8890c", sheltering: "#3f6fa8", ok: "#2fa872", unknown: "#5b6673" };
 // where to put a room's device-count chip: the inside corner farthest from every phone and puck (deterministic)
 export function chipSpot(room, b) {
   const xs = room.polygon.map((p) => p[0]), ys = room.polygon.map((p) => p[1]);
@@ -34,7 +32,6 @@ export function mirrorPair(p, pucks) {
   if (uwb.length !== 2 || !(p.geometry === "candidates" || (p.geometry === "fix" && (p.pruned || []).length))) return null;
   return [pucks[uwb[0].puck], pucks[uwb[1].puck]];
 }
-export const tagText = (p) => `${p.id} ${p.report?.status && p.report.status !== "unknown" ? p.report.status : "?"}`;
 export const STATUS_WORD = { trapped: "trapped", injured: "injured", sheltering: "sheltering", ok: "ok", unknown: "no status" };
 export const STATE_WORD = { "against-record": "record disagrees", "not-covered": "no puck there", "people-reported": "people reported", "devices-heard": "devices heard", silent: "silent", "vacant-on-record": "vacant on record", unscanned: "not scanned" };
 export const MODES = {
@@ -66,7 +63,7 @@ export class BeaconModel {
   constructor(bundle, onChange) {
     this.twin = bundle.twin; this.site = bundle.site; this.onChange = onChange;
     this.dev = new URLSearchParams(location.search).has("devbeacons");
-    this.b = null; this.acc = null; this.link = null; this.collapses = {}; this.prevGeom = {}; this.devStep = -1; this.hand = {};
+    this.b = null; this.acc = null; this.link = null; this.collapses = {}; this.prevGeom = {}; this.devStep = -1; this.hand = {}; this.sent = {};
   }
   reset() { this.b = null; this.acc = null; this.collapses = {}; this.prevGeom = {}; clearTimeout(this._devTimer); this.devStep = -1; this.onChange?.(this); }
   get connected() { return this.dev || !!(this.link && this.link.connected); }
@@ -110,7 +107,15 @@ export class BeaconModel {
     if (!this.b || this.foreign) return null;
     const key = `${this.b.seq ?? ""}|${this.b.t ?? ""}|${(this.b.phones || []).length}|${JSON.stringify((this.b.phones || []).map((p) => [p.geometry, p.x, p.ring?.r_m, p.candidates?.length, p.stale]))}|${JSON.stringify(this.b.pucks || [])}|${JSON.stringify(this.b.presence || [])}`;
     const hand = new Set((this.b.pucks || []).filter((pk) => pk.source === "hand" || (this.hand[pk.id] && Math.hypot(this.hand[pk.id][0] - pk.x, this.hand[pk.id][1] - pk.y) < 0.15)).map((pk) => pk.id));
-    return { key: key + [...hand].join(","), b: this.b, collapses: this.collapses, sample: this.sample, hand };
+    // how each puck's position came to be: the feed's placed_by when it carries one, else what this board sent (same place)
+    const origins = {};
+    for (const pk of this.b.pucks || []) {
+      const s = this.sent[pk.id];
+      const mine = s && Math.hypot(s.x - pk.x, s.y - pk.y) < 0.15 ? s.by : null;
+      // this board knows a puck it sent at the measured spacing is "baseline", even when a relay reports it only as "hand"
+      origins[pk.id] = (mine === "baseline" && (!pk.placed_by || pk.placed_by === "hand") ? "baseline" : pk.placed_by) || mine || (hand.has(pk.id) ? "hand" : pk.simulated ? "sim" : null);
+    }
+    return { key: key + [...hand].join(",") + JSON.stringify(origins), b: this.b, collapses: this.collapses, sample: this.sample, hand, origins };
   }
 
   // ---------------------------------------------------------------- the hand-made sample story (?devbeacons=1)

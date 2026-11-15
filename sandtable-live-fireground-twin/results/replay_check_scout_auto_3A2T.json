@@ -6,7 +6,7 @@
  "llm_backend": "replay",
  "final_step": "done",
  "phase": "terminated",
- "wall_s": 72.3,
+ "wall_s": 72.1,
  "runs": {
   "preplan": [
    "replay"
@@ -29,5 +29,5 @@
   "replans": 0,
   "hazards": 0
  },
- "at": "2026-11-14T15:18:38-0600"
+ "at": "2026-11-15T03:14:38-0600"
 }

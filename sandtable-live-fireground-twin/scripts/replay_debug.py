@@ -17,7 +17,7 @@ async def main():
     async def spy(system, messages, tier="main", image_path=None, image_sha=None):
         try:
             return await orig(system, messages, tier, image_path, image_sha)
-        except L.ReplayMiss as miss:
+        except L.ReplayMiss:
             if image_path and not image_sha: image_sha = L.file_sha(image_path)
             want = L.canonical_request(tier, system, messages, image_sha)
             best = None

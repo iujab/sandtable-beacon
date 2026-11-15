@@ -252,6 +252,7 @@ LLM_MODEL_HARD = env("LLM_MODEL_HARD", "claude-opus-5-5")
 AGENT_MAX_STEPS = int(env("SANDTABLE_AGENT_MAX_STEPS", "10"))
 REPLAY_PACE_S = env_float("SANDTABLE_REPLAY_PACE_S", 0.7)            # pause between replayed agent steps so people can read them
 AGENT_FALLBACK_AFTER_S = env_float("SANDTABLE_AGENT_FALLBACK_AFTER_S", 20.0)  # reflex policy takes over if the LLM has not acted
+SCRIPT_PACE = env_float("SANDTABLE_SCRIPT_PACE", 1.0)                 # the exercise script's pauses for people to follow it (tests shrink them)
 
 # --- reflex thresholds (building frame, metres and seconds) -----------------------
 # Real PASS devices pre-alert after about 20 s without motion and alarm at about 30 s.

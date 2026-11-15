@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
 import json
 import logging
 import math
@@ -83,15 +84,13 @@ def _unscanned(obj: dict) -> dict:
 
 def twin_hash(twin_raw: dict) -> str:
     """The building, not the session: tags (pins added during incidents) and private bookkeeping keys are left out."""
-    import hashlib
     stable = {k: v for k, v in twin_raw.items() if k != "tags" and not str(k).startswith("_")}
     return hashlib.sha256(json.dumps(stable, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
 def live_story_path(twin_raw: dict) -> Path:
     """Where a recorded Beacon run on a LIVE twin is kept: private, under data/live/, keyed by the twin it was made on."""
-    live = getattr(config, "LIVE_DIR", config.DATA_DIR / "live")
-    return Path(live) / "beacon" / f"story_{twin_hash(twin_raw)}.json"
+    return config.LIVE_DIR / "beacon" / f"story_{twin_hash(twin_raw)}.json"
 
 
 def scene_for(twin, room: str) -> dict:
@@ -155,6 +154,12 @@ def apply_searches(obj: dict, searches: dict) -> dict:
     return {**obj, "phones": phones, "annotated": True} if changed else obj
 
 
+# Puck fields relayed to the Beacon server's POST /api/pucks (BEACON_FEED A12): how a puck was placed ("hand" or
+# "baseline") and the Bluetooth accessory name a phone reports for it must reach the module, or a puck snapped to the
+# measured spacing is recorded as placed by hand and real phones cannot be matched to it.
+PUCK_FIELDS_FORWARDED = ("id", "x", "y", "sigma_m", "placed_by", "accessory", "host", "floor", "radios")
+
+
 class BeaconLink:
     def __init__(self, emit: Callable[[dict], None], incident=None, url: str | None = None, mode: str | None = None, fetch=None):
         self.emit, self.incident = emit, incident
@@ -173,6 +178,13 @@ class BeaconLink:
         self._sample = load_sample() if self.mode != "off" else None
         self._key = None
         self._brief_seq = None
+        self._unscanned_of: tuple[dict, dict] | None = None    # (source object, its copy before pucks are in): polled every POLL_S
+
+    def _before_pucks(self, obj: dict) -> dict:
+        """The sample or a story's first frame as it is before any puck is in, made once per source object."""
+        if self._unscanned_of is None or self._unscanned_of[0] is not obj:
+            self._unscanned_of = (obj, _unscanned(obj))
+        return self._unscanned_of[1]
 
     # ---- status
     def link_info(self) -> dict:
@@ -205,7 +217,7 @@ class BeaconLink:
         if self.story is not None:                              # a recorded run: identical objects on every run (replay determinism)
             self.source, self.connected, self.brief = "replay", False, None
             frame = self.story["frames"].get(self.story["step"]) if self.story["step"] else None
-            obj = frame if frame is not None else _unscanned(self.story["first"])
+            obj = frame if frame is not None else self._before_pucks(self.story["first"])
             self._accept({**obj, "replay": True, "simulated": True, "sample": False})
             return
         if self.mode == "off":
@@ -233,7 +245,7 @@ class BeaconLink:
             if self._sample is None:
                 return
             self.source, self.brief = "sample", None
-            obj = self._sample if self.pucks_are_in else _unscanned(self._sample)
+            obj = self._sample if self.pucks_are_in else self._before_pucks(self._sample)
         self._accept(obj)
 
     def _accept(self, obj: dict) -> None:
@@ -284,7 +296,7 @@ class BeaconLink:
             self.refresh()
             await self.poll_once()
             return {"ok": True, "reason": "replay of a recorded run: nothing sent to a Beacon server" if self.story is not None else "not sent"}
-        out = await self.remote("POST", "/api/pucks", {**body, "pucks": [{**{k: p[k] for k in ("id", "x", "y", "sigma_m") if k in p},
+        out = await self.remote("POST", "/api/pucks", {**body, "pucks": [{**{k: p[k] for k in PUCK_FIELDS_FORWARDED if k in p},
                                                                          **({"source": "hand"} if self.placed.get(str(p.get("id"))) == "by hand" else {})}
                                                                         for p in body["pucks"]]}
                                 if body.get("pucks") else body)

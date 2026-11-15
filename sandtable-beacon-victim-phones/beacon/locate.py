@@ -244,9 +244,10 @@ class Context:
                     if _seg_dist_vec(np.array(dx), np.array(dy), ax, ay, bx, by) <= hw + 0.15]
             self._wall_doors.append(near)
 
-    # walls between a puck and every cell of the floor grid (cached per puck position)
+    # walls between a puck and every cell of the floor grid (cached per exact puck position: a rounded key served one
+    # puck the grid of another a few millimetres away, so results depended on what had been computed before)
     def walls_from(self, px: float, py: float) -> np.ndarray:
-        key = (round(float(px), 2), round(float(py), 2))
+        key = (float(px), float(py))
         hit = self._wall_cache.get(key)
         if hit is not None:
             self._wall_cache.move_to_end(key)
@@ -291,7 +292,7 @@ def _wquantile(v: np.ndarray, w: np.ndarray, q):
     cw = np.cumsum(w[o])
     cw /= cw[-1]
     idx = np.clip(np.searchsorted(cw, q), 0, len(v) - 1)
-    return v[o][idx]
+    return v[o[idx]]
 
 
 def _label_runs(H: np.ndarray) -> tuple[np.ndarray, int]:
@@ -339,7 +340,7 @@ def _label_runs(H: np.ndarray) -> tuple[np.ndarray, int]:
     return labels, len(roots)
 
 
-def _components(H, P, X, Y, cell):
+def _components(H: np.ndarray, P: np.ndarray, X: np.ndarray, Y: np.ndarray, cell: float) -> tuple[np.ndarray, list[dict]]:
     labels, k = _label_runs(H)
     if k == 0:
         return labels, []
@@ -365,7 +366,7 @@ def _components(H, P, X, Y, cell):
     return labels, comps
 
 
-def _merge_close(comps, labels, H, P, X, Y, cell):
+def _merge_close(comps: list[dict], labels: np.ndarray, H, P, X, Y, cell: float) -> list[dict]:
     """Merge components whose centres are closer than merge_components_m."""
     n = len(comps)
     if n < 2:
@@ -413,7 +414,7 @@ def _merge_close(comps, labels, H, P, X, Y, cell):
     return out
 
 
-def _refine(comp, P, X, Y, H, labels, cell):
+def _refine(comp: dict, P, X, Y, H, labels, cell: float) -> tuple[float, float, np.ndarray]:
     """Moments of one component over every cell within Mahalanobis 3.5 of its HPD estimate (no truncation bias),
     excluding cells of other components' HPD."""
     C = comp["cov"]
@@ -435,18 +436,30 @@ def _refine(comp, P, X, Y, H, labels, cell):
     return float(mx), float(my), C2
 
 
-def _supersample_mass(P, X, Y, cell, pred) -> float:
-    """Posterior mass inside a region, each cell split into 4 x 4 sub-points (uniform density within a cell)."""
+_SUB = 4                                    # sub-points per cell side in `_supersample_mass`
+_SUB_OFF = ((np.arange(_SUB) + 0.5) / _SUB - 0.5)       # sub-point offsets from the cell centre, in cells
+_SUB_REACH = float(np.abs(_SUB_OFF).max()) * math.sqrt(2.0)   # farthest sub-point from its cell centre, in cells
+_NEAR_EPS = 1e-6                            # slack of the conservative cell test (far above float rounding)
+
+
+def _supersample_mass(P, X, Y, cell, region: tuple) -> float:
+    """Posterior mass inside a region, each cell split into 4 x 4 sub-points (uniform density within a cell).
+
+    region = (pred, near) from `_region_for`. Only cells that `near` says may touch the region are split; the others
+    have no sub-point inside, so their fraction is exactly 0 and the sum runs over the same terms in the same order."""
+    pred, near = region
     sel = P > P.max() * 1e-9
     if not sel.any():
         return 0.0
     w = P[sel]
     x, y = X[sel], Y[sel]
-    off = ((np.arange(4) + 0.5) / 4.0 - 0.5) * cell
-    ox, oy = np.meshgrid(off, off)
-    xs = x[:, None] + ox.ravel()[None, :]
-    ys = y[:, None] + oy.ravel()[None, :]
-    frac = pred(xs, ys).mean(axis=1)
+    ox, oy = np.meshgrid(_SUB_OFF * cell, _SUB_OFF * cell)
+    frac = np.zeros(w.shape)
+    hit = near(x, y, _SUB_REACH * cell) if near is not None else np.ones(w.shape, dtype=bool)
+    if hit.any():
+        xs = x[hit][:, None] + ox.ravel()[None, :]
+        ys = y[hit][:, None] + oy.ravel()[None, :]
+        frac[hit] = pred(xs, ys).mean(axis=1)
     return float((w * frac).sum())
 
 
@@ -458,7 +471,11 @@ def _in_arcs(theta_deg, arcs) -> np.ndarray:
     return ok
 
 
-def _pred_for(result: dict):
+def _region_for(result: dict) -> tuple | None:
+    """The published geometry's region (the one `confidence` and `inside` use) as (pred, near), or None for none.
+
+    pred(x, y): exact, elementwise: is the point inside? near(x, y, r): conservative: False only when no point within r
+    of (x, y) can be inside (None: no such test, every cell is looked at)."""
     g = result.get("geometry")
     k = _R["region_k_sigma"]
     if g == "fix":
@@ -470,7 +487,18 @@ def _pred_for(result: dict):
         def pred(x, y):
             dx, dy = x - x0, y - y0
             return Ci[0, 0] * dx * dx + 2 * Ci[0, 1] * dx * dy + Ci[1, 1] * dy * dy <= k * k
-        return pred
+
+        ev = np.linalg.eigvalsh((Ci + Ci.T) / 2)
+        if not (ev[0] > 0 and ev[-1] < 1e8 * ev[0]):
+            return pred, None                 # not a well-conditioned ellipse: no shortcut
+        stretch = math.sqrt(ev[-1])           # Mahalanobis length of a unit step, at most
+
+        def near(x, y, r):
+            # the Mahalanobis distance is a norm: a point within r of (x, y) is within r * stretch of it in that norm
+            dx, dy = x - x0, y - y0
+            m2 = Ci[0, 0] * dx * dx + 2 * Ci[0, 1] * dx * dy + Ci[1, 1] * dy * dy
+            return np.sqrt(np.maximum(m2, 0.0)) <= k + r * stretch + _NEAR_EPS
+        return pred, near
     if g == "candidates":
         cands = [(c["x"], c["y"], k * c["sigma_m"]) for c in result["candidates"]]
 
@@ -479,22 +507,37 @@ def _pred_for(result: dict):
             for cx, cy, rr in cands:
                 ok |= np.hypot(x - cx, y - cy) <= rr
             return ok
-        return pred
+
+        def near(x, y, r):
+            ok = np.zeros(np.shape(x), dtype=bool)
+            for cx, cy, rr in cands:
+                ok |= np.hypot(x - cx, y - cy) <= rr + r + _NEAR_EPS
+            return ok
+        return pred, near
     if g == "ring":
-        r = result["ring"]
-        cx, cy, rm, sg, arcs = r["cx"], r["cy"], r["r_m"], r["sigma_m"], r["arcs"]
+        rg = result["ring"]
+        cx, cy, rm, sg, arcs = rg["cx"], rg["cy"], rg["r_m"], rg["sigma_m"], rg["arcs"]
+        full_circle = any(a0 <= 0.0 and a1 >= 360.0 for a0, a1 in arcs)
 
         def pred(x, y):
-            d = np.hypot(x - cx, y - cy)
-            th = np.degrees(np.arctan2(y - cy, x - cx))
-            return (np.abs(d - rm) <= k * sg) & _in_arcs(th, arcs)
-        return pred
+            # the angle is the costly part: take it only where the annulus test holds, and not at all for a full circle
+            dx, dy = x - cx, y - cy
+            ok = np.abs(np.hypot(dx, dy) - rm) <= k * sg
+            if full_circle or not ok.any():
+                return ok
+            out = np.zeros(ok.shape, dtype=bool)
+            out[ok] = _in_arcs(np.degrees(np.arctan2(dy[ok], dx[ok])), arcs)
+            return out
+
+        def near(x, y, r):
+            return np.abs(np.hypot(x - cx, y - cy) - rm) <= k * sg + r + _NEAR_EPS
+        return pred, near
     if g == "zone":
         poly = result["zone"]["polygon"]
 
         def pred(x, y):
             return _pip_vec(np.asarray(x, dtype=float), np.asarray(y, dtype=float), poly)
-        return pred
+        return pred, None
     return None
 
 
@@ -502,10 +545,10 @@ def inside(result: dict, x: float, y: float) -> bool:
     """True when the point lies inside the published geometry, with the same regions `confidence` uses:
     fix = 2-sigma ellipse of cov; candidates = circles of 2 x sigma_m; ring = annulus r_m +- 2 sigma_m within arcs;
     zone = the room polygon; none = False."""
-    pred = _pred_for(result)
-    if pred is None:
+    region = _region_for(result)
+    if region is None:
         return False
-    return bool(np.asarray(pred(np.array([float(x)]), np.array([float(y)])))[0])
+    return bool(np.asarray(region[0](np.array([float(x)]), np.array([float(y)])))[0])
 
 
 def _arcs_from(theta_deg: np.ndarray, hw_deg: np.ndarray) -> list[list[float]]:
@@ -544,7 +587,7 @@ def _arcs_from(theta_deg: np.ndarray, hw_deg: np.ndarray) -> list[list[float]]:
 
 # --- likelihoods -----------------------------------------------------------------------------------------------
 
-def _uwb_ll(D, W, r, noise, puck_sigma, cell, use_walls):
+def _uwb_ll(D: np.ndarray, W, r: dict, noise: dict, puck_sigma: float, cell: float, use_walls: bool) -> np.ndarray:
     u = noise["uwb"]
     n = max(1, int(r.get("n") or 1))
     extra = puck_sigma ** 2 + cell * cell / 12.0
@@ -584,7 +627,7 @@ def _uwb_ll(D, W, r, noise, puck_sigma, cell, use_walls):
     return L
 
 
-def _ble_terms(D, W, r, noise):
+def _ble_terms(D: np.ndarray, W, r: dict, noise: dict) -> tuple[np.ndarray, float]:
     """Residual and per-link variance (without the common transmit offset) of one Bluetooth reading."""
     b = noise["ble"]
     n = max(1, int(r.get("n") or 1))
@@ -595,7 +638,8 @@ def _ble_terms(D, W, r, noise):
     return float(r["rssi"]) - mean, var
 
 
-def _loglik(ctx, X, Y, pk, ranges, noise, walls_of, use_walls):
+def _loglik(ctx: Context, X: np.ndarray, Y: np.ndarray, pk: dict, ranges: list[dict], noise: dict, walls_of,
+            use_walls: bool) -> np.ndarray:
     L = np.zeros(X.shape)
     ble_A = ble_B = None
     ble_c = 0.0
@@ -648,7 +692,7 @@ def _distinct(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
 
 # --- the estimate ----------------------------------------------------------------------------------------------
 
-def _validate(ctx, pucks, ranges, bearing, prior, noise):
+def _validate(ctx: Context, pucks, ranges, bearing, prior, noise: dict) -> tuple[dict, list[dict]]:
     pk = {}
     for p in pucks or []:
         try:
@@ -834,7 +878,7 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             geometry = "candidates"
     elif point_ok and compact and len(sig) == 1:
         geometry = "fix"
-        if n_uwb == 1 and has_bearing and n_uwb < 2:
+        if n_uwb == 1 and has_bearing:
             up = pk[uwb[0]["puck"]]
             sel = H & np.isin(labels, sig[0]["labels"])
             th = np.arctan2(Y[sel] - up["y"], X[sel] - up["x"])
@@ -852,23 +896,32 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
            "room": None, "room_label": None, "room_prob": None, "node": None, "geo": None,
            "ring": None, "candidates": [], "pruned": [], "zone": None, "hpd_area_m2": round(hpd_area, 2), "debug": debug}
 
-    def room_of(rid_mass):
+    def most_probable_room():
+        """(room id, label, probability) of the room holding the most posterior mass (twin on), else Nones."""
         if room_mass is None or not len(room_mass) or room_mass.max() <= 0:
             return None, None, None
-        k = int(np.argmax(rid_mass))
-        rid = ctx.rooms[k]["id"]
-        return rid, ctx.rooms[k]["label"], round(float(rid_mass[k]), 3)
+        k = int(np.argmax(room_mass))
+        return ctx.rooms[k]["id"], ctx.rooms[k]["label"], round(float(room_mass[k]), 3)
+
+    def publish_candidates(cands):
+        out.update({"geometry": "candidates", "candidates": cands})
+        rooms_c = {c["room"] for c in cands}
+        if len(rooms_c) == 1 and None not in rooms_c and room_mass is not None:
+            rid = rooms_c.pop()
+            out["room"], out["room_label"] = rid, ctx.room_label(rid)
+            out["room_prob"] = round(float(room_mass[ctx._room_k[rid]]), 3)
 
     published_pts = []
-    if geometry == "fix" and mirror is not None:
-        # structural guard (geometry_rules "mirror_guarantee"): the published fix's own mirror image must be explained
+    if geometry == "fix" and mirror is not None and mirror["kind"] == "merged":
+        # structural guard (geometry_rules "mirror_guarantee"): the published fix's own mirror image must be explained.
+        # A "fix" decision already is (its mirror has a hard reason, `_mirror_decision`); a "merged" spot is the whole
+        # posterior's, so its own mirror is checked here.
         sp = mirror["spot"]
-        c_, u_ = _line_through(_distinct([(pk[i]["x"], pk[i]["y"]) for i in sorted({r["puck"] for r in uwb}, key=str)]))
+        c_, u_ = mirror["line"]
         fx_, fy_ = _reflect(sp["x"], sp["y"], c_, u_)
-        merged_ok = mirror["kind"] == "merged" and (_mahal2(sp, fx_, fy_) <= _R["region_k_sigma"] ** 2
-                                                    or math.hypot(fx_ - sp["x"], fy_ - sp["y"]) <= _R["merge_components_m"])
-        pruned_ok = mirror["kind"] == "fix" and bool(_reasons(ctx, pk, ranges, None, None, fx_, fy_, noise, hard_only=True))
-        if not (merged_ok or pruned_ok):
+        merged_ok = (_mahal2(sp, fx_, fy_) <= _R["region_k_sigma"] ** 2
+                     or math.hypot(fx_ - sp["x"], fy_ - sp["y"]) <= _R["merge_components_m"])
+        if not merged_ok:
             R_ = np.eye(2) - 2.0 * np.outer([-u_[1], u_[0]], [-u_[1], u_[0]])
             other = {"x": fx_, "y": fy_, "cov": R_ @ sp["cov"] @ R_.T, "sigma": sp["sigma"]}
             mirror = {"kind": "candidates", "spots": [(sp, 1.0 - _R["mirror_weight_floor"]), (other, _R["mirror_weight_floor"])],
@@ -883,7 +936,7 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
         ev = np.linalg.eigvalsh(C)
         out.update({"geometry": "fix", "x": round(x, 2), "y": round(y, 2), "sigma_m": round(math.sqrt(max(ev[-1], 0.0)), 2),
                     "cov": [round(float(C[0, 0]), 4), round(float(C[0, 1]), 4), round(float(C[1, 1]), 4)]})
-        out["room"], out["room_label"], out["room_prob"] = room_of(room_mass)
+        out["room"], out["room_label"], out["room_prob"] = most_probable_room()
         if ctx.twin is not None:
             out["node"] = ctx.twin.locate(x, y, ctx.floor)["node"]
             out["geo"] = _geo(ctx, x, y)
@@ -905,12 +958,7 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             cands.append({"x": round(x, 2), "y": round(y, 2), "sigma_m": round(s, 2), "weight": round(wgt, 3),
                           "room": rid, "room_label": rl, "geo": _geo(ctx, x, y)})
             published_pts.append((x, y, s))
-        out.update({"geometry": "candidates", "candidates": cands})
-        rooms_c = {c["room"] for c in cands}
-        if len(rooms_c) == 1 and None not in rooms_c and room_mass is not None:
-            rid = rooms_c.pop()
-            out["room"], out["room_label"] = rid, ctx.room_label(rid)
-            out["room_prob"] = round(float(room_mass[ctx._room_k[rid]]), 3)
+        publish_candidates(cands)
     elif geometry == "candidates":
         cands = []
         tot = sum(c["mass"] for c in sig)
@@ -922,26 +970,22 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             if room is not None:
                 sel = H & np.isin(labels, c["labels"]) & (room >= 0)
                 if sel.any():
-                    rm = np.bincount(room[sel], P[sel], minlength=len(ctx.rooms))
-                    rid, rl = ctx.rooms[int(np.argmax(rm))]["id"], ctx.rooms[int(np.argmax(rm))]["label"]
+                    top = ctx.rooms[int(np.argmax(np.bincount(room[sel], P[sel], minlength=len(ctx.rooms))))]
+                    rid, rl = top["id"], top["label"]
             cands.append({"x": round(x, 2), "y": round(y, 2), "sigma_m": round(s, 2), "weight": round(c["mass"] / tot, 3),
                           "room": rid, "room_label": rl, "geo": _geo(ctx, x, y)})
             published_pts.append((x, y, s))
-        out.update({"geometry": "candidates", "candidates": cands})
-        rooms_c = {c["room"] for c in cands}
-        if len(rooms_c) == 1 and None not in rooms_c and room_mass is not None:
-            rid = rooms_c.pop()
-            out["room"], out["room_label"] = rid, ctx.room_label(rid)
-            out["room_prob"] = round(float(room_mass[ctx._room_k[rid]]), 3)
+        publish_candidates(cands)
     else:
         # ---- ring or zone
         cand_pucks = uwb if uwb else ble
         best = None
         sel = P > P.max() * 1e-9
         w = P[sel]
+        xsel, ysel = X[sel], Y[sel]
         for r in cand_pucks:
             p = pk[r["puck"]]
-            d = np.hypot(X[sel] - p["x"], Y[sel] - p["y"])
+            d = np.hypot(xsel - p["x"], ysel - p["y"])
             med = float(_wquantile(d, w, 0.5))
             mad = float(_wquantile(np.abs(d - med), w, 0.5)) * 1.4826
             if best is None or mad < best[2]:
@@ -954,9 +998,9 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
             # zone: strongest puck
             rb = max(ble, key=lambda q: float(q["rssi"]))
             pb_ = pk[rb["puck"]]
-            d = np.hypot(X[sel] - pb_["x"], Y[sel] - pb_["y"])
+            d = np.hypot(xsel - pb_["x"], ysel - pb_["y"])
             q05, q95 = _wquantile(d, w, [0.05, 0.95])
-            rid, rl, rp = room_of(room_mass)
+            rid, rl, rp = most_probable_room()
             poly = ctx.twin.room(rid)["polygon"] if rid else []
             cx, cy = ctx.twin.room_centre(rid) if rid else (pb_["x"], pb_["y"])
             out.update({"geometry": "zone", "room": rid, "room_label": rl, "room_prob": rp,
@@ -964,14 +1008,15 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
                                  "puck": rb["puck"], "r_min_m": round(float(q05), 1), "r_max_m": round(float(q95), 1),
                                  "polygon": [list(map(float, q)) for q in poly], "geo": _geo(ctx, cx, cy)}})
         else:
-            Hs = H
-            d = np.hypot(X[Hs] - p["x"], Y[Hs] - p["y"])
-            th = np.degrees(np.arctan2(Y[Hs] - p["y"], X[Hs] - p["x"])) % 360.0
+            # arcs: the directions from the puck covered by the HPD (a cell at the puck itself covers every direction)
+            hx, hy = X[H] - p["x"], Y[H] - p["y"]
+            d = np.hypot(hx, hy)
             keep = d > 0.5 * cell
-            hw = np.degrees(np.arctan2(0.75 * cell, np.maximum(d[keep], 1e-6)))
-            arcs = _arcs_from(th[keep], hw)
-            if (~keep).any():
+            if not keep.all():
                 arcs = [[0.0, 360.0]]
+            else:
+                th = np.degrees(np.arctan2(hy, hx)) % 360.0
+                arcs = _arcs_from(th, np.degrees(np.arctan2(0.75 * cell, np.maximum(d, 1e-6))))
             out.update({"geometry": "ring",
                         "ring": {"puck": r["puck"], "cx": round(p["x"], 2), "cy": round(p["y"], 2), "r_m": round(rm, 2),
                                  "sigma_m": round(sr, 2), "arcs": arcs, "kind": r["kind"], "geo": _geo(ctx, p["x"], p["y"])}})
@@ -979,8 +1024,8 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
     if out["geometry"] == "zone":
         out["confidence"] = out["room_prob"] or 0.0
     else:
-        pred = _pred_for(out)
-        out["confidence"] = round(min(1.0, _supersample_mass(P, X, Y, cell, pred)), 3) if pred else 0.0
+        region = _region_for(out)
+        out["confidence"] = round(min(1.0, _supersample_mass(P, X, Y, cell, region)), 3) if region else 0.0
 
     # ---- pruned: range-only, twin-free, bearing-free solution; its points that nothing published explains
     if out["geometry"] in ("fix", "candidates") and mirror is None and (n_uwb >= 2 or n_ble >= 3 or has_bearing):
@@ -1009,12 +1054,12 @@ def estimate(ctx: Context, pucks: list[dict], ranges: list[dict], bearing: dict 
         mxm, mym = (ax + bx) / 2, (ay + by) / 2
         beta = math.atan2(by - ay, bx - ax)
         side = (bx - ax) * (Y - mym) - (by - ay) * (X - mxm)
-        th = np.arctan2(Y - mym, X - mxm)
         m_pos, m_neg = float(P[side > 0].sum()), float(P[side < 0].sum())
         msk = side > 0 if m_pos >= m_neg else side < 0
         w = P[msk]
         if w.sum() > 0:
-            c_, s_ = (w * np.cos(th[msk])).sum() / w.sum(), (w * np.sin(th[msk])).sum() / w.sum()
+            th = np.arctan2(Y[msk] - mym, X[msk] - mxm)
+            c_, s_ = (w * np.cos(th)).sum() / w.sum(), (w * np.sin(th)).sum() / w.sum()
             main = math.degrees(math.atan2(s_, c_)) % 360.0
             Rl = math.hypot(c_, s_)
             debug["pair_bearing_deg"] = round(main, 1)
@@ -1051,16 +1096,25 @@ def _heat(P, xs, ys, cell, k: int = 2) -> dict:
             "nx": int(Q.shape[1]), "ny": int(Q.shape[0]), "values": [round(float(v), 3) for v in Q.ravel()]}
 
 
+def _wall_dists(ctx, x: float, y: float) -> np.ndarray:
+    """Distance from the point (x, y) to every merged wall segment of the floor (`_seg_dist_vec`, all walls at once)."""
+    ax, ay, bx, by = ctx.wall_segs.T
+    dx, dy = bx - ax, by - ay
+    den = dx * dx + dy * dy
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = np.clip(((x - ax) * dx + (y - ay) * dy) / den, 0.0, 1.0)
+        d = np.hypot(x - (ax + t * dx), y - (ay + t * dy))
+    return np.where(den == 0, np.hypot(x - ax, y - ay), d)
+
+
 def _wall_between(ctx, x, y):
     """Labels of the rooms on both sides of the wall nearest to (x, y), and the distance to it."""
-    best = None
-    for ax, ay, bx, by in ctx.wall_segs:
-        d = float(_seg_dist_vec(np.array(x), np.array(y), ax, ay, bx, by))
-        if best is None or d < best[0]:
-            best = (d, ax, ay, bx, by)
-    if best is None:
+    if len(ctx.wall_segs) == 0:
         return None, None, math.inf
-    d, ax, ay, bx, by = best
+    dists = _wall_dists(ctx, x, y)
+    i = int(np.argmin(dists))                 # the first of equally near walls, as a strict `<` scan would keep
+    d = float(dists[i])
+    ax, ay, bx, by = ctx.wall_segs[i]
     L = math.hypot(bx - ax, by - ay) or 1.0
     nx_, ny_ = -(by - ay) / L, (bx - ax) / L
     labels = []
@@ -1078,10 +1132,7 @@ def _in_wall(ctx, x: float, y: float) -> bool:
     for dx, dy, hw in ctx.doors:
         if math.hypot(x - dx, y - dy) <= hw:
             return False
-    for ax, ay, bx, by in ctx.wall_segs:
-        if float(_seg_dist_vec(np.array(x), np.array(y), ax, ay, bx, by)) < _R["wall_half_thickness_m"]:
-            return True
-    return False
+    return len(ctx.wall_segs) > 0 and bool((_wall_dists(ctx, x, y) < _R["wall_half_thickness_m"]).any())
 
 
 def _reasons(ctx, pk, ranges, bearing, prior, x, y, noise, hard_only: bool = False) -> list[str]:
@@ -1168,7 +1219,7 @@ def _reflect(x: float, y: float, c, u) -> tuple[float, float]:
     return 2 * fx - x, 2 * fy - y
 
 
-def _spot(P, X, Y, S, cell):
+def _spot(P: np.ndarray, X: np.ndarray, Y: np.ndarray, S: np.ndarray, cell: float) -> dict | None:
     """Mass, mean and covariance of the posterior restricted to the cells S (its own 90% HPD, then every cell of S
     within Mahalanobis 3.5, as in _refine)."""
     PS = np.where(S, P, 0.0)
@@ -1201,7 +1252,8 @@ def _mahal2(spot, x, y) -> float:
     return float(Ci[0, 0] * dx * dx + 2 * Ci[0, 1] * dx * dy + Ci[1, 1] * dy * dy)
 
 
-def _mirror_decision(ctx, X, Y, P, valid, pk, uwb, ranges, noise, cell) -> dict:
+def _mirror_decision(ctx: Context, X, Y, P, valid, pk: dict, uwb: list[dict], ranges: list[dict], noise: dict,
+                     cell: float) -> dict:
     """Side-by-side decision for UWB from two pucks or pucks in a line, without a bearing (geometry_rules
     "mirror_guarantee"). Returns {"kind": "merged" | "fix" | "candidates", ...}."""
     ids = sorted({r["puck"] for r in uwb}, key=str)
@@ -1220,10 +1272,11 @@ def _mirror_decision(ctx, X, Y, P, valid, pk, uwb, ranges, noise, cell) -> dict:
     dbg = {"line": [round(c[0], 2), round(c[1], 2), round(math.degrees(math.atan2(u[1], u[0])), 1)],
            "share_other_side": round(share_o, 3)}
     if _mahal2(s, mx, my) <= _R["region_k_sigma"] ** 2 or math.hypot(mx - s["x"], my - s["y"]) <= _R["merge_components_m"]:
-        return {"kind": "merged", "spot": _spot(P, X, Y, valid, cell), "debug": dict(dbg, kind="merged")}
+        return {"kind": "merged", "spot": _spot(P, X, Y, valid, cell), "line": (c, u), "debug": dict(dbg, kind="merged")}
     hard = _reasons(ctx, pk, ranges, None, None, mx, my, noise, hard_only=True)
     if share_o < _R["mirror_min_share"] and hard:
-        return {"kind": "fix", "spot": s, "mirror": (mx, my), "reasons": hard + [x for x in _reasons(ctx, pk, ranges, None, None, mx, my, noise) if x not in hard],
+        soft = [x for x in _reasons(ctx, pk, ranges, None, None, mx, my, noise) if x not in hard]
+        return {"kind": "fix", "spot": s, "line": (c, u), "mirror": (mx, my), "reasons": hard + soft,
                 "debug": dict(dbg, kind="fix", mirror_explained=hard[0])}
     if o is not None and share_o >= _R["mirror_min_share"]:
         other = o

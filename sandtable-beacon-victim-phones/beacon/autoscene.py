@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 
-from . import config, layout
+from . import config, layout, models, sim
 from .twin import _pip, _poly_dist
 
 
@@ -37,30 +37,15 @@ def _interior_points(poly, margin: float, step: float = 0.4) -> list[tuple[float
 
 
 def _unblocked_key(base: str, seed: int) -> str:
-    """A phone key whose simulated links to P1 and P2 are not body-blocked for the first few puck placements.
-    Uses the simulator's own draw; falls back to the base key when the simulator changes."""
-    try:
-        import numpy as np
-        from . import models, sim
-        p = float(models.DEFAULT_NOISE["uwb"].get("body_block_prob", 0.0))
-        if p <= 0.0:
-            return base
-        for i in range(60):
-            key = base if i == 0 else f"{base}-{i}"
-            ok = True
-            for puck in ("P1", "P2"):
-                for ver in range(0, 6):
-                    rng = np.random.default_rng([seed, sim._STREAM["link"], sim._h(puck), ver, sim._h(key), 0])
-                    rng.normal()
-                    if rng.random() < p:
-                        ok = False
-                        break
-                if not ok:
-                    break
-            if ok:
-                return key
-    except Exception:
-        pass
+    """A phone key whose simulated links to P1 and P2 are not body-blocked for the first few puck placements
+    (the simulator's own per-link draw, `sim._link_draw`); the base key when none of 60 tries is."""
+    p = float(models.DEFAULT_NOISE["uwb"].get("body_block_prob", 0.0))
+    if p <= 0.0:
+        return base
+    for i in range(60):
+        key = base if i == 0 else f"{base}-{i}"
+        if all(sim._link_draw(seed, puck, ver, key, 0)[1] >= p for puck in ("P1", "P2") for ver in range(0, 6)):
+            return key
     return base
 
 
@@ -91,7 +76,7 @@ def build(twin, room_id: str | None = None, seed: int | None = None) -> dict:
     if not pts:
         c = (sum(p[0] for p in poly) / len(poly), sum(p[1] for p in poly) / len(poly))
         pts = [(round(c[0], 2), round(c[1], 2))]
-    max_reach = 0.6 * float(__import__("beacon.models", fromlist=["DEFAULT_NOISE"]).DEFAULT_NOISE["uwb"]["max_range_m"])
+    max_reach = 0.6 * float(models.DEFAULT_NOISE["uwb"]["max_range_m"])
 
     def walls(q):                         # walls of the twin between the spot and either puck (a room need not be convex)
         try:

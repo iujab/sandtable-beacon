@@ -449,7 +449,6 @@ class CommandAgent:
                  "went_well": [], "improve": [], "follow_up": []}
         acc = self.tools.accountability_view() if self.tools.has_phones() else None
         if acc is not None:                           # the hand-off from the tables only, no judgement
-            t = acc.get("totals") or {}
             lows = [r["unaccounted"][0] for r in acc["suites"] if r.get("unaccounted") and r["unaccounted"][0] is not None]
             highs = [r["unaccounted"][1] for r in acc["suites"] if r.get("unaccounted") and r["unaccounted"][1] is not None]
             def people(n):

@@ -17,6 +17,7 @@ Privacy: building a provider with any live layer switches the whole process to t
 """
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -178,6 +179,7 @@ class Provider:
     def __init__(self, costar, matterport, vexcel):
         self.costar, self.matterport, self.vexcel = costar, matterport, vexcel
         self.modes = {"costar": costar.mode, "matterport": matterport.mode, "vexcel": vexcel.mode}
+        self._labels: dict | None = None
         live = [layer for layer, mode in self.modes.items() if mode == "live"]
         if live:                                          # the privacy guard: cannot be forgotten by a caller
             config.enter_live(live)
@@ -192,6 +194,14 @@ class Provider:
         return self.vexcel.aerial()
 
     def labels(self) -> dict:
+        """The honesty labels (docs/CONTRACTS.md 3.4). They follow from the modes and the bundles' sources, which do not change
+        while the process runs, so they are worked out once: the board asks for them on every state tick, and the twin read
+        behind them is a file read in fixture mode. Each caller gets its own copy."""
+        if self._labels is None:
+            self._labels = self._make_labels()
+        return copy.deepcopy(self._labels)
+
+    def _make_labels(self) -> dict:
         site, twin, aerial = self.site(), self.twin_raw(), self.aerial()
         img = (aerial.get("images") or [{}])[0]
         fixture_text = {

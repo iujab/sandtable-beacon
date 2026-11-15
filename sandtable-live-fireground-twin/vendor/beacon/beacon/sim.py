@@ -86,6 +86,8 @@ not count).
   reaches the session over the app's internet uplink, from anywhere. Barometer: 1002.0 hPa at ground level
   (weather, ASSUMPTION) - 0.12 hPa per metre above it (research section 8) at floor elevation + 1 m, + a per-phone
   offset N(0, 0.5) hPa clipped to +-1.4 hPa, + N(0, 0.03) hPa per report. Battery drains 1 % per 10 minutes.
+  `still` is true once the phone has not moved for 5 s; a move is one step of more than 0.2 m, or ending more than
+  0.2 m from where the phone last counted as moving (a slow drag in small steps moves; centimetre jitter does not).
 * Rates (with +-10 % jitter per tick): uwb 5 Hz per puck-phone pair in range, sos 2 Hz per puck in Bluetooth range,
   bearing 2 Hz while pointing, report on change and every 5 s, cold every 5 s per puck. A step after a long gap
   only catches up the last 2 s (ticks older than that are skipped, as a radio buffer would drop them).
@@ -192,6 +194,7 @@ SIM_MODEL["chips"] = copy.deepcopy(CHIPS)
 # missing (TODO: remove once models.DEFAULT_NOISE carries them); the world records which fallbacks it used.
 _NOISE_FALLBACKS = {("uwb", "link_bias_sigma_m"): 0.05, ("uwb", "body_block_prob"): 0.0}
 
+_MOVED_M = 0.2          # a phone more than this from where it last counted as moved has moved (report `still`)
 _KIND_ORDER = {"report": 0, "bearing": 1, "uwb": 2, "sos": 3, "cold": 4}
 _STREAM = {"puck": 1, "device": 2, "measure": 3, "shadow": 4, "cold_place": 5, "eid": 6, "puck_belief": 7, "aim": 8,
            "link": 9, "turns": 10}
@@ -213,6 +216,15 @@ def _h(s: str) -> int:
 
 def _r(v: float, nd: int = 2) -> float:
     return float(round(float(v), nd))
+
+
+def _link_draw(seed: int, puck_id: str, puck_version: int, key: str, epoch: int) -> tuple[float, float]:
+    """The per-link random draws of a puck-device pair at one puck placement and device epoch: (z, u), z ~ N(0, 1)
+    scales the static UWB error and the holder's body blocks the link when u < uwb.body_block_prob (phones only).
+    Shared with beacon.autoscene, which picks scripted phone keys whose links are not blocked."""
+    rng = np.random.default_rng([seed, _STREAM["link"], _h(puck_id), puck_version, _h(key), epoch])
+    z = float(rng.normal())
+    return z, float(rng.random())
 
 
 def georef_bearing_deg(twin: Twin) -> float:
@@ -323,7 +335,7 @@ def _random_point_in(rng, poly, clearance: float) -> list[float]:
 class _Device:
     __slots__ = ("key", "cls", "x", "y", "floor", "opt_in", "uwb", "pointing", "heading_deg", "aim", "tx_offset_db",
                  "advertises", "report", "eid", "prev_eid", "prev2_eid", "eid_since", "eid_index", "version", "shadow_epoch",
-                 "shadow_anchor", "last_moved", "baro_offset", "battery0", "battery_t0", "report_dirty", "outside",
+                 "shadow_anchor", "move_anchor", "last_moved", "baro_offset", "battery0", "battery_t0", "report_dirty", "outside",
                  "room", "explicit_heading", "chip", "camera_assist", "model")
 
     def public(self) -> dict:
@@ -525,6 +537,7 @@ class World:
         d.version = 0
         d.shadow_epoch = 0
         d.shadow_anchor = (d.x, d.y)
+        d.move_anchor = (d.x, d.y)
         d.last_moved = None
         d.report_dirty = False
         self._place(d)
@@ -545,8 +558,12 @@ class World:
         if math.dist(d.shadow_anchor, (d.x, d.y)) > self.sim_model["ble_shadow_redraw_m"]:
             d.shadow_epoch += 1
             d.shadow_anchor = (d.x, d.y)
-        if moved > 0.2:
+        # Moved (for the report's `still`): one move of more than 0.2 m, or more than 0.2 m from where it last counted as
+        # moved, so that a phone dragged in small steps moves too (the phone page posts every 250 ms) while centimetre
+        # jitter does not.
+        if moved > _MOVED_M or math.dist(d.move_anchor, (d.x, d.y)) > _MOVED_M:
             d.last_moved = self._now
+            d.move_anchor = (d.x, d.y)
         if not d.explicit_heading:
             d.aim = None
         self._place(d)
@@ -754,10 +771,8 @@ class World:
         k = (puck["id"], self._puck_version, d.key, d.shadow_epoch)
         v = self._linkstate.get(k)
         if v is None:
-            rng = np.random.default_rng([self.seed, _STREAM["link"], _h(puck["id"]), self._puck_version, _h(d.key),
-                                         d.shadow_epoch])
-            z = float(rng.normal())
-            body = bool(rng.random() < self._nz("uwb", "body_block_prob")) if d.cls == "phone" else False
+            z, u = _link_draw(self.seed, puck["id"], self._puck_version, d.key, d.shadow_epoch)
+            body = bool(u < self._nz("uwb", "body_block_prob")) if d.cls == "phone" else False
             v = (z, body)
             self._linkstate[k] = v
         return v
@@ -794,8 +809,9 @@ class World:
     def _period(self, hz: float) -> float:
         return 1.0 / hz
 
-    def _ticks(self, key: tuple, period: float, now: float, t_prev: float | None) -> list[float]:
-        """Tick times of one stream in (t_prev, now], jittered; first tick at a random phase."""
+    def _ticks(self, key: tuple, period: float, now: float) -> list[float]:
+        """Tick times of one stream up to `now` since its last call (at most max_catchup_s back), jittered; the first
+        tick at a random phase (a report stream: at once)."""
         sch = self.sim_model["schedule"]
         due = self._due.get(key)
         if due is None:
@@ -843,7 +859,7 @@ class World:
             obs.extend(self._phone_obs(d, pucks, now, t_prev))
 
         for p in pucks:
-            for t in self._ticks(("cold", p["id"], None), sch["cold_every_s"], now, t_prev):
+            for t in self._ticks(("cold", p["id"], None), sch["cold_every_s"], now):
                 obs.append(self._cold_obs(p, devices, t))
 
         obs.sort(key=lambda o: (o["t"], _KIND_ORDER[o["kind"]], o.get("puck") or "", o.get("eid") or ""))
@@ -861,6 +877,7 @@ class World:
         uwbn, blen = self.noise["uwb"], self.noise["ble"]
         out: list[dict] = []
         heard_by = []
+        turns = self.sim_model["board_sharing"] == "turns"
         for p in pucks:
             link = self._link(p, d)
             if link is None:
@@ -870,7 +887,7 @@ class World:
             if ble_mean >= blen["sensitivity_dbm"]:
                 heard_by.append(p["id"])
             # Bluetooth SOS beacon
-            for t in self._ticks(("sos", p["id"], d.key), self._period(sch["sos_hz"]), now, t_prev):
+            for t in self._ticks(("sos", p["id"], d.key), self._period(sch["sos_hz"]), now):
                 rssi = ble_mean + float(self._mrng.normal(0.0, blen["fast_fading_sigma_db"]))
                 if rssi < blen["sensitivity_dbm"]:
                     continue
@@ -881,8 +898,7 @@ class World:
                 ok = dist <= uwbn["max_range_m"] and nw <= uwbn["max_walls"]
                 if self.sim_model["uwb_link"]["needs_ble_link"]:
                     ok = ok and ble_mean >= blen["sensitivity_dbm"]
-                turns = self.sim_model["board_sharing"] == "turns"
-                for t in self._ticks(("uwb", p["id"], d.key), self._period(sch["uwb_hz"]), now, t_prev):
+                for t in self._ticks(("uwb", p["id"], d.key), self._period(sch["uwb_hz"]), now):
                     if not ok or (turns and not self._served(p["id"], d.key, t)):
                         continue
                     o = self._uwb_sample(p, d, dist, nw, t)
@@ -890,7 +906,7 @@ class World:
                         out.append(o)
         # bearing (computed on the phone)
         if self._bearing_on(d):
-            for t in self._ticks(("bearing", None, d.key), self._period(sch["bearing_hz"]), now, t_prev):
+            for t in self._ticks(("bearing", None, d.key), self._period(sch["bearing_hz"]), now):
                 o = self._bearing_sample(d, pucks, t)
                 if o is not None:
                     out.append(o)
@@ -901,7 +917,7 @@ class World:
         if d.report_dirty:
             rotated_now = t_prev is not None and d.eid_since is not None and t_prev < d.eid_since <= now
             self._due[key] = d.eid_since if rotated_now else now
-        for t in self._ticks(key, rep["every_s"], now, t_prev):
+        for t in self._ticks(key, rep["every_s"], now):
             if not reachable:
                 continue
             eid, prev = self._eid_at(d, t)
@@ -1043,7 +1059,8 @@ class World:
 
     def _battery(self, d: _Device, t: float) -> int:
         start = d.report.get("battery_pct") if d.report and d.report.get("battery_pct") is not None else d.battery0
-        drain = self.sim_model["report"]["battery_drain_pct_per_s"] * max(0.0, t - (d.battery_t0 or t))
+        t0 = d.battery_t0 if d.battery_t0 is not None else t           # a clock that starts at 0.0 is a start time too
+        drain = self.sim_model["report"]["battery_drain_pct_per_s"] * max(0.0, t - t0)
         return int(max(1, round(float(start) - drain)))
 
     def _compact_report(self, d: _Device) -> dict:

@@ -6,7 +6,7 @@ When a commercial building is on fire, the incident commander's hardest question
 
 ![Two pucks, one phone: the twin rules out the phone's mirror place outside the building](figures/ui_beacon_04_two_puck_moment_3d.png)
 
-*The hands-free beacon run on the stand-in building (phones, pucks and crews simulated; the agent turns are replays of a recorded real model run). Two pucks placed by hand (P1, P2) in Suite 310 hear phone B1. Its two possible places are mirror images across the line between the pucks (the dashed mirror line); one falls outside the building, so the twin rules it out ("ruled out: outside the building") and B1 becomes a point, beside what the stand-in record has for that suite (a dental office; patients may be sedated). The badges say what is real: `BEACON REPLAY · SIM`, `REPLAY, MODULE NOT LIVE`, `SPONSOR DATA: FIXTURE`.*
+*The hands-free beacon run on the stand-in building (phones, pucks and crews simulated; the agent turns are replays of a recorded real model run). Two pucks placed by hand (P1, P2) in Suite 310 hear phone B1. Its two possible places are mirror images across the line between the pucks (the dashed mirror line); one falls outside the building, so the twin rules it out ("ruled out: outside the building") and B1 becomes a point, beside what the stand-in record has for that suite (a dental office; patients may be sedated). The footer says what is real: the record, the twin and the aerial are STAND-IN; phones, pucks and crews are SIM; the agent's turns are REPLAY.*
 
 ![The same moment on the 2-D plan](figures/ui_beacon_05_two_puck_moment_plan.png)
 
@@ -132,7 +132,7 @@ python3 -m venv .venv
 .venv/bin/python -m sandtable.demo --host 0.0.0.0       # reachable from a laptop or phone on the same network
 ```
 
-Open <http://localhost:1810/>. The launcher also starts the vendored Beacon module on port 1885 (simulated phones) when nothing answers there. Without `--storyboard`, use the mode switch (**Beacon | Scout | Crews**), **Dispatch alarm**, **Place pucks** (click where each tape-measured puck stands, then send them to the Beacon module), **Throw pucks** (simulated), or the exercise button and its menu (Beacon, Scout and mayday exercises). Each exercise plays hands-free in about a minute and a half or less. Reporting centre: `/report.html`. Rescue team's phone page: `/crew.html?unit=RIT`. Feeds: `/feed/scan.geojson`, `/feed/cot.xml`, `/feed/cot/stream`.
+Open <http://localhost:1810/>. The launcher also starts the vendored Beacon module on port 1885 (simulated phones) when nothing answers there. Without `--storyboard`, use the mode switch (**Beacon | Scout | Crews**), **Dispatch alarm**, **Place pucks** (a guide, *Where did the beacon land?*: pick the floor, tap where P1 landed, tap toward P2; P2 snaps to the spacing the pucks measured when there is one, otherwise it goes where you tap; then send them to the Beacon module), **Throw pucks** (simulated), or the exercise button and its menu (Beacon, Scout and mayday exercises). Each exercise plays hands-free in about a minute and a half or less. Reporting centre: `/report.html`. Rescue team's phone page: `/crew.html?unit=RIT`. Feeds: `/feed/scan.geojson`, `/feed/cot.xml`, `/feed/cot/stream`.
 
 | Setting | Values | Default |
 |---|---|---|
@@ -152,11 +152,11 @@ Checked against lane L16's guides (`vendor/beacon/README.md`, `vendor/beacon/har
 
 What the boards do:
 
-- Each puck is a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware. There is no firmware of our own: a board that does not already run Qorvo's image is flashed with it once (`vendor/beacon/hardware/FLASH.md`). After that a puck needs power only.
+- For phones, each puck is a Qorvo DWM3001CDK running Qorvo's stock Nearby Interaction firmware: a board that does not already run Qorvo's image is flashed with it once (`vendor/beacon/hardware/FLASH.md`), and after that a puck needs power only. Our own firmware is only for measuring the puck spacing (below).
 - A board ranges **one phone at a time** over UWB, through Apple's accessory protocol (forum reports collected by lane L16), and gives a **distance only**: neither an iPhone 14 nor an iPhone 15 reports a direction to it. The distance arrives in the phone's app, which posts it to the Beacon server over Wi-Fi.
 - So two victims on two boards **take turns** (the app's "Take turns" switch, never tested), unless four boards are powered as two pairs, one pair per phone.
 - **Two boards on one device do not resolve the two places**: the baseline between them is too short, and in lane L16's simulation, at 0.1 to 0.5 m apart, they never gave one position. The pucks are separate, a few metres apart.
-- **The pucks do not range each other**, so their positions are tape-measured and clicked onto the plan. Lane L16's `hardware/LAYOUT.md` gives the spots: both pucks just inside the wall the door is in.
+- **On Qorvo's phone firmware the pucks cannot range each other.** Our board-to-board firmware (`vendor/beacon/hardware/twr_firmware`, shipped as a patch because the example code it builds on is not licensed for redistribution) measures their spacing: on the owner's two boards, about 1.57 m apart, 4.9 ranges a second with a spread of ±0.04 m (repeatability only: no tape-measured reference was taken; `vendor/beacon/results/twr_measured_2026-11-15.json`). A board runs one firmware at a time, so the spacing is measured before switching to the phone firmware, or continuously by a second board in each puck (four boards; untested). The placement guide snaps the second puck to the measured spacing; without one, the spacing is tape-measured. Lane L16's `hardware/LAYOUT.md` gives the spots: both pucks just inside the wall the door is in.
 - **Device counts of phones without the app are not collected by the stock firmware.** The simulated pucks show them; the UNO Q's own radio could count them (written, never run).
 
 What is not done:

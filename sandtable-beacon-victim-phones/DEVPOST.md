@@ -37,7 +37,7 @@ A search crew in smoke cannot see a person three metres away, and neither can a 
 
 - A board that says "cannot choose" when it cannot, and shows its reason when it can.
 - An evaluation that reports its own wrong answers, including what happens when the occupant's statement is false.
-- A hardware path that needs no custom firmware.
+- A hardware path for phones that needs no custom firmware, and a small one of our own for the pucks' spacing: two of our boards range each other with SS-TWR at about five readings a second on a long-range radio profile (measured on the bench, uncalibrated; `hardware/twr_firmware/`).
 
 ## What we learned
 
@@ -47,7 +47,7 @@ A search crew in smoke cannot see a person three metres away, and neither can a 
 ## What's next
 
 - Real iPhones against real boards, and measured error instead of simulated.
-- Puck firmware that reports ranges itself, so the phone can go dark, and pucks that survey their own positions after a throw.
+- Puck firmware that reports ranges itself, so the phone can go dark, and one firmware that ranges phones and the other puck at once, so a thrown pair measures its own spacing on landing (today it takes two firmwares: `hardware/BOARD_TO_BOARD.md`).
 - A dual-antenna radio for bearing from a single puck.
 - Live CoStar and Matterport data for a Houston building.
 
@@ -57,4 +57,4 @@ Python, FastAPI, numpy, Swift, SwiftUI, Core Bluetooth, Nearby Interaction, Qorv
 
 ## Honest status at submission
 
-TODO(owner): replace this paragraph with what was actually run on hardware. As of Saturday afternoon: every result is simulated and labelled; the iOS app is uncompiled source; the firmware is Qorvo's stock image, not ours; the building record and twin are labelled fixtures, not CoStar or Matterport data.
+TODO(owner): replace this paragraph with what was actually run on hardware. As of Sunday 02:20 CST: every phone result is simulated and labelled; the iOS app is uncompiled source in this repository; the phone-ranging firmware is Qorvo's stock image, not ours; our board-to-board firmware was measured on two boards (hand-transcribed summary in `results/twr_measured_2026-11-15.json`, uncalibrated), but the host's baseline mode and the anchor flow have not run against the boards; the building record and twin are labelled fixtures, not CoStar or Matterport data.

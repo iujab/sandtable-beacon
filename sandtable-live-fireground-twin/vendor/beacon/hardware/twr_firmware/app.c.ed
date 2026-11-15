@@ -1,0 +1,362 @@
+511,584c
+
+int main(void)
+{
+    SEGGER_RTT_Init();
+    uptime_init();
+    bsp_board_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS);
+    gpio_init();
+    dwm3001c_spi_init();
+    dw_irq_init();
+    nrf_delay_ms(2);
+    run();
+    while (1) { }
+}
+.
+505,506c
+            dwt_writesysstatuslo(SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+            errors++;
+.
+502a
+        else if (status_reg & SYS_STATUS_ALL_RX_TO)
+        {
+            dwt_writesysstatuslo(SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+            timeouts++;
+            if (++since_hb >= HEARTBEAT_EVERY_TIMEOUTS)
+            {
+                since_hb = 0;
+                snprintf(line, sizeof(line), "H,%lu,%lu,%lu,%lu", (unsigned long)responses,
+                         (unsigned long)timeouts, (unsigned long)errors, (unsigned long)late);
+                out();
+            }
+        }
+.
+498a
+                        responses++;
+                        /* Print only after the delayed TX is done so logging never affects timing. */
+                        snprintf(line, sizeof(line), "P,%u,%lu", poll_seq, (unsigned long)responses);
+                        out();
+                        bsp_board_led_invert(0);
+                    }
+                    else
+                    {
+                        late++;
+.
+496,497d
+493,494d
+491d
+488,489c
+                    if (dwt_starttx(DWT_START_TX_DELAYED) == DWT_SUCCESS)
+.
+478,486c
+                    resp_msg_set_ts(&resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
+                    resp_msg_set_ts(&resp_msg[RESP_MSG_RESP_TX_TS_IDX], resp_tx_ts);
+                    resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+                    dwt_writetxdata(sizeof(resp_msg), resp_msg, 0);
+                    dwt_writetxfctrl(sizeof(resp_msg), 0, 1);
+.
+474,475d
+470,471d
+468d
+466d
+464a
+                    uint64_t poll_rx_ts, resp_tx_ts;
+.
+463c
+                if (memcmp(rx_buffer, poll_msg, ALL_MSG_COMMON_LEN) == 0)
+.
+459,461c
+                poll_seq = rx_buffer[ALL_MSG_SN_IDX];
+.
+457a
+                uint8_t poll_seq;
+.
+453,455c
+            frame_len = safe_getframelength();
+.
+450,451d
+443,445c
+        waitforsysstatus(&status_reg, NULL, (DWT_INT_RXFCG_BIT_MASK | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR), 0);
+.
+441c
+        maybe_announce("RESP");
+.
+434,438d
+430,432c
+    dw_bringup("RESP");
+    dwt_setrxtimeout(LISTEN_WINDOW_UUS);
+.
+395,428c
+    static uint8_t rx_buffer[12];
+    uint32_t status_reg = 0;
+    uint8_t frame_seq_nb = 0;
+    uint32_t responses = 0, timeouts = 0, errors = 0, late = 0, since_hb = 0;
+.
+352,393c
+static void run(void)
+.
+348,350c
+#define POLL_RX_TO_RESP_TX_DLY_UUS 2700  /* > poll air-time (~1.3 ms) + setup; was 650 */
+#define LISTEN_WINDOW_UUS          60000   /* ~61 ms per RX window, keeps 16-bit-safe */
+#define HEARTBEAT_EVERY_TIMEOUTS   16      /* ~1 s */
+.
+324,346c
+#else /* ROLE_RESPONDER */
+.
+228,322d
+223,224c
+        seq++;
+.
+221a
+            snprintf(line, sizeof(line), "E,%u,%08lX", seq, (unsigned long)status_reg); out();
+.
+220d
+217a
+        else if (status_reg & SYS_STATUS_ALL_RX_TO)
+        {
+            dwt_writesysstatuslo(SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+            snprintf(line, sizeof(line), "T,%u", seq); out();
+        }
+.
+212,214c
+
+                    {
+                        dwt_rxdiag_t diag;
+                        double rxl = 0.0;
+                        uint32_t npre = 0;
+                        dwt_readdiagnostics(&diag);
+                        npre = diag.ipatovAccumCount;
+                        if (diag.ipatovPower > 0 && npre > 0)
+                            rxl = 10.0 * log10(((double)diag.ipatovPower * 2097152.0) /
+                                               ((double)npre * (double)npre)) - 121.7;
+                        /* R,<seq>,<dist_m>,<ppm>,<rx_level_dBm>,<preamble_acc_count> */
+                        snprintf(line, sizeof(line), "R,%u,%.3f,%.2f,%.1f,%lu",
+                                 seq, distance, (double)clockOffsetRatio * 1e6, rxl, (unsigned long)npre);
+                    }
+                    out();
+                    bsp_board_led_invert(0);
+.
+209d
+206d
+198,202c
+                    clockOffsetRatio = ((float)safe_readclockoffset()) / (uint32_t)(1 << 26);
+.
+195d
+193a
+                    double tof, distance;
+.
+189c
+                if (memcmp(rx_buffer, resp_msg, ALL_MSG_COMMON_LEN) == 0)
+.
+185,187d
+179,181c
+            frame_len = safe_getframelength();
+.
+176,177d
+170,172d
+167d
+160,164c
+        dwt_writetxdata(sizeof(poll_msg), poll_msg, 0);
+        dwt_writetxfctrl(sizeof(poll_msg), 0, 1);
+.
+157,158c
+        maybe_announce("INIT");
+        poll_msg[ALL_MSG_SN_IDX] = seq;
+.
+150,154d
+145,146c
+#if defined(ROLE_INITIATOR)
+
+#define RNG_DELAY_MS               200   /* 5 Hz */
+#define POLL_TX_TO_RESP_RX_DLY_UUS 650    /* open RX later: long frames (was 240) */
+#define RESP_RX_TIMEOUT_UUS        6000   /* span the long resp frame + turnaround (was 400) */
+
+static void run(void)
+{
+    static uint8_t rx_buffer[20];
+    uint32_t status_reg = 0;
+    uint8_t seq = 0;
+
+    dw_bringup("INIT");
+.
+143a
+    dwt_setlnapamode(DWT_LNA_ENABLE | DWT_PA_ENABLE);
+
+    dw_dev_id = dwt_readdevid();
+    snprintf(line, sizeof(line), "BOOT,%s,%08lX,%08lX%08lX", role,
+             (unsigned long)dw_dev_id,
+             (unsigned long)NRF_FICR->DEVICEID[1], (unsigned long)NRF_FICR->DEVICEID[0]);
+    out();
+}
+.
+140,141c
+    dwt_configciadiag(DW_CIA_DIAG_LOG_ALL);  /* populate RX diagnostics (ipatovPower/AccumCount); else they read 0 */
+.
+137,138d
+134c
+        snprintf(line, sizeof(line), "FAIL,%s,config", role); out();
+.
+129,131d
+126,127d
+123c
+        snprintf(line, sizeof(line), "FAIL,%s,init", role); out();
+.
+120d
+118a
+    while (!dwt_checkidlerc()) { };
+.
+111,117c
+    reset_DWIC();
+    Sleep(2);
+.
+106,109c
+static void dw_bringup(const char *role)
+{
+.
+104a
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    cyc_last = 0;
+    cyc_acc = 0;
+}
+static uint32_t uptime_s(void)
+{
+    uint32_t now = DWT->CYCCNT;
+    cyc_acc += (uint32_t)(now - cyc_last);
+    cyc_last = now;
+    return (uint32_t)(cyc_acc / 64000000ULL);
+}
+static void maybe_announce(const char *role)
+{
+    uint32_t up = uptime_s();
+    if (up >= next_id_s)
+    {
+        next_id_s = up + 5;
+        snprintf(line, sizeof(line), "ID,%s,%08lX,%08lX%08lX,%lu", role, (unsigned long)dw_dev_id,
+                 (unsigned long)NRF_FICR->DEVICEID[1], (unsigned long)NRF_FICR->DEVICEID[0], (unsigned long)up);
+        out();
+    }
+}
+.
+94,103c
+/* Uptime from the Cortex-M4 cycle counter (64 MHz), accumulated across 32-bit wraps.
+ * Both main loops call this at least every ~200 ms, far inside the 67 s wrap period. */
+static uint64_t cyc_acc;
+static uint32_t cyc_last;
+static uint32_t dw_dev_id;
+static uint32_t next_id_s = 5;
+static void uptime_init(void)
+.
+90,91c
+static uint8_t poll_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0 };
+static uint8_t resp_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+.
+69,88d
+60,65c
+#define ALL_MSG_COMMON_LEN      10
+.
+53,56d
+49c
+    DWT_STS_LEN_64,   /* STS length */
+.
+47c
+    (1025 + 8 - 32),  /* SFD timeout = preamble+1 + SFD - PAC (was 129 for PLEN128). */
+.
+43,44c
+    1,                /* non-standard 8 symbol SFD */
+    DWT_BR_850K,      /* Data rate: long-range profile (was DWT_BR_6M8). */
+.
+39,40c
+    DWT_PLEN_1024,    /* Preamble length: long-range profile (was DWT_PLEN_128). */
+    DWT_PAC32,        /* PAC size: recommended for preamble >= 512 (was DWT_PAC8). */
+.
+36d
+33,34c
+/* Route newlib stdout (printf) to RTT as well. */
+int _write(int fd, const char *buf, int len)
+{
+    (void)fd;
+    SEGGER_RTT_Write(0, buf, (unsigned)len);
+    return len;
+}
+.
+31c
+/* Some shared/platform code calls this. */
+void test_run_info(unsigned char *data)
+{
+    SEGGER_RTT_WriteString(0, (const char *)data);
+    SEGGER_RTT_WriteString(0, "\n");
+}
+.
+29c
+static char line[96];
+static void out(void)
+{
+    SEGGER_RTT_WriteString(0, line);
+    SEGGER_RTT_WriteString(0, "\n");
+}
+.
+27a
+#include "SEGGER_RTT.h"
+
+#if !defined(ROLE_INITIATOR) && !defined(ROLE_RESPONDER)
+#error "define ROLE_INITIATOR or ROLE_RESPONDER"
+#endif
+
+/*
+ * Workaround for a stack overwrite in the prebuilt dwt_uwb_driver 6.0.7 (m4-hfp):
+ * the dwt_getframelength() wrapper keeps its uint16_t result at sp+6, directly
+ * below its saved r4, and the driver ioctl behind it stores 32 bits there. The
+ * top two (zero) bytes land on the saved r4, so the *caller's* r4 comes back with
+ * its low half zeroed (seen live: 0x20000258 -> 0x20000000). dwt_readclockoffset()
+ * has the identical frame layout. These shims save/restore r4 around the call.
+ */
+__attribute__((naked, noinline)) static uint16_t safe_getframelength(void)
+{
+    __asm volatile("push {r4, lr}\n\t"
+                   "bl dwt_getframelength\n\t"
+                   "pop {r4, pc}\n\t");
+}
+__attribute__((naked, noinline)) static int16_t safe_readclockoffset(void)
+{
+    __asm volatile("push {r4, lr}\n\t"
+                   "bl dwt_readclockoffset\n\t"
+                   "pop {r4, pc}\n\t");
+}
+.
+23,25d
+18a
+#include <boards.h>
+#include <deca_spi.h>
+#include <port.h>
+#include <sdk_config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+.
+13,17c
+ * All output goes to SEGGER RTT channel 0 as one CSV-ish line per event:
+ *   BOOT,<role>,<dw_dev_id>,<nrf_device_id>
+ *   ID,<role>,<dw_dev_id>,<nrf_device_id>,<uptime_s>   every 5 s
+ *   R,<seq>,<dist_m>,<ppm>,<rx_level_dBm>,<preamble_count>   initiator: successful range
+ *   T,<seq>                                     initiator: response timeout
+ *   E,<seq>,<status_hex>                        initiator: RX error
+ *   P,<seq>,<responses>                         responder: answered a poll
+ *   H,<responses>,<rx_timeouts>,<rx_errors>,<late_tx>   responder: heartbeat
+ *   FAIL,<role>,init|config                     radio bring-up failed (the board then halts)
+ * <role> is INIT or RESP. Antenna delays are the uncalibrated default 16385.
+.
+11c
+ * Build with -DROLE_INITIATOR or -DROLE_RESPONDER.
+.
+5,9c
+ * Derived from the Qorvo/Decawave DW3000 API examples ex_06a/ex_06b
+ * (SS TWR initiator/responder) via Uberi/DWM3001C-starter-firmware.
+.
+1,3c
+/*
+ * DWM3001CDK two-board SS-TWR demo firmware.
+.

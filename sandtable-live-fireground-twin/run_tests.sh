@@ -8,7 +8,7 @@ if [ ! -x .venv/bin/python ] && [ ! -x .venv/Scripts/python.exe ]; then
 fi
 PY=.venv/bin/python; [ -x "$PY" ] || PY=.venv/Scripts/python.exe
 START=$(date +%s)
-OUT=$(LLM_BACKEND=replay SANDTABLE_DATA_MODE=fixture "$PY" -m pytest -q -p no:cacheprovider tests "$@" 2>&1); CODE=$?
+OUT=$(LLM_BACKEND=replay SANDTABLE_DATA_MODE=fixture "$PY" -m pytest -q -p no:cacheprovider -o asyncio_default_fixture_loop_scope=function tests "$@" 2>&1); CODE=$?
 echo "$OUT" | tail -4
 mkdir -p results
 "$PY" - "$OUT" "$START" <<'PYEOF'

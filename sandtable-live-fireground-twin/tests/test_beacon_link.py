@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 import pytest
 from fastapi.testclient import TestClient
 
-from sandtable import config
 from sandtable.beacon_link import BeaconLink, load_sample
 from sandtable.scout import feeds
 
@@ -143,6 +142,19 @@ def test_feeds_draw_phones_as_what_they_are():
     assert float(b2.find("point").get("lat")) == pytest.approx(lat, abs=1e-6) and float(b2.find("point").get("ce")) > obj["phones"][1]["ring"]["r_m"]
     assert "RING" in b2.find("detail/remarks").text and "sandtable.beacon.B3.c2" in ev and ev["sandtable.beacon.B1"].get("how") == "m-s"
 
+    some = feeds.cot_events(None, [], twin, time.time(), beacons=obj, only=lambda uid: uid.startswith("sandtable.beacon.B3."))
+    every = dict(feeds.cot_events(None, [], twin, time.time(), beacons=obj))
+    assert some and {u for u, _x in some} == {u for u in every if u.startswith("sandtable.beacon.B3.")}
+
+
+def test_the_sample_before_pucks_is_made_once_and_the_sample_itself_is_untouched():
+    link = BeaconLink(lambda m: None, None, mode="sample")
+    before = json.dumps(link._sample, sort_keys=True)
+    a = link._before_pucks(link._sample)
+    assert a is link._before_pucks(link._sample) and a["phones"] == [] and a["pucks"] == []    # polled every 0.5 s: not re-copied each time
+    assert json.dumps(link._sample, sort_keys=True) == before and link._sample["phones"]
+    other = load_sample()
+    assert link._before_pucks(other) is not a                                                  # a new source (a story) gets its own copy
 
 def test_beacon_endpoints_accountability_and_report(monkeypatch):
     monkeypatch.setenv("SANDTABLE_BEACON", "sample")
@@ -285,3 +297,25 @@ def test_the_fallback_policy_finishes_the_beacon_script_when_the_first_phone_has
     assert agent and all(e["backend"] == "reflex-fallback" for e in agent)       # every turn labelled as the fallback policy
     assert any(e["kind"] == "fallback" for e in inc.timeline)
     assert any(e["kind"] == "search" and "phone B1" in e["text"] for e in inc.timeline)          # the priority phone needed the search
+
+
+def test_pucks_in_forwards_how_each_puck_was_placed_and_its_accessory_name():
+    """A puck snapped to the measured spacing must reach the Beacon module as placed_by "baseline", and the Bluetooth
+    name a phone reports must reach it too; the relay used to keep only id, x, y and sigma_m."""
+    sent = []
+
+    def fetch(method, url, body=None, timeout=1.5):
+        sent.append((method, url, body))
+        if url.endswith("/api/beacons"):
+            return {**load_sample(), "sample": False, "seq": 1}
+        return {"ok": True}
+
+    link = BeaconLink(lambda m: None, None, url="http://beacon.test", mode="auto", fetch=fetch)
+    asyncio.run(link.pucks_in({"room": "r310", "pucks": [
+        {"id": "P1", "x": 9.15, "y": 6.7, "placed_by": "hand", "accessory": "DWM3001CDK (AAAA0001)", "floor": "f3"},
+        {"id": "P2", "x": 9.15, "y": 2.73, "placed_by": "baseline", "sigma_m": 0.04}]}))
+    posts = [b for m, u, b in sent if m == "POST" and u.endswith("/api/pucks")]
+    assert len(posts) == 1 and posts[0]["room"] == "r310"
+    by_id = {p["id"]: p for p in posts[0]["pucks"]}
+    assert by_id["P1"]["placed_by"] == "hand" and by_id["P1"]["accessory"] == "DWM3001CDK (AAAA0001)" and by_id["P1"]["floor"] == "f3"
+    assert by_id["P2"]["placed_by"] == "baseline" and by_id["P2"]["sigma_m"] == 0.04 and "accessory" not in by_id["P2"]

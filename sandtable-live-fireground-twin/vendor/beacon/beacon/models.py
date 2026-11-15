@@ -167,7 +167,7 @@ def ble_expected_rssi(d_true_m, n_walls, noise: dict | None = None, tx_dbm: floa
     mean = tx - 10.0 * b["n_los"] * np.log10(d) - w * b["wall_loss_db"]
     var = b["shadow_sigma_db"] ** 2 + b["fast_fading_sigma_db"] ** 2 / max(1, int(n_samples)) + b["tx_spread_db"] ** 2
     if body is None:
-        p = (noise or DEFAULT_NOISE).get("uwb", {}).get("body_block_prob", 0.5) if isinstance(noise or DEFAULT_NOISE, dict) else 0.5
+        p = (DEFAULT_NOISE if noise is None else noise).get("uwb", {}).get("body_block_prob", 0.5)   # 0.5: section only
         mean = mean - p * b["body_loss_db"]
         var = var + p * (1.0 - p) * b["body_loss_db"] ** 2
     elif body:

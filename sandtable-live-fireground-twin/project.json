@@ -50,8 +50,8 @@
   },
   "status": "partial",
   "progress": {
-    "percent": 92,
-    "phase": "Software finished for the stand-in (public) demo and for the private live run. Public demo: hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks; 183 tests pass; figures re-taken from the replayed run; an independent judge review was done and its findings fixed. Private live run (owner's keys and the CoStar kit, nothing published): CoStar record, Matterport scan and Vexcel imagery all live; a recorded hands-free run replays to the report with zero fallbacks; laptop bundle packed; a private instance runs for the owner. Not done: nothing has run on the owner's boards or phones.",
+    "percent": 95,
+    "phase": "Software finished for the stand-in demo and the private live run, after a full sweep: the board was rebuilt around the responder's story (know before you go, beacon on scene, command), the backend cleaned up with 8 bugs fixed, and the puck spacing measured by the boards now positions the pucks on the plan. Hands-free beacon, scout and mayday exercises replay recorded real model turns with zero fallbacks (stand-in), and the beacon exercise does on the live building too; 198 tests pass. Not done: no phone has been ranged by our app on real boards yet.",
     "done": [
       "Board, reflex layer, agent with tools, report page, GeoJSON and Cursor-on-Target feeds; three modes (Beacon phones, Scout radar, Crews tags) on one board",
       "Stand-in data for the public repository: real open data for a Los Angeles medical office building, footprint-fitted synthetic twin, NAIP imagery",
@@ -60,7 +60,12 @@
       "Live adapters for CoStar (data kit), Matterport (Model API, Showcase SDK view) and Vexcel (API v2), run privately on one real building; privacy guard and publish check keep every sponsor-derived byte out of the tree",
       "Live accountability: the record against the phones, the storey's other tenancies as not covered; private recorded hands-free live run, replayed four times with zero fallbacks; private laptop bundle and laptop steps (docs/TOOLKIT_SWAP.md)",
       "Scout radar engine in simulation with ablation; radar feasibility write-up with sources; puck enclosure design",
-      "Independent judge review and fixes; README, PITCH, DEVPOST truth pass (what ran live, what is stand-in, what the hardware does and does not do)"
+      "Independent judge review and fixes; README, PITCH, DEVPOST truth pass (what ran live, what is stand-in, what the hardware does and does not do)",
+      "Board rebuilt around the responder's story: know before you go (building facts, floor-by-floor tenant stack with life hazards and people on record, access, aerial, scanned interior), beacon on scene (where it landed, how each puck was placed, measured or hand spacing, every phone with its geometry as measured, the opt-in note, per-floor accountability), command (agent, radio, crews, report); the plan is the hero, every layer carries its source stamp, status by word and shape, tablet and phone widths, night theme",
+      "Place-the-beacon guide: pick the floor, tap where P1 landed, tap toward P2; P2 snaps to the spacing the pucks measured (Beacon feed A12)",
+      "Backend sweep: 8 bugs fixed with tests (a reset now ends the old incident's agent turn and pre-plan, a resolved mayday no longer leaks into the next report, lossless board catch-up, safe teleports and exercise starts, orphaned CLI turns killed, unique hazard ids); faster anchor plan, twin geometry and beacon polling",
+      "The relay to the Beacon module now forwards how each puck was placed and its Bluetooth name; the module keeps a board's name when its puck is re-placed by position (both bugs found while integrating, each with a test)",
+      "Final verification on the integrated tree: replay checks beacon, scout and mayday (stand-in) and beacon (live) all with zero fallback runs; privacy scan passes"
     ],
     "left_software": [
       "Optional, with an Anthropic key on the laptop: run the live exercise with LLM_BACKEND=anthropic (written, never exercised: no key on the build machine)",
@@ -81,7 +86,7 @@
       "ANTHROPIC_API_KEY for live agent decisions with real phones (recorded turns cover only the recorded exercises)",
       "Tape-measured positions of the two pucks in the demo room, and which room of the twin the demo room stands in for"
     ],
-    "updated": "2026-11-14T15:30:57-06:00"
+    "updated": "2026-11-15T03:20:14-06:00"
   },
   "rubric": {
     "Use of the data (30%)": "Record says who should be in each suite; twin gives rooms, routes and deletes impossible phone positions (two pucks become one point); aerial gives sides, approach and staging read by a vision tool; combined into 'phone B1, Suite 310, dentists, patients may be sedated, 17 m from Stair B'. On a live record (private run) the accountability reads the record against the phones: \"The record does not say who is in this suite; the phones reported 3 people in it\", and the storey's five other tenancies, with no puck, are listed as not covered with the 25 to 62 people the record's employee counts imply.",
@@ -131,9 +136,9 @@
   ],
   "tests": {
     "command": "bash run_tests.sh",
-    "passed": 183,
+    "passed": 198,
     "failed": 0,
-    "last_run": "2026-11-14T15:25:01-0600"
+    "last_run": "2026-11-15T03:20:14-06:00"
   },
   "limitations": [
     "No phone and no puck has been in the loop of any number reported; the live path (stock Qorvo firmware, lane L16's iOS app) is written, and the real range error of an iPhone against these boards is unmeasured",
@@ -196,7 +201,7 @@
     },
     {
       "q": "[Radar] Why not?",
-      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 \u00b5s, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
+      "a": "Its antenna is switched either to the transmitter or to the receiver. One frame lasts at least 32.6 µs, but a wall 3 m away answers after 20 ns, while the board is still transmitting. The receiver only switches on after the frame ends, by which time every room echo has already passed."
     },
     {
       "q": "[Radar] How do multiple boards fix it?",
@@ -204,7 +209,7 @@
     },
     {
       "q": "[Radar] How many are needed, and what does each added board buy?",
-      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m\u00b2 (two boards) to 0.40 m\u00b2 (three) and 0.15 m\u00b2 (five)."
+      "a": "Two boards give presence and breathing but no position. Three give a 2-D position (3 ellipses), four add a redundant check (6), and five add better angles and outlier rejection (10). In the sample throw, the area that fits every pair shrinks from 4.01 m² (two boards) to 0.40 m² (three) and 0.15 m² (five)."
     },
     {
       "q": "[Radar] What is the 'map', and what is it not?",
@@ -212,7 +217,7 @@
     },
     {
       "q": "[Radar] Why does this beat cameras and LiDAR in smoke, and where does it not?",
-      "a": "Smoke particles (0.01 to 1 \u00b5m) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
+      "a": "Smoke particles (0.01 to 1 µm) scatter light and LiDAR strongly but are negligible to a 46 mm radio wave. In fire tests, LiDAR erred below 4 m visibility while radar stayed within 1%. Thermal imagers also see through smoke and remain better at seeing fire. Flames, wet walls and metal cost radio signal; a still, non-breathing person stays invisible."
     },
     {
       "q": "[Radar] What is the biggest open risk?",

@@ -481,7 +481,7 @@ class VexcelLive:
         xmp = parse_xmp(raw)
         if "pixel-bbox" not in xmp or "image-name" not in xmp:
             raise VexcelError("/oriented/extract", 200, "the oblique carries no crop metadata; world_to_pixel would be wrong")
-        from PIL import Image, ImageOps
+        from PIL import Image
         import io
         img = Image.open(io.BytesIO(raw))
         if (img.getexif() or {}).get(0x0112, 1) not in (1, None):

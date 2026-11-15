@@ -377,3 +377,47 @@ What changes on another twin: suites are grouped by suite number, so a scan of o
 - The Beacons object's `agent` summary gains `as_of_t` and `stale` (true once phones' geometry kinds, statuses or the puck set changed after the plan was made).
 - `hello` carries `sim_model` (including `board_sharing`: the simulation gives each puck position one board per phone unless it says `"turns"`) and `story.expected_s`.
 - In the simulator, a phone created through `POST /api/sim/phone` leaves when nothing polls it for 15 s, and leaves the board at once when its `opt_in` is switched off (it stays a cold device).
+
+## A12. Puck-to-puck baselines and on-landing calibration (Sun Nov 15 2026, 02:00 CST; additive)
+
+The beacon is two pucks. On landing they range each other, so their spacing is **measured, not guessed**; the responder
+anchors one puck on the plan and taps the direction of the other, and the other is placed at the measured spacing.
+Hardware truth (`hardware/BOARD_TO_BOARD.md`): Qorvo's stock Nearby Interaction firmware ranges iPhones but not another
+board; our SS-TWR firmware (`hardware/twr_firmware/`) ranges board to board but not phones; a board runs one firmware at
+a time. A baseline therefore comes from the TWR firmware (`"source": "twr"`, posted by
+`python -m beacon.host --baseline-to P2 ...`) or from a tape measure (`"source": "manual"`).
+
+**Beacons object** gains two top-level lists (always present, `[]` when empty):
+
+```json
+"baselines": [{"pair": ["P1", "P2"], "d_m": 3.972, "sigma_m": 0.041, "samples": 48, "t": 1794729420.8, "source": "twr"}],
+"warnings":  [{"kind": "baseline-mismatch", "pair": ["P1", "P2"], "placed_by": {"P1": "hand", "P2": "hand"},
+               "placed_m": 4.6, "plan_m": 4.6, "measured_m": 3.972, "diff_m": 0.628, "tolerance_m": 0.323, "scale": 1.0,
+               "text": "Pucks P1 and P2 are 4.60 m apart by hand but measured 3.97 m apart (twr; allowed difference 0.32 m): ..."}]
+```
+
+- `baselines`: the latest measurement per unordered pair, sorted by pair. `pair` is sorted (`["P1", "P2"]` whichever
+  order was posted). `d_m` and `sigma_m` are **physical metres as measured**. `sigma_m` from the puck host is the robust
+  spread of single ranges in its window (1.4826 x the median absolute deviation), not the standard error of the median and
+  not the antenna-delay bias (uncalibrated boards carry an unknown constant offset); `null` when not given (a tape measure).
+  `samples` = ranges behind the value (`null` when not given). `t` = server receive time. Cleared by `POST /api/reset`;
+  persisted with the live puck table.
+- `warnings`: a placed pair whose spacing on the plan disagrees with its baseline: |placed spacing - `d_m`| >
+  3 `sigma_m` + 0.2 m (`sigma_m` null counts as 0), compared in physical metres (plan metres / exercise scale in live
+  mode). Raised whatever placed the pucks (`placed_by` says which); in practice it catches pucks placed by hand. These are
+  for the board: they are **not** added to `limits` and not to `/api/brief`, so no agent prompt changes.
+
+**Puck** gains `placed_by`: `"hand"` (an operator's click or a `POST /api/pucks` entry) | `"baseline"` (placed by
+`/api/pucks/anchor`, or posted as such) | `"layout"` (the simulator's recommended two-puck layout, `POST /api/pucks
+{"n": 2}`) | `"sim"` (simulated throws, scenarios, the walk-through, the SAMPLE engine).
+
+**HTTP** (all answer 409 on the SAMPLE engine, which has no session):
+
+| Method + path | Body | Answer |
+|---|---|---|
+| `POST /api/pucks` | entries may carry `"placed_by": "hand" \| "baseline"` (default `"hand"`; anything else is 400) | unchanged |
+| `POST /api/pucks/baseline` | `{"pair": ["P1", "P2"], "d_m": 3.972, "sigma_m": 0.041 \| null, "samples": 48 \| null, "source": "twr" \| "manual"}`; `source` defaults to `"manual"`; `sigma_m`, `samples` optional | `{"ok": true, "baseline": {...as in baselines[]...}}`. 400 unless the two ids are distinct `P1..P5` and 0.05 < `d_m` < 150; 400 for `sigma_m` < 0, `samples` not a whole number >= 1, an unknown `source`, or `"dry_run": true` (sample lines are not a measurement) |
+| `POST /api/pucks/anchor` | `{"anchor": "P1", "x": 9.15, "y": 6.7, "toward": {"x": 9.15, "y": 0.0}, "other": "P2", "room": "r310" \| null, "floor": "f3" \| null}` | `{"ok": true, "pucks": [...all pucks...], "room", "floor", "baseline": {...}, "spacing_plan_m": 3.972}`. The anchor goes to (`x`, `y`); the other to anchor + `d_m` x scale x unit(`toward` - anchor), where scale is the exercise scale in live mode (A4) and 1 otherwise; both get `placed_by: "baseline"`; other pucks are kept (merge); accessory names are kept. The anchor's `sigma_m` is 0.08 m, the other's sqrt(0.08^2 + `sigma_m`^2); the error of the tapped direction is not modelled. 400 when there is no baseline for the pair, when `toward` is within 1 cm of the anchor, for ids outside `P1..P5` or equal, or an unknown room/floor |
+
+A `beacon_event` `pucks_changed` is emitted for each baseline ("Baseline P1-P2: 3.97 m ± 0.04 m (measured by UWB
+board-to-board ranging, 48 samples)"). In the simulator, anchored pucks move the simulated pucks too.

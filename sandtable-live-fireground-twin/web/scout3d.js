@@ -193,8 +193,8 @@ export class Scout3D {
       vg.add(disc, ring, ring2, breath);
       const core = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), mat(0xffd0e6, 1)); core.position.copy(this.V(v.x, v.y, 0.3)); this._o(core, 32);
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4), mat(VICTIM_COLOR, 0.8)); beam.position.copy(this.V(v.x, v.y, 1.5)); this._o(beam, 31);
-      const tag = this._lab(`${v.id} · ${victimState(v)}`, "#fff", "rgba(150,20,80,.92)", 0.034); tag.position.copy(this.V(v.x, v.y, 3.0)); this.g.add(tag);
-      const conf = this._lab(`±${(v.sigma_m ?? e.a).toFixed(1)} m · not tagged`, "#ffd0e6", "rgba(40,8,24,.85)", 0.025); conf.position.copy(this.V(v.x, v.y, 2.35)); this.g.add(conf);
+      const tag = this._lab(`${v.id}: ${victimState(v)}`, "#fff", "rgba(150,20,80,.92)", 0.034); tag.position.copy(this.V(v.x, v.y, 3.0)); this.g.add(tag);
+      const conf = this._lab(`within ${(v.sigma_m ?? e.a).toFixed(1)} m, not tagged`, "#ffd0e6", "rgba(40,8,24,.85)", 0.025); conf.position.copy(this.V(v.x, v.y, 2.35)); this.g.add(conf);
       A.victim = { v, vg, disc, ring, ring2, breath, core, tag, conf, e, f: v.state === "breathing" && v.breathing_bpm ? v.breathing_bpm / 60 : v.state === "moving" || v.moving ? 1.6 : 0 };
       this._pickable(this.V(v.x, v.y, 0.4), Math.max(0.6, e.a), { tip: `${v.id}: ${v.text || victimState(v)}`, pick: v.id, kind: "victim" });
     }
@@ -216,7 +216,7 @@ export class Scout3D {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.7), mat(0xffd9a0, 1)); pole.position.copy(this.V(at[0], at[1], 0.85)); this._o(pole, 33);
       const flagGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.75, -0.22, 0), new THREE.Vector3(0, -0.44, 0)]);
       const flag = new THREE.Mesh(flagGeo, mat(FLAG_COLOR, 1)); flag.position.copy(this.V(at[0], at[1], 1.7)); this._o(flag, 34);
-      const lab = this._lab(`${m.id} · differs from the twin`, "#1a1405", "rgba(255,159,10,.95)", 0.025); lab.position.copy(this.V(at[0], at[1], 2.25)); this.g.add(lab);
+      const lab = this._lab(`${m.id}: differs from the twin`, "#1a1405", "rgba(255,159,10,.95)", 0.025); lab.position.copy(this.V(at[0], at[1], 2.25)); this.g.add(lab);
       A.flags.push(flag);
       this._pickable(this.V(at[0], at[1], 0.9), Math.max(0.6, w.radius_m || 0.6), { tip: `${m.id} (${m.kind.replace("_", " ")}, confidence ${m.confidence}): ${m.text}`, pick: m.id, kind: "flag" });
     }

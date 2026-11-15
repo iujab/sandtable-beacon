@@ -1,8 +1,8 @@
 # Vendored: the Beacon module (lane L16)
 
-A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-15T03:17:42-0600.
+A copy of `../sandtable-beacon-victim-phones/` (sibling lane **L16**, "Sandtable Beacon"), made by `scripts/vendor_beacon.py` on 2026-11-15T09:57:17-0600.
 
-Source: commit `0fa2d55793296d9bb77d82a8ad901b13bce19002` (2026-11-15T03:16:32-06:00): "Honesty check re-run after the name-retention fix: all scenes pass". Copied with `git archive`, so only committed files are here.
+Source: commit `130331c9dae5359980a9897d425585c8109f58cc` (2026-11-15T09:57:17-06:00): "Restart a puck's board (POST /api/pucks/restart): find the board by the address in its Bluetooth name over SWD and reset it, so a phone whose UWB distance dropped redoes its handshake; dry-run; udev rule for the J-Link; 344 tests". Copied with `git archive`, so only committed files are here.
 
 It is that team's work, credited to them; it is copied (not linked) so this repository stands alone. Do not edit it here: change the sibling project and re-run `python scripts/vendor_beacon.py`. This file is generated from the copy.
 
@@ -12,16 +12,16 @@ It is that team's work, credited to them; it is copied (not linked) so this repo
 |---|---|---|
 | top level | 4 | 28,803 |
 | `apps/` | 18 | 160,498 |
-| `beacon/` | 30 | 652,927 |
+| `beacon/` | 31 | 659,648 |
 | `docs/` | 11 | 287,723 |
 | `figures/` | 24 | 5,875,388 |
 | `fixtures/` | 26 | 582,526 |
-| `hardware/` | 18 | 277,307 |
+| `hardware/` | 19 | 277,771 |
 | `results/` | 5 | 401,468 |
 | `scripts/` | 6 | 163,382 |
-| `tests/` | 19 | 251,628 |
+| `tests/` | 20 | 256,856 |
 | `web/` | 16 | 320,290 |
-| **total** | **177** | **9,001,940** |
+| **total** | **180** | **9,014,353** |
 
 Skipped: nothing among the committed files of the copied directories. Never copied: `data/`, virtualenvs, caches, build outputs, `.env*`, keys and signing material, any `live` directory.
 
@@ -73,9 +73,10 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `beacon/locate.py` | 62,890 |
 | `beacon/models.py` | 12,377 |
 | `beacon/prune.py` | 3,805 |
+| `beacon/puckreset.py` | 5,123 |
 | `beacon/report.py` | 52,484 |
 | `beacon/roster.py` | 21,550 |
-| `beacon/server.py` | 54,444 |
+| `beacon/server.py` | 56,042 |
 | `beacon/session.py` | 96,849 |
 | `beacon/sim.py` | 66,402 |
 | `beacon/story.py` | 20,720 |
@@ -143,6 +144,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `fixtures/llm_cache/f4ff09d1b0f6a7fce38767a4a89e3288e51f92e5271f8524d0991634973d2a43.json` | 8,761 |
 | `fixtures/llm_cache/fb1ccfd360ac53c3eebcd5824da69045e60222dedba60feb7b57878da0a974ca.json` | 29,277 |
 | `fixtures/llm_cache/ff4c47da6132cbc2c6e82968ab2695a8c915231e08d6ebb61287f44122f720d4.json` | 32,543 |
+| `hardware/99-segger-jlink.rules` | 464 |
 | `hardware/BOARD_TO_BOARD.md` | 8,901 |
 | `hardware/BRINGUP.md` | 40,241 |
 | `hardware/FLASH.md` | 10,319 |
@@ -186,6 +188,7 @@ Skipped: nothing among the committed files of the copied directories. Never copi
 | `tests/test_ios_wire.py` | 13,503 |
 | `tests/test_locate.py` | 27,521 |
 | `tests/test_models.py` | 5,261 |
+| `tests/test_puckreset.py` | 5,228 |
 | `tests/test_quality_locator.py` | 8,342 |
 | `tests/test_quality_misc.py` | 6,690 |
 | `tests/test_report.py` | 7,376 |

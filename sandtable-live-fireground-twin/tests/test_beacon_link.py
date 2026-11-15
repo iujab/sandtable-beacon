@@ -319,3 +319,33 @@ def test_pucks_in_forwards_how_each_puck_was_placed_and_its_accessory_name():
     by_id = {p["id"]: p for p in posts[0]["pucks"]}
     assert by_id["P1"]["placed_by"] == "hand" and by_id["P1"]["accessory"] == "DWM3001CDK (AAAA0001)" and by_id["P1"]["floor"] == "f3"
     assert by_id["P2"]["placed_by"] == "baseline" and by_id["P2"]["sigma_m"] == 0.04 and "accessory" not in by_id["P2"]
+
+
+def test_puck_restart_is_relayed_to_a_live_beacon_server_and_refused_otherwise(monkeypatch):
+    """The board's Restart button: POST /api/beacon/puck_restart forwards to the Beacon server's /api/pucks/restart,
+    passes its reason through, and refuses while no live Beacon server is connected (sample or a recorded run)."""
+    import io
+    import urllib.error
+    monkeypatch.setenv("SANDTABLE_BEACON", "sample")
+    import sandtable.server as server
+    with TestClient(server.app) as client:
+        assert client.post("/api/beacon/puck_restart", json={"puck": "P2"}).status_code == 409      # the sample: nothing to restart
+        assert client.post("/api/beacon/puck_restart", json={}).status_code == 400
+        link, sent = server.STATE.beacon, []
+
+        def fetch(method, url, body=None, timeout=1.5):
+            sent.append((method, url, body, timeout))
+            if body and body.get("puck") == "P9":
+                raise urllib.error.HTTPError(url, 409, "conflict", {}, io.BytesIO(b'{"detail": "P9 has no board name tied to it"}'))
+            return {"ok": True, "puck": body["puck"], "dry_run": body["dry_run"], "address": "1BDB5E43", "jlink": "000760226574"}
+
+        monkeypatch.setattr(link, "mode", "auto")
+        monkeypatch.setattr(link, "connected", True)
+        monkeypatch.setattr(link, "story", None)
+        monkeypatch.setattr(link, "fetch", fetch)
+        r = client.post("/api/beacon/puck_restart", json={"puck": "P2", "dry_run": True})
+        assert r.status_code == 200 and r.json()["jlink"] == "000760226574"
+        assert sent[-1][0] == "POST" and sent[-1][1].endswith("/api/pucks/restart") and sent[-1][2] == {"puck": "P2", "dry_run": True}
+        assert sent[-1][3] >= 30                                                                   # a reset takes seconds
+        bad = client.post("/api/beacon/puck_restart", json={"puck": "P9"})
+        assert bad.status_code == 409 and "no board name" in bad.json()["detail"]

@@ -484,6 +484,16 @@ async function act(a, el) {
     case "alarm": api("/api/alarm", {}).catch(() => {}); break;
     case "report": window.open("/report.html", "_blank", "noopener"); break;
     case "place": startPlacing(); break;
+    case "restart-puck": {
+      const id = el.dataset.puck;
+      el.disabled = true; el.textContent = `Restarting ${id}…`;
+      toast(`Restarting ${id}: its UWB distance should come back in about 10 seconds`);
+      api("/api/beacon/puck_restart", { puck: id })
+        .then(() => toast(`${id} restarted. Its UWB distance should return in about 10 seconds.`))
+        .catch(() => {})
+        .finally(() => { el.disabled = false; el.textContent = `Restart ${id}`; });
+      break;
+    }
     case "throw":
       if (S.mode === "beacon") { if (beacon.dev) beacon.devPlay(true); else api("/api/beacon/pucks", { n: 3 }).catch(() => {}); }
       else if (scout.dev) scout.devPlay(true); else api("/api/scout/deploy", {}).catch(() => {});

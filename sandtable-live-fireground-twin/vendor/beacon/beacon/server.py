@@ -22,6 +22,7 @@ import copy
 import json
 import logging
 import math
+import subprocess
 import threading
 import time
 from collections import deque
@@ -34,6 +35,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import baseline as _bl
+from . import puckreset
 from . import config, feeds
 from .twin import Twin, _pip
 
@@ -888,6 +890,37 @@ async def api_pucks_anchor(request: Request):
         return {"ok": True, **s.anchor_pucks(body)}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+_RESTART_LOCK = asyncio.Lock()
+
+
+@router.post("/api/pucks/restart")
+async def api_pucks_restart(request: Request):
+    """Restart one puck's board ({"puck": "P2", "dry_run"?: true}; beacon/puckreset.py), for a phone whose UWB distance to it
+    dropped while Bluetooth stayed up. Works only where the boards are wired to this machine; 409 for simulated pucks or a
+    puck with no board name; one restart at a time."""
+    s = await get_state()
+    session = s.require_session()
+    body = _obj(await _json_body(request))
+    pid = body.get("puck")
+    puck = next((p for p in session.pucks if p.get("id") == pid), None)
+    if puck is None:
+        raise HTTPException(400, f"no puck {pid!r} is placed")
+    if getattr(session, "simulated", False) or puck.get("simulated"):
+        raise HTTPException(409, "simulated pucks have no board to restart")
+    if not puck.get("accessory"):
+        raise HTTPException(409, f"{pid} has no board name tied to it: name it from the pucks-heard tray first")
+    async with _RESTART_LOCK:
+        try:
+            res = await asyncio.to_thread(puckreset.restart, puck["accessory"], dry_run=bool(body.get("dry_run")))
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(503, f"could not reach the board ({type(exc).__name__})")
+    if not res["ok"]:
+        raise HTTPException(502, f"could not restart {pid}: {res.get('detail', 'OpenOCD failed')}")
+    return {"ok": True, "puck": pid, **res}
 
 
 @router.post("/api/reset")

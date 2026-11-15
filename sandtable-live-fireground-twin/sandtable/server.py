@@ -615,6 +615,32 @@ async def beacon_pucks(request: Request):
     return {"ok": True, "forwarded": out, "link": s.beacon.link_info()}
 
 
+@app.post("/api/beacon/puck_restart")
+async def beacon_puck_restart(request: Request):
+    """Restart one puck's board through the Beacon server (its POST /api/pucks/restart {"puck"}), for a phone whose UWB
+    distance to that puck dropped while Bluetooth stayed up. Only with a live Beacon server wired to the boards."""
+    import urllib.error
+    s, body = S(), await _json_body(request)
+    pid = body.get("puck")
+    if not isinstance(pid, str) or not pid:
+        raise HTTPException(400, 'send {"puck": "P2"}')
+    link = s.beacon
+    if link.mode != "auto" or link.story is not None or not link.connected:
+        raise HTTPException(409, "No live Beacon server is connected (a recorded run or the sample is showing): nothing to restart")
+    try:
+        out = await asyncio.to_thread(link.fetch, "POST", link.url + "/api/pucks/restart",
+                                      {"puck": pid, "dry_run": bool(body.get("dry_run"))}, 45.0)
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode() or "{}").get("detail")
+        except Exception:
+            detail = None
+        raise HTTPException(exc.code if 400 <= exc.code < 600 else 502, detail or f"The Beacon server answered {exc.code}")
+    except Exception as exc:
+        raise HTTPException(503, f"The Beacon server is not reachable ({type(exc).__name__})")
+    return {"ok": True, **(out if isinstance(out, dict) else {})}
+
+
 @app.get("/api/accountability")
 async def accountability_view():
     return S().accountability()

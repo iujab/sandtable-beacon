@@ -311,6 +311,10 @@ small { font-size: 13px; color: var(--ink-3); }
 .callout ol li { margin: 2px 0; }
 .pk-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .pk-list li { display: flex; gap: 8px; align-items: baseline; }
+.pk-list .uwb-ok { color: var(--ink-2); }
+.pk-list .uwb-lost { color: var(--danger); font-weight: 600; }
+.pk-list .pk-restart { margin-left: auto; align-self: center; white-space: nowrap; }
+.pk-list .pk-restart.urgent { border-color: var(--danger); color: var(--danger); font-weight: 700; }
 .pk { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; font: 700 14px/1 var(--cond); padding: 4px 5px 3px; border-radius: 3px; background: var(--puck); color: var(--puck-ink); border: 1.5px solid var(--puck-ink); }
 .spacing { font-weight: 600; }
 .warnline { margin: 6px 0 0; padding: 8px 10px; border-radius: 7px; border: 2px solid var(--flag); background: color-mix(in srgb, var(--flag) 10%, var(--paper)); font-weight: 600; font-size: 14px; }

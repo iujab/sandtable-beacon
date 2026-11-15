@@ -1,0 +1,5 @@
+# Lets users in the dialout group open the DWM3001CDK's on-board J-Link (USB vendor 0x1366) without root, so the Beacon
+# server can restart a puck's board (POST /api/pucks/restart, beacon/puckreset.py). Install on the machine the boards are
+# wired to (the Arduino UNO Q):
+#   sudo cp hardware/99-segger-jlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+SUBSYSTEM=="usb", ATTR{idVendor}=="1366", MODE="0660", GROUP="dialout"

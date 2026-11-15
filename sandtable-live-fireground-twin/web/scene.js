@@ -49,6 +49,12 @@ function beaconHTML(k) {
   } else {
     const floorNo = bundle.twin.floors.find((f) => f.id === (b.floor || bundle.twin.exercise_floor))?.label ?? planFloorNo(bundle);
     const hand = beacon.view();
+    // A puck whose UWB distance dropped while Bluetooth stayed up leaves the phone with one ring: say so, and offer to restart
+    // that puck's board (POST /api/beacon/puck_restart), which makes the phone redo its UWB handshake in about 10 s.
+    const liveLink = b.simulated === false && !b.replay && !b.sample && !!b.link?.connected;
+    const kinds = (id) => { const k = new Set(); for (const ph of b.phones || []) for (const r of ph.ranges || []) if (r.puck === id) k.add(r.kind); return k; };
+    const uwbLost = (id) => { const k = kinds(id); return k.size > 0 && !k.has("uwb"); };
+    const uwbNote = (id) => { const k = kinds(id); return !k.size ? "" : k.has("uwb") ? `, <span class="uwb-ok">UWB distance live</span>` : `, <span class="uwb-lost">Bluetooth only: no UWB distance</span>`; };
     let spacing = "";
     if (pucks.length >= 2) {
       const [a, c] = pucks, bl = baselineFor(b, a.id, c.id), d = Math.hypot(a.x - c.x, a.y - c.y) / rangeScale(b);
@@ -57,7 +63,8 @@ function beaconHTML(k) {
         : oa === "hand" && oc === "hand" ? `Spacing set by hand: ${d.toFixed(2)} m` : `Spacing ${d.toFixed(2)} m${oa === "sim" ? " (simulated positions)" : ""}`;
     }
     out.push(`<section class="sec"><h3 class="sec-h">Where the beacon landed ${src}</h3><div class="landed"><div class="where">Floor ${esc(floorNo)}, ${esc(b.room_label || "room unknown")}</div>` +
-      `<ul class="pk-list">${pucks.map((q) => { const o = puckOrigin(q, hand); return `<li><span class="pk">${esc(q.id)}</span><span>${esc(ORIGIN_WORD[o] || "position from the Beacon module")}${q.sigma_m != null && o !== "hand" ? `, ±${q.sigma_m} m` : ""}</span></li>`; }).join("")}</ul>` +
+      `<ul class="pk-list">${pucks.map((q) => { const o = puckOrigin(q, hand); return `<li><span class="pk">${esc(q.id)}</span><span>${esc(ORIGIN_WORD[o] || "position from the Beacon module")}${q.sigma_m != null && o !== "hand" ? `, ±${q.sigma_m} m` : ""}${liveLink ? uwbNote(q.id) : ""}</span>` +
+        `${liveLink ? `<button class="btn small pk-restart${uwbLost(q.id) ? " urgent" : ""}" data-act="restart-puck" data-puck="${esc(q.id)}" title="Reboot ${esc(q.id)}'s board so phones redo their UWB handshake (about 10 s)">Restart ${esc(q.id)}</button>` : ""}</li>`; }).join("")}</ul>` +
       (spacing ? `<p class="spacing">${esc(spacing)}</p>` : "") +
       (b.warnings || []).map((w) => `<p class="warnline" title="${esc(w.text || "")}">${esc(warningWords(w))}</p>`).join("") + `<p class="note">${esc(srcWords)}${b.link?.note && !/^replay/i.test(srcWords) ? `. ${esc(b.link.note)}` : ""}.${(b.unplaced_pucks || []).length ? ` Not placed yet: ${esc(b.unplaced_pucks.map((q) => q.id || q).join(", "))}.` : ""}</p>` +
       `<div class="actions"><button class="btn small" data-act="place">Move the pucks</button></div></div></section>`);
